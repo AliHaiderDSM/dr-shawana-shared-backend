@@ -1,0 +1,6 @@
+dist
+node_modules
+coverage
+docs/openapi.json
+package-lock.json
+docs/BUSINESS_FLOW.md

@@ -1,0 +1,336 @@
+import request from 'supertest';
+import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
+import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
+import { createApp } from '../../app';
+import { AppDataSource } from '../../database/data-source';
+import { AuditLog } from '../audit/audit-log.entity';
+import { StockMovement } from '../inventory/stock-movement.entity';
+
+const fake = installFakeSupabase();
+const app = createApp();
+
+describe('POS sales', () => {
+  let admin: { id: string };
+  let frontDesk: { id: string };
+  let otherFrontDesk: { id: string };
+  let accountant: { id: string };
+  let deliveryPrint: { id: string };
+  let pharmacy: { id: string };
+  let islamabadAdmin: { id: string };
+  let serum: string;
+  let toner: string;
+  let bundleId: string;
+  let cashSheet: string;
+  let bankSheet: string;
+  let patientId: string;
+  let saleId: string;
+  let onlineSaleId: string;
+
+  const api = (method: 'get' | 'post' | 'patch' | 'delete', path: string, who: { id: string }) =>
+    request(app)[method](`/api/v1${path}`).set(bearer(who));
+
+  async function stock(productId: string) {
+    const res = await api('get', '/branch/inventory/stock?pageSize=100', admin);
+    return res.body.data.find((r: { productId: string }) => r.productId === productId)?.quantity as string;
+  }
+
+  beforeAll(async () => {
+    const lahore = await createBranch({ code: 'LHR', city: 'Lahore' });
+    const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
+    admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
+    frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
+    otherFrontDesk = await createStaff(fake, { role: 'team_manager', branchId: lahore.id });
+    accountant = await createStaff(fake, { role: 'accountant', branchId: lahore.id });
+    deliveryPrint = await createStaff(fake, { role: 'delivery_print', branchId: lahore.id });
+    pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
+    islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
+
+    const categoryId = (await api('post', '/branch/categories', admin).send({ name: 'Skin' })).body.data.id;
+    const product = (name: string, quantity: string, unitPrice: string) =>
+      api('post', '/branch/products', admin).send({
+        name,
+        categoryId,
+        initialPurchase: { date: '2026-09-01', quantity, unitPrice },
+      });
+    serum = (await product('Serum', '10', '1000')).body.data.id;
+    toner = (await product('Toner', '5', '500')).body.data.id;
+    bundleId = (
+      await api('post', '/branch/bundles', admin).send({
+        name: 'Glow Kit',
+        items: [
+          { productId: serum, price: '900' },
+          { productId: toner, price: '400', qty: '2' },
+        ],
+      })
+    ).body.data.id;
+    cashSheet = (
+      await api('post', '/branch/account-sheets', admin).send({
+        accountName: 'Cash',
+        accountCode: 'C1',
+        type: 'cash',
+      })
+    ).body.data.id;
+    const bankId = (await api('post', '/branch/banks', admin).send({ name: 'Meezan' })).body.data.id;
+    bankSheet = (
+      await api('post', '/branch/account-sheets', admin).send({
+        accountName: 'Meezan',
+        accountCode: 'M1',
+        type: 'bank',
+        bankId,
+      })
+    ).body.data.id;
+    patientId = (
+      await api('post', '/branch/patients', frontDesk).send({
+        name: 'Ayesha',
+        phone: '923001234567',
+        city: 'Kasur',
+        address: 'Main Road',
+      })
+    ).body.data.id;
+  });
+
+  it('prices items on the server, expands bundles, takes payments and reduces stock', async () => {
+    const res = await request(app)
+      .post('/api/v1/branch/sales')
+      .set(bearer(frontDesk))
+      .field(
+        'data',
+        JSON.stringify({
+          patientId,
+          date: '2026-09-10',
+          saleType: 'office',
+          discountPercent: '10',
+          items: [
+            { productId: serum, qty: '2' },
+            { bundleId, qty: '1' },
+          ],
+          payments: [
+            { method: 'cash', amount: '2000', accountSheetId: cashSheet },
+            {
+              method: 'online',
+              amount: '500',
+              accountSheetId: bankSheet,
+              senderBank: 'HBL',
+              proofIndex: 0,
+            },
+          ],
+        }),
+      )
+      .attach('paymentProofs', Buffer.from('png'), { filename: 'p.png', contentType: 'image/png' });
+    expect(res.status).toBe(201);
+    saleId = res.body.data.id;
+    expect(res.body.data).toMatchObject({
+      invoiceNo: 'LHR-000001',
+      saleType: 'office',
+      city: 'Lahore',
+      patientCity: 'Kasur',
+      deliveryStatus: null,
+      totalQty: '5.000',
+      subtotal: '3700.00',
+      discountPercent: '10.00',
+      discountAmount: '370.00',
+      total: '3330.00',
+      received: '2500.00',
+      remaining: '830.00',
+      paymentStatus: 'partial',
+      paymentMethods: ['cash', 'online'],
+    });
+    expect(
+      res.body.data.items.map((i: { unitPrice: string; bundleId: string | null }) => [
+        i.unitPrice,
+        !!i.bundleId,
+      ]),
+    ).toEqual([
+      ['1000.00', false],
+      ['900.00', true],
+      ['400.00', true],
+    ]);
+    expect(await stock(serum)).toBe('7.000');
+    expect(await stock(toner)).toBe('3.000');
+  });
+
+  it('ignores client prices and blocks a sale when stock is short', async () => {
+    const short = await api('post', '/branch/sales', frontDesk).send({
+      patientId,
+      saleType: 'office',
+      items: [{ productId: toner, qty: '4', unitPrice: '1' }],
+    });
+    expect(short.status).toBe(422);
+    expect(short.body.error.details.shortages[0]).toMatchObject({
+      productName: 'Toner',
+      available: '3',
+      required: '4',
+    });
+    expect(await stock(toner)).toBe('3.000');
+    const noItems = await api('post', '/branch/sales', frontDesk).send({
+      patientId,
+      saleType: 'office',
+      items: [],
+    });
+    expect(noItems.status).toBe(400);
+  });
+
+  it('turns an underpayment into the discount with posSoft "Auto"', async () => {
+    const res = await api('post', '/branch/sales', admin).send({
+      patient: { name: 'Walk In', phone: '923331112222', city: 'Lahore' },
+      saleType: 'online',
+      autoDiscount: true,
+      items: [{ productId: serum, qty: '1' }],
+      payments: [{ method: 'cash', amount: '900', accountSheetId: cashSheet }],
+    });
+    expect(res.status).toBe(201);
+    onlineSaleId = res.body.data.id;
+    expect(res.body.data).toMatchObject({
+      invoiceNo: 'LHR-000002',
+      deliveryStatus: 'pending',
+      discountAmount: '100.00',
+      discountPercent: '10.00',
+      total: '900.00',
+      remaining: '0.00',
+      paymentStatus: 'paid',
+    });
+  });
+
+  it('adjusts stock by the difference on edit and lets front desk edit only their own sales', async () => {
+    expect((await api('patch', `/branch/sales/${saleId}`, otherFrontDesk).send({ note: 'x' })).status).toBe(
+      403,
+    );
+    const res = await api('patch', `/branch/sales/${saleId}`, frontDesk).send({
+      items: [{ productId: serum, qty: '1' }],
+      discountPercent: '0',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ subtotal: '1000.00', total: '1000.00', remaining: '-1500.00' });
+    expect(await stock(serum)).toBe('8.000');
+    expect(await stock(toner)).toBe('5.000');
+    const adjust = await AppDataSource.getRepository(StockMovement).find({
+      where: { referenceId: saleId, type: 'sale_edit_adjust' },
+    });
+    expect(adjust.map((m) => m.qty.toString()).sort()).toEqual(['2', '2']);
+    const log = await AppDataSource.getRepository(AuditLog).findOneBy({
+      entity: 'sale',
+      entityId: saleId,
+      action: 'update',
+    });
+    expect(log).not.toBeNull();
+  });
+
+  it('recomputes totals when payments change', async () => {
+    const payments = (await api('get', `/branch/sales/${saleId}`, frontDesk)).body.data.payments;
+    const removed = await api('delete', `/branch/sales/${saleId}/payments/${payments[0].id}`, frontDesk);
+    expect(removed.status).toBe(204);
+    const after = await api('get', `/branch/sales/${saleId}`, frontDesk);
+    expect(after.body.data).toMatchObject({
+      received: '500.00',
+      remaining: '500.00',
+      paymentStatus: 'partial',
+    });
+    const proof = await api('get', `/branch/sales/${saleId}/payments/${payments[1].id}/proof-url`, frontDesk);
+    expect(proof.status).toBe(200);
+    const added = await api('post', `/branch/sales/${saleId}/payments`, frontDesk).send({
+      method: 'cash',
+      amount: '500',
+      accountSheetId: cashSheet,
+    });
+    expect(added.body.data).toMatchObject({ received: '1000.00', remaining: '0.00', paymentStatus: 'paid' });
+  });
+
+  it('returns an online sale into stock, once', async () => {
+    expect(
+      (await api('post', `/branch/sales/${saleId}/delivery`, admin).send({ status: 'delivered' })).status,
+    ).toBe(422);
+    const delivered = await api('post', `/branch/sales/${onlineSaleId}/delivery`, admin).send({
+      status: 'delivered',
+    });
+    expect(delivered.body.data.deliveryStatus).toBe('delivered');
+    expect(await stock(serum)).toBe('8.000');
+    const returned = await api('post', `/branch/sales/${onlineSaleId}/delivery`, admin).send({
+      status: 'returned',
+    });
+    expect(returned.body.data.deliveryStatus).toBe('returned');
+    expect(await stock(serum)).toBe('9.000');
+    expect(
+      (await api('post', `/branch/sales/${onlineSaleId}/delivery`, admin).send({ status: 'delivered' }))
+        .status,
+    ).toBe(409);
+    expect(
+      (
+        await api('patch', `/branch/sales/${onlineSaleId}`, admin).send({
+          items: [{ productId: serum, qty: '1' }],
+        })
+      ).status,
+    ).toBe(409);
+
+    const report = await api(
+      'get',
+      `/branch/inventory/report?from=2026-01-01&to=2030-12-31&productId=${serum}`,
+      admin,
+    );
+    const row = report.body.data.rows[0];
+    expect(row).toMatchObject({ returned: '1.000' });
+  });
+
+  it('lists with posSoft filters and totals, prints the bill and delivery slips', async () => {
+    const list = await api('get', '/branch/sales?saleType=office', frontDesk);
+    expect(list.body.data.map((s: { id: string }) => s.id)).toEqual([saleId]);
+    expect(list.body.meta.totals).toMatchObject({ total: '1000.00', received: '1000.00' });
+    const byProduct = await api('get', `/branch/sales?productId=${toner}`, frontDesk);
+    expect(byProduct.body.data).toEqual([]);
+    const search = await api('get', '/branch/sales?search=LHR-000002', frontDesk);
+    expect(search.body.data.map((s: { id: string }) => s.id)).toEqual([onlineSaleId]);
+    expect(
+      (await api('get', `/branch/sales?method=online&accountSheetId=${bankSheet}`, admin)).body.meta.total,
+    ).toBe(1);
+
+    const bill = await api('get', `/branch/sales/${saleId}/bill`, frontDesk);
+    expect(bill.body.data).toMatchObject({
+      branch: { code: 'LHR', city: 'Lahore' },
+      customer: { name: 'Ayesha', address: 'Main Road' },
+      sale: { invoiceNo: 'LHR-000001', total: '1000.00' },
+      items: [{ sr: 1, product: 'Serum', qty: '1.000' }],
+    });
+    expect(bill.body.data.payments.cash).toHaveLength(1);
+    expect(bill.body.data.payments.online).toHaveLength(1);
+
+    const slips = await api(
+      'get',
+      '/branch/sales/delivery-slips?from=2026-01-01&to=2030-12-31&invoiceFrom=1&invoiceTo=1',
+      deliveryPrint,
+    );
+    expect(slips.status).toBe(200);
+    expect(slips.body.data.slips).toHaveLength(1);
+    expect(slips.body.data.slips[0]).toMatchObject({
+      invoiceNo: 'LHR-000001',
+      to: { name: 'Ayesha', city: 'Kasur' },
+      items: [{ name: 'Serum', qty: '1.000' }],
+      from: { city: 'Lahore' },
+    });
+    expect((await api('get', '/branch/sales', deliveryPrint)).status).toBe(403);
+    expect((await api('get', '/branch/sales/delivery-slips', frontDesk)).status).toBe(403);
+  });
+
+  it('keeps roles and branches apart', async () => {
+    expect((await api('get', '/branch/sales', pharmacy)).status).toBe(403);
+    expect((await api('patch', `/branch/sales/${saleId}`, accountant).send({ note: 'x' })).status).toBe(403);
+    expect((await api('get', `/branch/sales/${saleId}`, islamabadAdmin)).status).toBe(404);
+    const foreign = await api('post', '/branch/sales', islamabadAdmin).send({
+      patientId,
+      saleType: 'office',
+      items: [{ productId: serum, qty: '1' }],
+    });
+    expect(foreign.status).toBe(400);
+  });
+
+  it('removes a sale, reversing its stock and payments', async () => {
+    expect((await api('delete', `/branch/sales/${saleId}`, otherFrontDesk)).status).toBe(403);
+    expect((await api('delete', `/branch/sales/${saleId}`, frontDesk)).status).toBe(204);
+    expect(await stock(serum)).toBe('10.000');
+    expect((await api('get', `/branch/sales/${saleId}`, admin)).status).toBe(404);
+    const next = await api('post', '/branch/sales', admin).send({
+      patientId,
+      saleType: 'office',
+      items: [{ productId: toner, qty: '1' }],
+    });
+    expect(next.body.data.invoiceNo).toBe('LHR-000003');
+  });
+});
