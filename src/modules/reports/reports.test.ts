@@ -408,5 +408,20 @@ describe('accounts, expenses, reports and dashboard', () => {
       expect(all.body.data.scope).toBe('all_branches');
       expect(all.body.data.byBranch.map((b: { branch: string }) => b.branch)).toEqual(['ISB', 'LHR']);
     });
+
+    it('limits the KPIs to a chosen period', async () => {
+      const september = await api('get', '/branch/dashboard?from=2026-09-01&to=2026-09-30', admin);
+      expect(september.body.data.period).toEqual({ from: '2026-09-01', to: '2026-09-30' });
+      expect(september.body.data.sales.month.revenue).toBe('2000.00');
+      expect(september.body.data.appointments.month.amount).toBe('5000.00');
+      const august = await api('get', '/branch/dashboard?from=2026-08-01&to=2026-08-31', admin);
+      expect(august.body.data.sales.month.revenue).toBe('0.00');
+      const all = await api('get', '/branch/dashboard?from=2026-09-01&to=2026-09-30', superAdmin);
+      expect(all.body.data.byBranch.find((b: { branch: string }) => b.branch === 'LHR')).toMatchObject({
+        salesMonth: '2000.00',
+        appointmentsMonth: '5000.00',
+      });
+      expect((await api('get', '/branch/dashboard?from=2026-09-30&to=2026-09-01', admin)).status).toBe(400);
+    });
   });
 });

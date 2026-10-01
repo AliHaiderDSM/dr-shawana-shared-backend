@@ -87,10 +87,19 @@ export const expensesReportQuerySchema = z.object({
   accountSheetId: z.uuid().optional(),
 });
 
-export const dashboardQuerySchema = z.object({
-  year: z.coerce.number().int().min(2000).max(2100).optional(),
-  branchId: z.uuid().optional(),
-});
+export const dashboardQuerySchema = z
+  .object({
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    from: dateInput
+      .optional()
+      .openapi({ description: 'Start of the KPI period (default: first day of this month)' }),
+    to: dateInput.optional().openapi({ description: 'End of the KPI period (default: today)' }),
+    branchId: z.uuid().optional(),
+  })
+  .refine((v) => !v.from || !v.to || v.to >= v.from, {
+    message: '"to" must not be before "from"',
+    path: ['to'],
+  });
 
 export type SaleProductsQuery = z.output<typeof saleProductsQuerySchema>;
 export type PurchasesQuery = z.output<typeof purchasesQuerySchema>;

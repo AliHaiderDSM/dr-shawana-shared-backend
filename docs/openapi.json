@@ -40007,6 +40007,30 @@
           {
             "schema": {
               "type": "string",
+              "format": "date",
+              "example": "2026-09-30",
+              "description": "Start of the KPI period (default: first day of this month)"
+            },
+            "required": false,
+            "description": "Start of the KPI period (default: first day of this month)",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30",
+              "description": "End of the KPI period (default: today)"
+            },
+            "required": false,
+            "description": "End of the KPI period (default: today)",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": false,

@@ -15,13 +15,20 @@ function branchClause(column: string, index: number) {
 }
 
 export const dashboardService = {
-  async kpis(actor: Actor, scope: ReportScope, year?: number) {
+  async kpis(actor: Actor, scope: ReportScope, year?: number, period: { from?: string; to?: string } = {}) {
     const day = today();
     const month = day.slice(0, 7);
+    const from = period.from ?? `${month}-01`;
+    const to = period.to ?? (period.from && period.from > day ? period.from : day);
     const chartYear = year ?? Number(day.slice(0, 4));
     const b = scope.branchId;
     const can = (permission: Parameters<typeof hasPermission>[1]) => hasPermission(actor.role, permission);
-    const result: Record<string, unknown> = { date: day, month, scope: b ? 'branch' : 'all_branches' };
+    const result: Record<string, unknown> = {
+      date: day,
+      month,
+      period: { from, to },
+      scope: b ? 'branch' : 'all_branches',
+    };
 
     result.counts = await one(
       `SELECT (SELECT COUNT(*) FROM patients p WHERE p.deleted_at IS NULL AND ($1::uuid IS NULL OR p.created_in_branch_id = $1
@@ -44,7 +51,7 @@ export const dashboardService = {
                     WHERE r.deleted_at IS NULL AND ${branchClause('r.branch_id', 1)} AND r.refund_date BETWEEN $2 AND $3)::numeric(12,2)::text AS refunds`,
           [b, from, to],
         );
-      result.sales = { today: await sales(day, day), month: await sales(`${month}-01`, day) };
+      result.sales = { today: await sales(day, day), month: await sales(from, to) };
       result.pendingDeliveries = (
         await one(
           `SELECT COUNT(*)::int AS count FROM sales s WHERE s.deleted_at IS NULL AND s.delivery_status = 'pending' AND ${branchClause('s.branch_id', 1)}`,
@@ -65,7 +72,7 @@ export const dashboardService = {
         );
       result.appointments = {
         today: await appointments(day, day),
-        month: await appointments(`${month}-01`, day),
+        month: await appointments(from, to),
       };
     }
 
@@ -85,7 +92,7 @@ export const dashboardService = {
         );
       result.stock = {
         today: await movement(day, day),
-        month: await movement(`${month}-01`, day),
+        month: await movement(from, to),
         lowStockCount: (
           await one(
             `SELECT COUNT(*)::int AS count FROM product_stock_balances v WHERE v.is_low_stock AND ${branchClause('v.branch_id', 1)}`,
@@ -146,13 +153,13 @@ export const dashboardService = {
       result.byBranch = await many(
         `SELECT br.code AS branch, br.name,
                 ((SELECT COALESCE(SUM(y.amount), 0) FROM sale_payments y JOIN sales s ON s.id = y.sale_id
-                  WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND to_char(y.date, 'YYYY-MM') = $1)
+                  WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND y.date BETWEEN $1 AND $2)
                  - (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r
-                  WHERE r.deleted_at IS NULL AND r.branch_id = br.id AND to_char(r.refund_date, 'YYYY-MM') = $1))::numeric(12,2)::text AS "salesMonth",
+                  WHERE r.deleted_at IS NULL AND r.branch_id = br.id AND r.refund_date BETWEEN $1 AND $2))::numeric(12,2)::text AS "salesMonth",
                 (SELECT COALESCE(SUM(y.amount), 0) FROM appointment_payments y JOIN appointments a ON a.id = y.appointment_id
-                  WHERE a.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND to_char(y.date, 'YYYY-MM') = $1)::numeric(12,2)::text AS "appointmentsMonth"
+                  WHERE a.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND y.date BETWEEN $1 AND $2)::numeric(12,2)::text AS "appointmentsMonth"
            FROM branches br WHERE br.deleted_at IS NULL ORDER BY br.code`,
-        [month],
+        [from, to],
       );
     }
     return result;

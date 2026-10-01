@@ -92,7 +92,7 @@ reportsRouter.get(
   requirePermission('dashboard.view'),
   validate({ query: dashboardQuerySchema }),
   async (req, res) => {
-    const { year } = validQuery(req, dashboardQuerySchema);
-    sendOk(res, await dashboardService.kpis(actorFrom(req), await scopeOf(req), year));
+    const { year, from, to } = validQuery(req, dashboardQuerySchema);
+    sendOk(res, await dashboardService.kpis(actorFrom(req), await scopeOf(req), year, { from, to }));
   },
 );

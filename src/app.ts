@@ -27,7 +27,14 @@ export function createApp(): Express {
       autoLogging: { ignore: (req) => req.url === '/api/v1/health' },
     }),
   );
-  app.use(helmet());
+  app.use(
+    helmet({
+      strictTransportSecurity: isProduction,
+      contentSecurityPolicy: {
+        directives: { upgradeInsecureRequests: isProduction ? [] : null },
+      },
+    }),
+  );
   app.use(
     cors({
       origin(origin, callback) {
