@@ -6,7 +6,7 @@ import { requirePermission } from '../middleware/requirePermission';
 import { validate, validBody, validQuery } from '../middleware/validate';
 import { actorFrom, type Actor } from './actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk, type PageMeta } from './http';
-import { type Module } from './permissions';
+import { type Module, type Permission } from './permissions';
 import { branchIdOf, idOf } from './request';
 
 export interface CrudService<TQuery, TCreate, TUpdate> {
@@ -63,6 +63,7 @@ export function mountBranchCrud<Q, C, U>(
     service: CrudService<Q, C, U>;
     schemas: CrudSchemas;
     extraItemRoutes?: (byId: RequestHandler) => void;
+    optionsAlsoFor?: Permission[];
   },
 ): void {
   const { path, module, schemas } = options;
@@ -72,7 +73,12 @@ export function mountBranchCrud<Q, C, U>(
 
   router.use(path, authenticate, branchScope());
   router.get(path, can('view'), validate({ query: schemas.list }), controller.list);
-  router.get(`${path}/options`, can('view'), validate({ query: schemas.options }), controller.options);
+  router.get(
+    `${path}/options`,
+    requirePermission(`${module}.view`, ...(options.optionsAlsoFor ?? [])),
+    validate({ query: schemas.options }),
+    controller.options,
+  );
   router.post(path, can('create'), validate({ body: schemas.create }), controller.create);
   router.get(`${path}/:id`, can('view'), byId, controller.get);
   router.patch(

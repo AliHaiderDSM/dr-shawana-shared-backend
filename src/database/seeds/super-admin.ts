@@ -19,7 +19,12 @@ async function findAuthUserByEmail(email: string): Promise<User | null> {
 async function ensureAuthUser(email: string, password: string): Promise<string> {
   const existing = await findAuthUserByEmail(email);
   if (existing) {
-    console.log('Auth user already exists, keeping its current password.');
+    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(existing.id, {
+      password,
+      email_confirm: true,
+    });
+    if (error) throw error;
+    console.log('Auth user already exists; its password now matches SUPER_ADMIN_PASSWORD.');
     return existing.id;
   }
   const { data, error } = await getSupabaseAdmin().auth.admin.createUser({
