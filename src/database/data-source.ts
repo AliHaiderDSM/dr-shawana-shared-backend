@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import fs from 'node:fs';
 import path from 'node:path';
+import pg from 'pg';
 import { DataSource } from 'typeorm';
 import { databaseUrl, env } from '../config/env';
 
@@ -16,6 +17,7 @@ function sslOptions() {
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
+  driver: pg,
   url: databaseUrl,
   ssl: sslOptions(),
   synchronize: false,
