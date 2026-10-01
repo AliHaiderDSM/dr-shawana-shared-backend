@@ -11,7 +11,7 @@ The API runs on Vercel as one serverless function:
 - **Root Directory:** `backend`
 - **Framework Preset:** Other
 
-`vercel.json` already sets the install command (`npm ci`), the build command (`npm run build`) and includes `dist/**` in the function.
+`vercel.json` already sets the install command (`npm ci`) and the build command (`npm run build`). It also includes `dist/**` and `node_modules/swagger-ui-dist/**` in the function: Vercel's file tracing does not see folders served as static files, so without the second glob `/api/docs` loads blank. `pg` is imported directly in `data-source.ts` for the same reason.
 
 ## 2. Environment variables (Production)
 

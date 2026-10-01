@@ -6,9 +6,14 @@
   "outputDirectory": "public",
   "functions": {
     "api/index.js": {
-      "includeFiles": "dist/**",
+      "includeFiles": "{dist/**,node_modules/swagger-ui-dist/**}",
       "maxDuration": 30
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    }
+  ]
 }
