@@ -12,6 +12,10 @@ export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
   unique: true,
   where: '"sku" IS NOT NULL AND "deleted_at" IS NULL',
 })
+@Index('UQ_products_branch_barcode', ['branchId', 'barcode'], {
+  unique: true,
+  where: '"barcode" IS NOT NULL AND "deleted_at" IS NULL',
+})
 export class Product extends BranchScopedEntity {
   @Column({ type: 'varchar', length: 200 })
   name: string;
@@ -26,6 +30,9 @@ export class Product extends BranchScopedEntity {
 
   @Column({ type: 'varchar', length: 60, nullable: true })
   sku: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  barcode: string | null;
 
   @Column({ name: 'batch_no', type: 'varchar', length: 100, nullable: true })
   batchNo: string | null;

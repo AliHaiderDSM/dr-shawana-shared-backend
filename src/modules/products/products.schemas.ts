@@ -32,10 +32,21 @@ const purchaseFields = z.object({
   note: optionalText(1000),
 });
 
+export const barcodeInput = z
+  .string()
+  .trim()
+  .min(3)
+  .max(64)
+  .regex(/^[!-~]+$/, 'Use the printed barcode characters only')
+  .openapi({ example: '8964000123456' });
+
+export const barcodeParamsSchema = z.object({ code: barcodeInput });
+
 const productFields = z.object({
   name: requiredText(1, 200),
   categoryId: z.uuid(),
   sku: z.string().trim().min(1).max(60).nullable().optional(),
+  barcode: barcodeInput.nullable().optional(),
   batchNo: optionalText(100).openapi({ description: 'posSoft "Gram" / batch label' }),
   sizeGrams: quantityInput
     .nullable()
@@ -89,6 +100,7 @@ export const productSchema = registry.register(
     categoryId: z.uuid(),
     category: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     sku: z.string().nullable(),
+    barcode: z.string().nullable(),
     batchNo: z.string().nullable(),
     sizeGrams: quantityOutput.nullable(),
     unit: z.string(),
@@ -121,6 +133,7 @@ registerCrudDocs({
     name: z.string(),
     salePrice: moneyOutput,
     batchNo: z.string().nullable(),
+    barcode: z.string().nullable(),
   }),
   imageUpload: true,
 });
@@ -128,6 +141,18 @@ registerCrudDocs({
 const common = securedDocs('Products');
 const onePurchase = (description: string) => ({ description, ...jsonContent(dataEnvelope(purchaseSchema)) });
 const purchaseById = { params: purchaseParamsSchema, query: branchQuerySchema };
+
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/products/barcode/{code}',
+  summary: 'Find the product with this scanned barcode (404 when none)',
+  request: { params: barcodeParamsSchema, query: branchQuerySchema },
+  responses: {
+    200: { description: 'Product', ...jsonContent(dataEnvelope(productSchema)) },
+    ...errorResponses,
+  },
+});
 
 registry.registerPath({
   ...common,

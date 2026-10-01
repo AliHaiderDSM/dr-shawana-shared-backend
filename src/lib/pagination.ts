@@ -34,6 +34,10 @@ export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+function searchColumn(path: string) {
+  return path.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
 export function applyListQuery<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   query: ListQuery,
@@ -44,7 +48,9 @@ export function applyListQuery<T extends ObjectLiteral>(
     const term = `%${escapeLike(query.search)}%`;
     qb.andWhere(
       new Brackets((w) => {
-        searchColumns.forEach((col) => w.orWhere(`${col}::text ILIKE :__search`, { __search: term }));
+        searchColumns.forEach((col) =>
+          w.orWhere(`${searchColumn(col)}::text ILIKE :__search`, { __search: term }),
+        );
       }),
     );
   }

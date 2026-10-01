@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { mountBranchCrud } from '../../lib/crud';
-import { idParamsSchema } from '../../lib/http';
+import { idParamsSchema, sendOk } from '../../lib/http';
+import { branchIdOf } from '../../lib/request';
 import { imageUpload } from '../../lib/upload';
 import { requirePermission } from '../../middleware/requirePermission';
-import { validate } from '../../middleware/validate';
+import { validate, validParams } from '../../middleware/validate';
 import { productExtrasController, purchaseListQuerySchema } from './products.controller';
 import {
+  barcodeParamsSchema,
   createProductSchema,
   createPurchaseSchema,
   productListQuerySchema,
@@ -25,6 +27,15 @@ mountBranchCrud(productsRouter, {
   service: productsService,
   schemas: { list: productListQuerySchema, create: createProductSchema, update: updateProductSchema },
   extraItemRoutes: (byId) => {
+    productsRouter.get(
+      `${path}/barcode/:code`,
+      requirePermission('products.view', 'stock.view'),
+      validate({ params: barcodeParamsSchema }),
+      async (req, res) => {
+        const { code } = validParams(req, barcodeParamsSchema);
+        sendOk(res, await productsService.findByBarcode(branchIdOf(req), code));
+      },
+    );
     productsRouter.post(
       `${path}/:id/image`,
       requirePermission('products.update'),

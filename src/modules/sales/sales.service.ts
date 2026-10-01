@@ -17,6 +17,7 @@ import { Bundle } from '../bundles/bundle.entity';
 import { stockLedger } from '../inventory/stock-ledger';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { patientsService } from '../patients/patients.service';
+import { returnsService } from '../returns/returns.service';
 import { Product } from '../products/product.entity';
 import { nextSequence } from '../sequences/sequences';
 import { SaleItem } from './sale-item.entity';
@@ -461,8 +462,11 @@ export const salesService = {
       const sale = await getSale(branchId, id, em);
       assertCanChange(actor, sale);
       const before = toSaleDto(sale);
-      if (sale.deliveryStatus === 'returned' && (input.items || input.saleType)) {
-        throw AppError.conflict('A returned sale cannot change its items or type');
+      if (
+        (input.items || input.saleType) &&
+        (sale.deliveryStatus === 'returned' || (await returnsService.hasReturns(em, sale.id)))
+      ) {
+        throw AppError.conflict('A sale with returns cannot change its items or type');
       }
 
       if (input.items) {
@@ -511,22 +515,7 @@ export const salesService = {
         throw AppError.unprocessable('Only online sales have a delivery status');
       if (sale.deliveryStatus === status) return toSaleDto(sale);
       if (sale.deliveryStatus === 'returned') throw AppError.conflict('This sale was already returned');
-      if (status === 'returned') {
-        const net = await netStock(em, sale);
-        await stockLedger.apply(
-          em,
-          ledgerRef(actor, sale),
-          [...net]
-            .filter(([, qty]) => !qty.isZero())
-            .map(([productId, qty]) => ({
-              productId,
-              type: 'sale_return' as const,
-              qty: qty.negated(),
-              date: today(),
-              note: `${sale.invoiceNo} returned`,
-            })),
-        );
-      }
+      if (status === 'returned') await returnsService.createForReturnedDelivery(em, actor, sale);
       const before = { deliveryStatus: sale.deliveryStatus };
       await repo(Sale, em).update({ id }, { deliveryStatus: status, updatedBy: actor.userId });
       await audit(actor, sale, `delivery:${status}`, em, before, { deliveryStatus: status });
@@ -538,6 +527,9 @@ export const salesService = {
     await withTransaction(async (em) => {
       const sale = await getSale(branchId, id, em);
       assertCanChange(actor, sale);
+      if (await returnsService.hasReturns(em, sale.id)) {
+        throw AppError.conflict('A sale with returns cannot be deleted; delete its returns first');
+      }
       const before = toSaleDto(sale);
       await stockLedger.reverse(em, ledgerRef(actor, sale), `${sale.invoiceNo} removed`);
       for (const item of sale.items ?? []) await saleItems.softDelete(item, actor.userId, em);

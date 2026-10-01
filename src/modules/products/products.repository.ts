@@ -31,7 +31,7 @@ export const productsRepository = {
       );
     }
     return paginate(qb, query, {
-      searchColumns: ['p.name', 'p.batchNo', 'p.sku'],
+      searchColumns: ['p.name', 'p.batchNo', 'p.sku', 'p.barcode'],
       sortMap: { name: 'p.name', createdAt: 'p.createdAt', salePrice: 'p.salePrice' },
     });
   },
@@ -39,10 +39,24 @@ export const productsRepository = {
   options(branchId: string, manager?: EntityManager) {
     return base
       .query(branchId, manager)
-      .select(['p.id', 'p.name', 'p.salePrice', 'p.batchNo'])
+      .select(['p.id', 'p.name', 'p.salePrice', 'p.batchNo', 'p.barcode'])
       .andWhere("p.status = 'active'")
       .orderBy('p.name', 'ASC')
       .getMany();
+  },
+
+  findByBarcode(branchId: string, barcode: string, manager?: EntityManager) {
+    return base
+      .query(branchId, manager)
+      .leftJoinAndSelect('p.category', 'category')
+      .andWhere('p.barcode = :barcode', { barcode })
+      .getOne();
+  },
+
+  findBarcodeConflict(branchId: string, barcode: string, excludeId?: string, manager?: EntityManager) {
+    const qb = base.query(branchId, manager).andWhere('p.barcode = :barcode', { barcode });
+    if (excludeId) qb.andWhere('p.id <> :excludeId', { excludeId });
+    return qb.getOne();
   },
 
   findSkuConflict(branchId: string, sku: string, excludeId?: string, manager?: EntityManager) {

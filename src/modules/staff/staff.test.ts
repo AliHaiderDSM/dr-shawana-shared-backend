@@ -84,6 +84,13 @@ describe('branch staff', () => {
     it('filters by role and searches', async () => {
       const res = await request(app).get('/api/v1/branch/staff?role=doctor').set(bearer(lahoreAdmin));
       expect(res.body.data.every((s: { role: string }) => s.role === 'doctor')).toBe(true);
+      const all = await request(app).get('/api/v1/branch/staff?pageSize=100').set(bearer(lahoreAdmin));
+      const someone = all.body.data[0] as { id: string; firstName: string };
+      const search = await request(app)
+        .get(`/api/v1/branch/staff?search=${encodeURIComponent(someone.firstName)}`)
+        .set(bearer(lahoreAdmin));
+      expect(search.status).toBe(200);
+      expect(search.body.data.map((s: { id: string }) => s.id)).toContain(someone.id);
     });
 
     it('rejects duplicate username or email', async () => {

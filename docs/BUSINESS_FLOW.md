@@ -170,6 +170,11 @@ Print Bill (ORD#)
   |
   v
 Online Sale: Pending --> Delivered / Returned
+  |                                  |
+  v                                  v
+  |                     Returns section (pending inspection)
+  |                       --> Restocked / Damaged / Sent to supplier
+  |                       --> optional refund from an account
   |
   v
 Delivery slips printed (Delivery Print role)

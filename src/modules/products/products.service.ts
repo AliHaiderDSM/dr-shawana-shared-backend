@@ -80,6 +80,15 @@ async function assertSkuAvailable(branchId: string, sku: string | null | undefin
   }
 }
 
+async function assertBarcodeAvailable(
+  branchId: string,
+  barcode: string | null | undefined,
+  excludeId?: string,
+) {
+  const owner = barcode ? await productsRepository.findBarcodeConflict(branchId, barcode, excludeId) : null;
+  if (owner) throw AppError.conflict(`Barcode ${barcode} is already used by ${owner.name}`);
+}
+
 async function syncSalePriceWithLatestEntry(branchId: string, product: Product, manager: EntityManager) {
   const latest = await purchaseEntriesRepository.latestForProduct(branchId, product.id, manager);
   if (latest && !new Decimal(latest.unitPrice).equals(product.salePrice)) {
@@ -158,6 +167,12 @@ export const productsService = {
 
   options: (branchId: string) => productsRepository.options(branchId),
 
+  async findByBarcode(branchId: string, barcode: string) {
+    const product = await productsRepository.findByBarcode(branchId, barcode);
+    if (!product) throw AppError.notFound(`No product has barcode ${barcode}`);
+    return toProductDto(product);
+  },
+
   async get(branchId: string, id: string) {
     return toProductDto(await getProduct(branchId, id));
   },
@@ -165,6 +180,7 @@ export const productsService = {
   async create(actor: Actor, branchId: string, input: CreateProductInput) {
     const { initialPurchase, ...fields } = input;
     await assertSkuAvailable(branchId, fields.sku);
+    await assertBarcodeAvailable(branchId, fields.barcode);
     return withTransaction(async (em) => {
       await assertCategory(branchId, fields.categoryId, em);
       const created = await productsRepository.create(branchId, actor.userId, fields as Partial<Product>, em);
@@ -187,6 +203,7 @@ export const productsService = {
 
   async update(actor: Actor, branchId: string, id: string, input: UpdateProductInput) {
     if (input.sku) await assertSkuAvailable(branchId, input.sku, id);
+    if (input.barcode) await assertBarcodeAvailable(branchId, input.barcode, id);
     return withTransaction(async (em) => {
       const product = await getProduct(branchId, id, em);
       if (input.categoryId) await assertCategory(branchId, input.categoryId, em);

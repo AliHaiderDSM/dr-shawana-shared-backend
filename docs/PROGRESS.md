@@ -12,9 +12,33 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 | B5    | Consultation, clinical records and prescriptions                       | ✅ Done (2026-09-30) |
 | B6    | POS sales, payments and delivery                                       | ✅ Done (2026-09-30) |
 | B7    | Accounts, finance, reports and dashboard KPIs                          | ✅ Done (2026-09-30) |
+| B6b   | Sale returns (inspection, refunds) and product barcodes                | ✅ Done (2026-10-01) |
 | B8    | Mobile app API (patients)                                              | ⏳ Next              |
 | B9    | Data migration from posSoft                                            | Not started          |
 | B10   | Hardening and deployment                                               | Not started          |
+
+---
+
+## B6b — Sale returns and product barcodes (done 2026-10-01)
+
+Added on request; posSoft had only a "returned" status and no barcodes.
+
+- **Barcodes:** `products.barcode` (the code printed on the pack), unique per branch. `GET /branch/products/barcode/:code` finds the scanned product (`products.view` or `stock.view`), and product search also matches barcodes.
+- **Returns:** a new module, `/branch/returns`, with numbering `LHR-RET-000001`.
+  - A return holds several products from one sale (part or all of it), a reason and a note. Quantities cannot exceed what is sold minus what was already returned (422 with `details.items`).
+  - Returned goods do not go back into stock when they are received. Each item is inspected: **restocked** (a `sale_return` movement puts it back into stock), **damaged** (written off) or **supplier** (sent back). When every item is inspected the return is `completed`.
+  - A return can be deleted only before any item is inspected.
+  - An optional refund (amount, cash or online, the account it is paid from, date) cannot exceed the money received minus earlier refunds. It is set on creation or with `PUT /:id/refund`.
+  - Refunds are credits in `account_movements`, so account balances drop. Dashboard revenue is net of refunds.
+- **Sales:** marking an online sale `returned` now creates a pending return for everything still on the sale, instead of restocking straight away. A sale with returns cannot change its items or type, and cannot be deleted.
+- **Permissions:** a new `returns` module.
+  - Branch admin: everything.
+  - Accountant, Front Desk and Team Manager: view and create.
+  - Pharmacy and Store Keeper: view and update (inspection).
+- Migration `ReturnsBarcodes`: two tables with RLS, the barcode column and index, and the `account_movements` view with refund rows. Tested up, down and for drift.
+- **Fixed:** list search on camelCase columns (product batch, staff names, doctor name, account name, lab batch no) crashed with a 500 error. The search helper now maps them to their snake_case columns.
+
+**Verified:** lint, typecheck and `npm test` (20 suites, 181 tests) on the temporary local Postgres.
 
 ---
 

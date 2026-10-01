@@ -29,6 +29,7 @@ export const BRANCH_MODULES = [
   'consultations',
   'prescriptions',
   'sales',
+  'returns',
   'deliveryReport',
   'categories',
   'products',
@@ -72,6 +73,7 @@ const frontDeskGrants: Grants = {
   appointmentPayments: FULL,
   consultations: VIEW_CREATE_UPDATE,
   sales: FULL,
+  returns: VIEW_CREATE,
   products: VIEW,
   bundles: VIEW,
   inventoryReport: VIEW,
@@ -98,6 +100,7 @@ const MATRIX: Record<Role, Grants> = {
   team_manager: frontDeskGrants,
   pharmacy: {
     dashboard: VIEW,
+    returns: ['view', 'update'],
     stock: VIEW_CREATE_UPDATE,
     inventoryReport: VIEW,
     materials: VIEW,
@@ -112,6 +115,7 @@ const MATRIX: Record<Role, Grants> = {
   },
   store_keeper: {
     dashboard: VIEW,
+    returns: ['view', 'update'],
     materials: VIEW_CREATE_UPDATE,
     materialCategories: VIEW_CREATE_UPDATE,
     recipes: VIEW_CREATE_UPDATE,

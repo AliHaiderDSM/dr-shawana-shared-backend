@@ -36,8 +36,12 @@ export const dashboardService = {
           `SELECT (SELECT COUNT(*) FROM sales s WHERE s.deleted_at IS NULL AND ${branchClause('s.branch_id', 1)} AND s.date BETWEEN $2 AND $3)::int AS bills,
                   (SELECT COALESCE(SUM(si.qty), 0) FROM sale_items si JOIN sales s ON s.id = si.sale_id
                     WHERE s.deleted_at IS NULL AND si.deleted_at IS NULL AND ${branchClause('s.branch_id', 1)} AND s.date BETWEEN $2 AND $3)::numeric(12,3)::text AS qty,
-                  (SELECT COALESCE(SUM(y.amount), 0) FROM sale_payments y JOIN sales s ON s.id = y.sale_id
-                    WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)} AND y.date BETWEEN $2 AND $3)::numeric(12,2)::text AS revenue`,
+                  ((SELECT COALESCE(SUM(y.amount), 0) FROM sale_payments y JOIN sales s ON s.id = y.sale_id
+                    WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)} AND y.date BETWEEN $2 AND $3)
+                   - (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r
+                    WHERE r.deleted_at IS NULL AND ${branchClause('r.branch_id', 1)} AND r.refund_date BETWEEN $2 AND $3))::numeric(12,2)::text AS revenue,
+                  (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r
+                    WHERE r.deleted_at IS NULL AND ${branchClause('r.branch_id', 1)} AND r.refund_date BETWEEN $2 AND $3)::numeric(12,2)::text AS refunds`,
           [b, from, to],
         );
       result.sales = { today: await sales(day, day), month: await sales(`${month}-01`, day) };
@@ -97,10 +101,15 @@ export const dashboardService = {
       months.map((m) => rows.find((r) => r.month === m)?.[key] ?? '0');
     if (can('sales.view')) {
       const rows = await many(
-        `SELECT to_char(y.date, 'YYYY-MM') AS month, SUM(y.amount)::numeric(12,2)::text AS amount
-           FROM sale_payments y JOIN sales s ON s.id = y.sale_id
-          WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)} AND EXTRACT(YEAR FROM y.date) = $2
-          GROUP BY 1`,
+        `SELECT t.month, SUM(t.amount)::numeric(12,2)::text AS amount FROM (
+           SELECT to_char(y.date, 'YYYY-MM') AS month, y.amount
+             FROM sale_payments y JOIN sales s ON s.id = y.sale_id
+            WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)} AND EXTRACT(YEAR FROM y.date) = $2
+           UNION ALL
+           SELECT to_char(r.refund_date, 'YYYY-MM'), -r.refund_amount
+             FROM sale_returns r
+            WHERE r.deleted_at IS NULL AND r.refund_amount > 0 AND ${branchClause('r.branch_id', 1)} AND EXTRACT(YEAR FROM r.refund_date) = $2
+          ) t GROUP BY 1`,
         [b, chartYear],
       );
       charts.salesAmount = series(rows, 'amount');
@@ -136,8 +145,10 @@ export const dashboardService = {
     if (!b && can('sales.view')) {
       result.byBranch = await many(
         `SELECT br.code AS branch, br.name,
-                (SELECT COALESCE(SUM(y.amount), 0) FROM sale_payments y JOIN sales s ON s.id = y.sale_id
-                  WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND to_char(y.date, 'YYYY-MM') = $1)::numeric(12,2)::text AS "salesMonth",
+                ((SELECT COALESCE(SUM(y.amount), 0) FROM sale_payments y JOIN sales s ON s.id = y.sale_id
+                  WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND to_char(y.date, 'YYYY-MM') = $1)
+                 - (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r
+                  WHERE r.deleted_at IS NULL AND r.branch_id = br.id AND to_char(r.refund_date, 'YYYY-MM') = $1))::numeric(12,2)::text AS "salesMonth",
                 (SELECT COALESCE(SUM(y.amount), 0) FROM appointment_payments y JOIN appointments a ON a.id = y.appointment_id
                   WHERE a.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND to_char(y.date, 'YYYY-MM') = $1)::numeric(12,2)::text AS "appointmentsMonth"
            FROM branches br WHERE br.deleted_at IS NULL ORDER BY br.code`,

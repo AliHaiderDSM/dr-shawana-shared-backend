@@ -235,7 +235,7 @@ describe('POS sales', () => {
     expect(added.body.data).toMatchObject({ received: '1000.00', remaining: '0.00', paymentStatus: 'paid' });
   });
 
-  it('returns an online sale into stock, once', async () => {
+  it('returns an online sale into the returns section, once, and restocks it after inspection', async () => {
     expect(
       (await api('post', `/branch/sales/${saleId}/delivery`, admin).send({ status: 'delivered' })).status,
     ).toBe(422);
@@ -248,7 +248,24 @@ describe('POS sales', () => {
       status: 'returned',
     });
     expect(returned.body.data.deliveryStatus).toBe('returned');
+    expect(await stock(serum)).toBe('8.000');
+    const pending = await api('get', `/branch/returns?saleId=${onlineSaleId}`, admin);
+    expect(pending.body.data).toHaveLength(1);
+    const deliveryReturn = pending.body.data[0];
+    expect(deliveryReturn).toMatchObject({
+      status: 'pending',
+      reason: 'customer_refused',
+      totalQty: '1.000',
+    });
+    expect(deliveryReturn.returnNo).toMatch(/^LHR-RET-\d{6}$/);
+    const restocked = await api(
+      'post',
+      `/branch/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/resolve`,
+      admin,
+    ).send({ disposition: 'restocked' });
+    expect(restocked.body.data.status).toBe('completed');
     expect(await stock(serum)).toBe('9.000');
+    expect((await api('delete', `/branch/sales/${onlineSaleId}`, admin)).status).toBe(409);
     expect(
       (await api('post', `/branch/sales/${onlineSaleId}/delivery`, admin).send({ status: 'delivered' }))
         .status,
