@@ -413,7 +413,7 @@ export const salesService = {
       base().leftJoinAndSelect('sale.patient', 'patient').leftJoinAndSelect('sale.branch', 'saleBranch'),
       query,
     );
-    const totals = await applyFilters(base().leftJoin('sale.patient', 'patient'), query)
+    const totalsQuery = applyFilters(base().leftJoin('sale.patient', 'patient'), query)
       .select('COUNT(*)', 'count')
       .addSelect('COALESCE(SUM(sale.totalQty), 0)', 'qty')
       .addSelect('COALESCE(SUM(sale.subtotal), 0)', 'subtotal')
@@ -427,9 +427,10 @@ export const salesService = {
       { ...query, search: undefined },
       {
         sortMap: { date: 'sale.date', createdAt: 'sale.createdAt', invoiceSeq: 'sale.invoiceSeq' },
+        toOneJoins: true,
       },
     );
-    const rows = await qb.getMany();
+    const [totals, rows] = await Promise.all([totalsQuery, qb.getMany()]);
     const withPayments = rows.length
       ? await repo(SalePayment).find({ where: { saleId: In(rows.map((r) => r.id)) } })
       : [];

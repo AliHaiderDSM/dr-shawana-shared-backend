@@ -37,7 +37,11 @@ export const staffRepository = {
   },
 
   findByIdForAuth(id: string, manager?: EntityManager) {
-    return repo(StaffProfile, manager).findOne({ where: { id }, relations: { branch: true } });
+    return repo(StaffProfile, manager)
+      .createQueryBuilder('profile')
+      .leftJoinAndSelect('profile.branch', 'branch')
+      .where('profile.id = :id', { id })
+      .getOne();
   },
 
   findByLogin(identifier: string, manager?: EntityManager) {

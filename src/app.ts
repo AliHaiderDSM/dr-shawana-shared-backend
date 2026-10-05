@@ -9,6 +9,7 @@ import { env, isProduction } from './config/env';
 import { buildOpenApiDocument } from './docs';
 import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
+import { requestTiming } from './lib/perf';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
 import { apiRouter } from './routes';
@@ -19,6 +20,7 @@ export function createApp(): Express {
   if (isProduction) app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
+  app.use(requestTiming);
   app.use(requestId);
   app.use(
     pinoHttp({
@@ -42,7 +44,7 @@ export function createApp(): Express {
         callback(AppError.forbidden(`Origin ${origin} is not allowed`));
       },
       credentials: true,
-      exposedHeaders: ['X-Request-Id'],
+      exposedHeaders: ['X-Request-Id', 'Server-Timing'],
     }),
   );
   app.use(express.json({ limit: '1mb' }));

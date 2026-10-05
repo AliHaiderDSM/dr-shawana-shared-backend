@@ -28,6 +28,7 @@ export interface ListQuery {
 export interface ListOptions {
   searchColumns?: string[];
   sortMap: Record<string, string>;
+  toOneJoins?: boolean;
 }
 
 export function escapeLike(value: string): string {
@@ -60,7 +61,10 @@ export function applyListQuery<T extends ObjectLiteral>(
   const column = options.sortMap[key];
   if (column) qb.orderBy(column, desc ? 'DESC' : 'ASC');
 
-  return qb.skip((query.page - 1) * query.pageSize).take(query.pageSize);
+  const skipped = (query.page - 1) * query.pageSize;
+  return options.toOneJoins
+    ? qb.offset(skipped).limit(query.pageSize)
+    : qb.skip(skipped).take(query.pageSize);
 }
 
 export function pageMeta(query: Pick<ListQuery, 'page' | 'pageSize'>, total: number): PageMeta {
@@ -77,6 +81,7 @@ export async function paginate<T extends ObjectLiteral>(
   query: ListQuery,
   options: ListOptions,
 ): Promise<{ items: T[]; meta: PageMeta }> {
-  const [items, total] = await applyListQuery(qb, query, options).getManyAndCount();
+  const listed = applyListQuery(qb, query, options);
+  const [items, total] = await Promise.all([listed.getMany(), listed.clone().getCount()]);
   return { items, meta: pageMeta(query, total) };
 }

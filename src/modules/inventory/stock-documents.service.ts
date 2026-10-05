@@ -328,6 +328,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       const { items, meta } = await paginate(qb, query, {
         searchColumns: ['d.note', 'product.name', 'party.name', 'd.qty'],
         sortMap: { date: 'd.date', createdAt: 'd.createdAt' },
+        toOneJoins: true,
       });
       const files = await attachmentsFor(
         branchId,

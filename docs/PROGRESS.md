@@ -22,6 +22,17 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Performance pass (done 2026-10-05)
+
+- Root cause: every query is one network round trip to Supabase in ap-south-1 (Mumbai), about 70 ms from Pakistan. Production also ran the function in `iad1` (Washington), which put about 250 ms of round trip on every query. `vercel.json` now sets `"regions": ["bom1"]`.
+- `lib/perf.ts` adds a `Server-Timing` header to every response: `db` time with the query count, `app` time, and `total` time. It is exposed through CORS, so the browser DevTools Network → Timing tab shows it.
+- Auth (`staffRepository.findByIdForAuth`) uses one QueryBuilder join. `findOne` with relations ran an extra DISTINCT query on every request.
+- Dashboard KPIs run their independent queries with `Promise.all`. The SQL is unchanged.
+- `paginate` runs the page query and the count in parallel. `toOneJoins` uses OFFSET/LIMIT instead of a DISTINCT id query; it is used for sales and stock documents.
+- The sales list runs its totals and rows in parallel.
+- EXPLAIN ANALYZE on Supabase shows index scans under 0.2 ms, so no new indexes were added.
+- No duplicate API calls were found from the dashboard.
+
 ## B6e — Main Warehouse and transfers (done 2026-10-05)
 
 Stock now flows **Factory → Main Warehouse → Branch → Sale**.

@@ -30,13 +30,16 @@ export const dashboardService = {
       scope: b ? 'branch' : 'all_branches',
     };
 
-    result.counts = await one(
+    const counts = one(
       `SELECT (SELECT COUNT(*) FROM patients p WHERE p.deleted_at IS NULL AND ($1::uuid IS NULL OR p.created_in_branch_id = $1
                  OR EXISTS (SELECT 1 FROM appointments a WHERE a.patient_id = p.id AND a.branch_id = $1 AND a.deleted_at IS NULL)))::int AS patients,
               (SELECT COUNT(*) FROM products pr WHERE pr.deleted_at IS NULL AND pr.status = 'active' AND ${branchClause('pr.branch_id', 1)})::int AS products`,
       [b],
     );
 
+    let salesToday: Promise<Row> | null = null;
+    let salesPeriod: Promise<Row> | null = null;
+    let pending: Promise<Row> | null = null;
     if (can('sales.view')) {
       const sales = (from: string, to: string) =>
         one(
@@ -51,15 +54,16 @@ export const dashboardService = {
                     WHERE r.deleted_at IS NULL AND ${branchClause('r.branch_id', 1)} AND r.refund_date BETWEEN $2 AND $3)::numeric(12,2)::text AS refunds`,
           [b, from, to],
         );
-      result.sales = { today: await sales(day, day), month: await sales(from, to) };
-      result.pendingDeliveries = (
-        await one(
-          `SELECT COUNT(*)::int AS count FROM sales s WHERE s.deleted_at IS NULL AND s.delivery_status = 'pending' AND ${branchClause('s.branch_id', 1)}`,
-          [b],
-        )
-      ).count;
+      salesToday = sales(day, day);
+      salesPeriod = sales(from, to);
+      pending = one(
+        `SELECT COUNT(*)::int AS count FROM sales s WHERE s.deleted_at IS NULL AND s.delivery_status = 'pending' AND ${branchClause('s.branch_id', 1)}`,
+        [b],
+      );
     }
 
+    let appointmentsToday: Promise<Row> | null = null;
+    let appointmentsPeriod: Promise<Row> | null = null;
     if (can('appointments.view')) {
       const appointments = (from: string, to: string) =>
         one(
@@ -70,18 +74,11 @@ export const dashboardService = {
                       AND ($4::uuid IS NULL OR a.doctor_id = $4) AND y.date BETWEEN $2 AND $3)::numeric(12,2)::text AS amount`,
           [b, from, to, scope.doctorId],
         );
-      result.appointments = {
-        today: await appointments(day, day),
-        month: await appointments(from, to),
-      };
+      appointmentsToday = appointments(day, day);
+      appointmentsPeriod = appointments(from, to);
     }
 
-    if (can('sales.view') && can('appointmentPayments.view') && !scope.doctorId) {
-      const sales = (result.sales as { month: Row }).month.revenue ?? '0';
-      const consultations = (result.appointments as { month: Row } | undefined)?.month.amount ?? '0';
-      result.revenueSplit = { month, sales, consultations };
-    }
-
+    let stock: Promise<[Row, Row, Row]> | null = null;
     if (can('stock.view') || can('inventoryReport.view')) {
       const movement = (from: string, to: string) =>
         one(
@@ -90,25 +87,25 @@ export const dashboardService = {
              FROM stock_movements m WHERE ${branchClause('m.branch_id', 1)} AND m.date BETWEEN $2 AND $3`,
           [b, from, to],
         );
-      result.stock = {
-        today: await movement(day, day),
-        month: await movement(from, to),
-        lowStockCount: (
-          await one(
-            `SELECT COUNT(*)::int AS count FROM product_stock_balances v WHERE v.is_low_stock AND ${branchClause('v.branch_id', 1)}`,
-            [b],
-          )
-        ).count,
-      };
+      stock = Promise.all([
+        movement(day, day),
+        movement(from, to),
+        one(
+          `SELECT COUNT(*)::int AS count FROM product_stock_balances v WHERE v.is_low_stock AND ${branchClause('v.branch_id', 1)}`,
+          [b],
+        ),
+      ]);
     }
 
     const charts: Record<string, unknown> = { year: chartYear };
     const months = Array.from({ length: 12 }, (_, i) => `${chartYear}-${String(i + 1).padStart(2, '0')}`);
     const series = (rows: Row[], key: string) =>
       months.map((m) => rows.find((r) => r.month === m)?.[key] ?? '0');
+    let salesChart: Promise<[Row[], Row[]]> | null = null;
     if (can('sales.view')) {
-      const rows = await many(
-        `SELECT t.month, SUM(t.amount)::numeric(12,2)::text AS amount FROM (
+      salesChart = Promise.all([
+        many(
+          `SELECT t.month, SUM(t.amount)::numeric(12,2)::text AS amount FROM (
            SELECT to_char(y.date, 'YYYY-MM') AS month, y.amount
              FROM sale_payments y JOIN sales s ON s.id = y.sale_id
             WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)} AND EXTRACT(YEAR FROM y.date) = $2
@@ -117,27 +114,20 @@ export const dashboardService = {
              FROM sale_returns r
             WHERE r.deleted_at IS NULL AND r.refund_amount > 0 AND ${branchClause('r.branch_id', 1)} AND EXTRACT(YEAR FROM r.refund_date) = $2
           ) t GROUP BY 1`,
-        [b, chartYear],
-      );
-      charts.salesAmount = series(rows, 'amount');
-      const products = await many(
-        `SELECT pr.name AS product, to_char(s.date, 'YYYY-MM') AS month, SUM(si.qty)::numeric(12,3)::text AS qty
+          [b, chartYear],
+        ),
+        many(
+          `SELECT pr.name AS product, to_char(s.date, 'YYYY-MM') AS month, SUM(si.qty)::numeric(12,3)::text AS qty
            FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN products pr ON pr.id = si.product_id
           WHERE s.deleted_at IS NULL AND si.deleted_at IS NULL AND ${branchClause('s.branch_id', 1)} AND EXTRACT(YEAR FROM s.date) = $2
           GROUP BY 1, 2`,
-        [b, chartYear],
-      );
-      const names = [...new Set(products.map((p) => p.product as string))];
-      charts.productSales = names.map((name) => ({
-        product: name,
-        qty: series(
-          products.filter((p) => p.product === name),
-          'qty',
+          [b, chartYear],
         ),
-      }));
+      ]);
     }
+    let appointmentsChart: Promise<Row[]> | null = null;
     if (can('appointments.view')) {
-      const rows = await many(
+      appointmentsChart = many(
         `SELECT to_char(y.date, 'YYYY-MM') AS month, SUM(y.amount)::numeric(12,2)::text AS amount
            FROM appointment_payments y JOIN appointments a ON a.id = y.appointment_id
           WHERE a.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)}
@@ -145,12 +135,11 @@ export const dashboardService = {
           GROUP BY 1`,
         [b, chartYear, scope.doctorId],
       );
-      charts.appointmentAmount = series(rows, 'amount');
     }
-    result.charts = { months, ...charts };
 
+    let byBranch: Promise<Row[]> | null = null;
     if (!b && can('sales.view')) {
-      result.byBranch = await many(
+      byBranch = many(
         `SELECT br.code AS branch, br.name,
                 ((SELECT COALESCE(SUM(y.amount), 0) FROM sale_payments y JOIN sales s ON s.id = y.sale_id
                   WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND y.date BETWEEN $1 AND $2)
@@ -162,6 +151,64 @@ export const dashboardService = {
         [from, to],
       );
     }
+
+    const [
+      countsRow,
+      todaySales,
+      periodSales,
+      pendingRow,
+      todayAppointments,
+      periodAppointments,
+      stockRows,
+      salesSeries,
+      appointmentSeries,
+      branches,
+    ] = await Promise.all([
+      counts,
+      salesToday,
+      salesPeriod,
+      pending,
+      appointmentsToday,
+      appointmentsPeriod,
+      stock,
+      salesChart,
+      appointmentsChart,
+      byBranch,
+    ]);
+
+    result.counts = countsRow;
+    if (todaySales && periodSales) {
+      result.sales = { today: todaySales, month: periodSales };
+      result.pendingDeliveries = pendingRow?.count;
+    }
+    if (todayAppointments && periodAppointments) {
+      result.appointments = { today: todayAppointments, month: periodAppointments };
+    }
+    if (can('sales.view') && can('appointmentPayments.view') && !scope.doctorId) {
+      result.revenueSplit = {
+        month,
+        sales: periodSales?.revenue ?? '0',
+        consultations: periodAppointments?.amount ?? '0',
+      };
+    }
+    if (stockRows) {
+      result.stock = { today: stockRows[0], month: stockRows[1], lowStockCount: stockRows[2].count };
+    }
+    if (salesSeries) {
+      const [rows, products] = salesSeries;
+      charts.salesAmount = series(rows, 'amount');
+      const names = [...new Set(products.map((p) => p.product as string))];
+      charts.productSales = names.map((name) => ({
+        product: name,
+        qty: series(
+          products.filter((p) => p.product === name),
+          'qty',
+        ),
+      }));
+    }
+    if (appointmentSeries) charts.appointmentAmount = series(appointmentSeries, 'amount');
+    result.charts = { months, ...charts };
+    if (branches) result.byBranch = branches;
     return result;
   },
 };
