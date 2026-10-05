@@ -192,6 +192,8 @@ Delivery slips printed (Delivery Print role)
 - **Stock Out** records stock sent out through a dispatcher.
 - **Inventory Report** shows stock per product for the branch.
 - Stock is kept **per branch**. One branch's sales and stock never affect another branch.
+- **Main Warehouse:** factory stock is received into the Main Warehouse, which only the Super Admin runs and which never sells. A warehouse Stock Out with "Transfer to branch" moves the stock (same batches and labels) straight into that branch's stock; the branch does not enter it again. Branches never receive stock any other way.
+- **Expiry alerts:** batches that expire within 3 months appear on the dashboard (every branch for the Super Admin, own branch for branch staff) and on the Stock page.
 
 ### 4.7 Manufacturing (Raw Materials)
 
@@ -314,7 +316,7 @@ These are the posSoft tables with `branch_id` added, plus a few new ones.
 
 - **dr-shawan website:** stays on its own Firebase with no link to this backend. It keeps its own products, stock and orders. Website orders keep reaching staff by email and are entered by hand as Online Sale.
 - **Patient–doctor chat and notifications:** posSoft has only a static placeholder. These can be added later as a separate phase.
-- **Stock transfer between branches:** not in the first version. Each branch manages its own stock.
+- **Stock transfer between branches:** branches do not transfer to each other; stock moves from the Main Warehouse to a branch only.
 
 ---
 

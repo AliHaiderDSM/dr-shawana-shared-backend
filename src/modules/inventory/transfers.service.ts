@@ -122,6 +122,20 @@ async function batchIn(
 }
 
 export const transfersService = {
+  async assertReceivesFromWarehouse(manager: EntityManager, branchId: string) {
+    const [row] = (await manager.query(
+      `SELECT b.kind,
+              EXISTS (SELECT 1 FROM branches w WHERE w.kind = 'warehouse' AND w.deleted_at IS NULL) AS "hasWarehouse"
+         FROM branches b WHERE b.id = $1`,
+      [branchId],
+    )) as { kind: string; hasWarehouse: boolean }[];
+    if (row?.kind === 'branch' && row.hasWarehouse) {
+      throw AppError.conflict(
+        'Branches get their stock from the Main Warehouse. Ask the Super Admin to transfer it.',
+      );
+    }
+  },
+
   async assertRoute(manager: EntityManager, fromBranchId: string, toBranchId: string) {
     const from = await branchOf(manager, fromBranchId);
     if (from?.kind !== 'warehouse') {

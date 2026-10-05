@@ -10,6 +10,7 @@ import { auditService } from '../audit/audit.service';
 import { categoriesRepository } from '../categories/categories.repository';
 import { inventoryItemsService } from '../inventory/inventory-items.service';
 import { stockLedger } from '../inventory/stock-ledger';
+import { transfersService } from '../inventory/transfers.service';
 import { suppliersRepository } from '../suppliers/suppliers.repository';
 import { type ProductPurchaseEntry } from './product-purchase-entry.entity';
 import { type Product } from './product.entity';
@@ -155,6 +156,7 @@ async function insertPurchase(
   product: Product,
   input: CreatePurchaseInput,
 ) {
+  await transfersService.assertReceivesFromWarehouse(manager, branchId);
   await assertSupplier(branchId, input.supplierId, manager);
   const entry = await purchaseEntriesRepository.create(
     branchId,
@@ -312,8 +314,10 @@ export const productsService = {
       const previousQty = new Decimal(entry.quantity);
       Object.assign(entry, input, { updatedBy: actor.userId });
       if (!new Decimal(entry.quantity).equals(previousQty)) {
-        if (new Decimal(entry.quantity).gt(previousQty)) await assertNotTracked(em, branchId, productId);
-        else await assertUnlabelledRoom(em, branchId, productId, previousQty.minus(entry.quantity));
+        if (new Decimal(entry.quantity).gt(previousQty)) {
+          await transfersService.assertReceivesFromWarehouse(em, branchId);
+          await assertNotTracked(em, branchId, productId);
+        } else await assertUnlabelledRoom(em, branchId, productId, previousQty.minus(entry.quantity));
       }
       delete entry.supplier;
       await purchaseEntriesRepository.save(entry, em);

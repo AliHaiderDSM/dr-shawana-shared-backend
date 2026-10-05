@@ -7,6 +7,7 @@ import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import {
+  expiryAlertsQuerySchema,
   inventoryReportQuerySchema,
   productLedgerQuerySchema,
   productParamsSchema,
@@ -29,7 +30,9 @@ export const inventoryRouter = Router();
 const path = '/branch/inventory';
 const canViewStock = requirePermission('stock.view', 'inventoryReport.view');
 
-inventoryRouter.use(path, authenticate, branchScope());
+inventoryRouter.use(path, authenticate, (req, res, next) =>
+  branchScope({ allowAllForSuperAdmin: req.path === '/expiry-alerts' })(req, res, next),
+);
 
 inventoryRouter.get(
   `${path}/stock`,
@@ -41,6 +44,18 @@ inventoryRouter.get(
       validQuery(req, stockBalanceQuerySchema),
     );
     sendOk(res, items, meta);
+  },
+);
+
+inventoryRouter.get(
+  `${path}/expiry-alerts`,
+  canViewStock,
+  validate({ query: expiryAlertsQuerySchema }),
+  async (req: Request, res: Response) => {
+    sendOk(
+      res,
+      await inventoryService.expiryAlerts(req.branchId ?? null, validQuery(req, expiryAlertsQuerySchema)),
+    );
   },
 );
 

@@ -14,6 +14,12 @@ export const stockBalanceQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
   categoryId: z.uuid().optional(),
   lowStockOnly: booleanQuery.optional(),
+  productId: z.uuid().optional(),
+  branchId: z.uuid().optional(),
+});
+
+export const expiryAlertsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).default(90),
   branchId: z.uuid().optional(),
 });
 
@@ -111,6 +117,24 @@ export const productLedgerSchema = registry.register(
 );
 
 export type StockBalanceQuery = z.output<typeof stockBalanceQuerySchema>;
+export type ExpiryAlertsQuery = z.output<typeof expiryAlertsQuerySchema>;
+
+export const expiryAlertSchema = registry.register(
+  'ExpiryAlert',
+  z.object({
+    batchId: z.uuid(),
+    branchId: z.uuid(),
+    branchName: z.string(),
+    branchKind: z.enum(['branch', 'warehouse']),
+    productId: z.uuid(),
+    productName: z.string(),
+    unit: z.string(),
+    batchNo: z.string(),
+    expiryDate: z.iso.date(),
+    daysLeft: z.number().int(),
+    quantity: quantityOutput,
+  }),
+);
 export type InventoryReportQuery = z.output<typeof inventoryReportQuerySchema>;
 export type ProductLedgerQuery = z.output<typeof productLedgerQuerySchema>;
 
@@ -124,6 +148,18 @@ registry.registerPath({
   request: { query: stockBalanceQuerySchema },
   responses: {
     200: { description: 'Balances', ...jsonContent(pageEnvelope(stockBalanceSchema)) },
+    ...errorResponses,
+  },
+});
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/inventory/expiry-alerts',
+  summary:
+    'Batches in stock that expire within the next days (default 90) or have expired. Super Admin without branchId gets every branch and the Main Warehouse.',
+  request: { query: expiryAlertsQuerySchema },
+  responses: {
+    200: { description: 'Alerts, soonest first', ...jsonContent(dataEnvelope(z.array(expiryAlertSchema))) },
     ...errorResponses,
   },
 });

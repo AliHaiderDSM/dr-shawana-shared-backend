@@ -6,6 +6,7 @@ import { escapeLike, pageMeta } from '../../lib/pagination';
 import { today } from '../../lib/validation';
 import { productsRepository } from '../products/products.repository';
 import {
+  type ExpiryAlertsQuery,
   type InventoryReportQuery,
   type ProductLedgerQuery,
   type StockBalanceQuery,
@@ -61,10 +62,37 @@ function balanceFilters(branchId: string, query: StockBalanceQuery) {
     where.push(`(b.name ILIKE $${params.length} OR b.batch_no ILIKE $${params.length})`);
   }
   if (query.lowStockOnly) where.push('b.is_low_stock');
+  if (query.productId) {
+    params.push(query.productId);
+    where.push(`b.product_id = $${params.length}`);
+  }
   return { where: where.join(' AND '), params };
 }
 
 export const inventoryService = {
+  async expiryAlerts(branchId: string | null, query: ExpiryAlertsQuery) {
+    const params: unknown[] = [query.days];
+    if (branchId) params.push(branchId);
+    const rows: (Record<string, unknown> & { quantity: string; daysLeft: number })[] =
+      await AppDataSource.query(
+        `SELECT b.id AS "batchId", b.branch_id AS "branchId", br.name AS "branchName", br.kind AS "branchKind",
+              b.product_id AS "productId", p.name AS "productName", p.unit, b.batch_no AS "batchNo",
+              to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate", (b.expiry_date - CURRENT_DATE)::int AS "daysLeft",
+              SUM(m.qty)::text AS quantity
+         FROM product_batches b
+         JOIN branches br ON br.id = b.branch_id AND br.deleted_at IS NULL
+         JOIN products p ON p.id = b.product_id AND p.deleted_at IS NULL
+         JOIN stock_movements m ON m.batch_id = b.id
+        WHERE b.deleted_at IS NULL AND b.expiry_date <= CURRENT_DATE + $1::int
+          ${branchId ? 'AND b.branch_id = $2' : ''}
+        GROUP BY b.id, br.name, br.kind, p.name, p.unit
+       HAVING SUM(m.qty) > 0
+        ORDER BY b.expiry_date ASC, br.name ASC, p.name ASC`,
+        params,
+      );
+    return rows.map((r) => ({ ...r, quantity: toQuantity(r.quantity) }));
+  },
+
   async stock(branchId: string, query: StockBalanceQuery) {
     const { where, params } = balanceFilters(branchId, query);
     const [{ total }] = (await AppDataSource.query(

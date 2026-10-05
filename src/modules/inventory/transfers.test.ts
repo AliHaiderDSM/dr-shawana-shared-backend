@@ -201,6 +201,54 @@ describe('Main Warehouse transfers to branches', () => {
     expect(back.body.data).toMatchObject({ status: 'in_stock', branchName: 'Main Warehouse' });
   });
 
+  it('lets branches get stock only from the Main Warehouse', async () => {
+    const stockIn = await asBranch('post', '/branch/stock-ins').send({
+      date: '2026-10-04',
+      items: [{ productId: lahoreToner, qty: '5' }],
+    });
+    expect(stockIn.status).toBe(409);
+    const purchase = await asBranch('post', `/branch/products/${lahoreToner}/purchases`).send({
+      date: '2026-10-04',
+      quantity: '5',
+      unitPrice: '500',
+    });
+    expect(purchase.status).toBe(409);
+    const filtered = await asAdmin('get', `/branch/inventory/stock?productId=${toner}`);
+    expect(filtered.body.data).toHaveLength(1);
+    expect(filtered.body.data[0]).toMatchObject({ productId: toner, quantity: '70.000' });
+  });
+
+  it('warns about batches that expire within three months, everywhere for the Super Admin', async () => {
+    const soon = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    await asAdmin('post', '/branch/stock-ins').send({
+      date: '2026-10-04',
+      items: [{ productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
+    });
+    await asAdmin('post', '/branch/stock-outs').send({
+      date: '2026-10-04',
+      toBranchId: lahoreId,
+      items: [{ productId: toner, qty: '75' }],
+    });
+
+    const all = await request(app).get('/api/v1/branch/inventory/expiry-alerts').set(bearer(superAdmin));
+    expect(all.status).toBe(200);
+    const rows = all.body.data as {
+      branchName: string;
+      batchNo: string;
+      quantity: string;
+      daysLeft: number;
+    }[];
+    expect(rows.map((r) => `${r.branchName}:${r.batchNo}:${r.quantity}`).sort()).toEqual([
+      'Lahore:SOON-1:10.000',
+    ]);
+    expect(rows[0]!.daysLeft).toBe(30);
+
+    const branch = await asBranch('get', '/branch/inventory/expiry-alerts');
+    expect(branch.body.data.map((r: { branchName: string }) => r.branchName)).toEqual(['Lahore']);
+    const longer = await asBranch('get', '/branch/inventory/expiry-alerts?days=365');
+    expect(longer.body.data.map((r: { batchNo: string }) => r.batchNo)).toEqual(['SOON-1', 'T-01']);
+  });
+
   it('only transfers from the warehouse to an active branch', async () => {
     const fromBranch = await asBranch('post', '/branch/stock-outs').send({
       date: '2026-10-04',

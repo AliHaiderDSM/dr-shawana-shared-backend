@@ -345,6 +345,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         return await withTransaction(async (em) => {
           const partyId = input[config.partyKey] ?? null;
           await assertParty(branchId, partyId, em);
+          if (config.kind === 'stock_in') await transfersService.assertReceivesFromWarehouse(em, branchId);
           const route =
             config.kind === 'stock_out' && input.toBranchId
               ? await transfersService.assertRoute(em, branchId, input.toBranchId)

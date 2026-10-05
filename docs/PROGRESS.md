@@ -15,9 +15,31 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 | B6b   | Sale returns (inspection, refunds) and product barcodes                | ✅ Done (2026-10-01) |
 | B6c   | Product batches, expiry and FEFO allocation                            | ✅ Done (2026-10-05) |
 | B6d   | Labelled pieces (DSM serials), label printing and scanning             | ✅ Done (2026-10-05) |
+| B6e   | Main Warehouse and transfers to branches                               | ✅ Done (2026-10-05) |
 | B8    | Mobile app API (patients)                                              | ⏳ Next              |
 | B9    | Data migration from posSoft                                            | Not started          |
 | B10   | Hardening and deployment                                               | Not started          |
+
+---
+
+## B6e — Main Warehouse and transfers (done 2026-10-05)
+
+Stock now flows **Factory → Main Warehouse → Branch → Sale**.
+
+- **Main Warehouse:** `branches.kind` is `warehouse` or `branch` and replaces the old "head office" flag. The migration creates one warehouse (`MAINWH`, "Main Warehouse"). Only the Super Admin can open it: it cannot get staff, cannot be deactivated or deleted, and cannot sell (sale → 409). It comes first in `/admin/branches/options`, which now returns `kind`.
+- **Transfer:** in the warehouse, a Stock Out with `toBranchId` moves the stock to that branch in the same transaction:
+  - The branch product is found by `products.origin_product_id`, else by the same name (then linked), else copied with its category.
+  - Every batch keeps its number, dates and cost. Each batch arrives as a branch Stock In with `transfer_out_id`, marked "From Main Warehouse".
+  - Labelled pieces keep their DSM serial and only change branch, product and batch. Their history shows Received (warehouse) → Sent out → Received (branch).
+- The branch cannot edit or delete a transferred Stock In. Cancelling the transfer (deleting the warehouse Stock Out) works only while the branch has not sold or moved any of it; the stock and pieces then return to the warehouse. A transfer cannot change product, quantity or branch afterwards.
+- Branches cannot transfer, and the warehouse cannot transfer to itself.
+- **Branches receive stock only from the Main Warehouse:** once a warehouse exists, a branch Stock In or a purchase entry that adds stock (also a new product's first purchase) is a 409. The dashboard hides those buttons outside the warehouse.
+- **Stock on the Stock Out line:** `GET /branch/inventory/stock` takes `productId`; Stock Out shows, under the chosen product, the stock on hand and every batch with its quantity and expiry.
+- **Expiry alerts:** `GET /branch/inventory/expiry-alerts?days=90` lists batches in stock that expire within 90 days (or already expired), soonest first. The Super Admin without a branch gets every branch and the Main Warehouse. Shown on the dashboard and the Stock page.
+- **Dashboard:** the branch switcher shows the Main Warehouse on its own; in the warehouse, Patients & Care and Sales are hidden and Stock Out asks for "Transfer to branch"; branch Stock In marks transferred rows.
+- Migration `MainWarehouse`, tested up, down, up and for drift.
+
+**Verified:** lint, build and `npm test` (23 suites, 211 tests); a transfer, the Stock Out stock hint, the expiry alerts and the branch Stock In page driven in a browser.
 
 ---
 
