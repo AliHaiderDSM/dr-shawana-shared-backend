@@ -130,7 +130,10 @@ export const staffService = {
 
   async create(actor: Actor, branchId: string, input: NewStaffAccount) {
     assertCanManage(actor, input.role);
-    await ensureBranchExists(branchId);
+    const branch = await ensureBranchExists(branchId);
+    if (branch.kind === 'warehouse') {
+      throw AppError.conflict('The Main Warehouse has no staff. The Super Admin runs it.');
+    }
     return toStaffDto(await this.createAccount(actor, branchId, input));
   },
 

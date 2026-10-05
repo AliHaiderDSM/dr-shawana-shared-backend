@@ -2,6 +2,7 @@ import { type Decimal } from 'decimal.js';
 import { Check, Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BranchScopedEntity } from '../../database/branch-scoped.entity';
 import { quantityColumn } from '../../database/transformers';
+import { Branch } from '../branches/branch.entity';
 import { Product } from '../products/product.entity';
 import { Supplier } from '../suppliers/supplier.entity';
 
@@ -37,4 +38,12 @@ export class StockOut extends BranchScopedEntity {
 
   @Column({ type: 'text', nullable: true })
   note: string | null;
+
+  @Index()
+  @Column({ name: 'to_branch_id', type: 'uuid', nullable: true })
+  toBranchId: string | null;
+
+  @ManyToOne(() => Branch, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'to_branch_id' })
+  toBranch?: Branch | null;
 }

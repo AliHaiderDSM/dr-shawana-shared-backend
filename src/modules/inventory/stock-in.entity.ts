@@ -53,6 +53,10 @@ export class StockIn extends BranchScopedEntity {
   @Column({ name: 'unit_cost', ...moneyColumn({ nullable: true }) })
   unitCost: Decimal | null;
 
+  @Index()
+  @Column({ name: 'transfer_out_id', type: 'uuid', nullable: true })
+  transferOutId: string | null;
+
   @Column({ type: 'text', nullable: true })
   note: string | null;
 }

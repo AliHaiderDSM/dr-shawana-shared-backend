@@ -20,7 +20,7 @@ export function toBranchDto(branch: Branch) {
     phone: branch.phone,
     email: branch.email,
     logoPath: branch.logoPath,
-    isHeadOffice: branch.isHeadOffice,
+    kind: branch.kind,
     status: branch.status,
     createdAt: branch.createdAt,
     updatedAt: branch.updatedAt,
@@ -38,11 +38,8 @@ async function assertCodeAvailable(code: string, excludeId?: string, manager?: E
   if (existing && existing.id !== excludeId) throw AppError.conflict(`Branch code ${code} is already used`);
 }
 
-async function assertSingleHeadOffice(excludeId?: string, manager?: EntityManager) {
-  const headOffice = await branchesRepository.findHeadOffice(manager);
-  if (headOffice && headOffice.id !== excludeId) {
-    throw AppError.conflict(`${headOffice.name} is already the head office`);
-  }
+function assertNotWarehouse(branch: Branch, action: string) {
+  if (branch.kind === 'warehouse') throw AppError.conflict(`The Main Warehouse cannot be ${action}`);
 }
 
 export const branchesService = {
@@ -62,9 +59,8 @@ export const branchesService = {
   async create(actor: Actor, input: CreateBranchInput) {
     return withTransaction(async (em) => {
       await assertCodeAvailable(input.code, undefined, em);
-      if (input.isHeadOffice) await assertSingleHeadOffice(undefined, em);
       const branch = await branchesRepository.create(
-        { ...input, isHeadOffice: input.isHeadOffice ?? false, status: 'active', createdBy: actor.userId },
+        { ...input, kind: 'branch', status: 'active', createdBy: actor.userId },
         em,
       );
       await catalogService.seedBranch(branch.id, em);
@@ -87,7 +83,6 @@ export const branchesService = {
     return withTransaction(async (em) => {
       const branch = await getBranch(id, em);
       if (input.code && input.code !== branch.code) await assertCodeAvailable(input.code, id, em);
-      if (input.isHeadOffice && !branch.isHeadOffice) await assertSingleHeadOffice(id, em);
       const before = toBranchDto(branch);
       Object.assign(branch, input, { updatedBy: actor.userId });
       const saved = await branchesRepository.save(branch, em);
@@ -110,6 +105,7 @@ export const branchesService = {
   async setStatus(actor: Actor, id: string, status: BranchStatus) {
     return withTransaction(async (em) => {
       const branch = await getBranch(id, em);
+      if (status === 'inactive') assertNotWarehouse(branch, 'deactivated');
       if (branch.status === status) return toBranchDto(branch);
       const before = toBranchDto(branch);
       branch.status = status;
@@ -134,6 +130,7 @@ export const branchesService = {
   async remove(actor: Actor, id: string) {
     await withTransaction(async (em) => {
       const branch = await getBranch(id, em);
+      assertNotWarehouse(branch, 'deleted');
       if ((await staffRepository.countInBranch(id, em)) > 0) {
         throw AppError.conflict(
           'This branch still has staff. Deactivate it instead, or remove its staff first.',
@@ -155,7 +152,7 @@ export const branchesService = {
   },
 
   async createBranchAdmin(actor: Actor, branchId: string, input: Omit<NewStaffAccount, 'role'>) {
-    await getBranch(branchId);
+    assertNotWarehouse(await getBranch(branchId), 'given staff');
     const profile = await staffService.createAccount(actor, branchId, { ...input, role: 'branch_admin' });
     return toStaffDto(profile);
   },

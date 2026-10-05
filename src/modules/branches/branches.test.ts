@@ -24,7 +24,7 @@ describe('super admin branches', () => {
   let branchAdmin: { id: string };
 
   beforeAll(async () => {
-    const lahore = await createBranch({ code: 'LHR', name: 'Lahore', isHeadOffice: true });
+    const lahore = await createBranch({ code: 'LHR', name: 'Lahore' });
     superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
     branchAdmin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
   });
@@ -32,7 +32,7 @@ describe('super admin branches', () => {
   it('creates, lists, updates and deactivates a branch with audit logs', async () => {
     const created = await request(app).post('/api/v1/admin/branches').set(bearer(superAdmin)).send(newBranch);
     expect(created.status).toBe(201);
-    expect(created.body.data).toMatchObject({ code: 'ISB', status: 'active', isHeadOffice: false });
+    expect(created.body.data).toMatchObject({ code: 'ISB', status: 'active', kind: 'branch' });
     const id = created.body.data.id;
 
     const list = await request(app).get('/api/v1/admin/branches?search=islam').set(bearer(superAdmin));
@@ -52,18 +52,32 @@ describe('super admin branches', () => {
     expect(actions.map((a) => a.action).sort()).toEqual(['create', 'deactivate', 'update']);
   });
 
-  it('rejects duplicate codes and a second head office', async () => {
+  it('rejects duplicate codes and protects the Main Warehouse', async () => {
     const dup = await request(app)
       .post('/api/v1/admin/branches')
       .set(bearer(superAdmin))
       .send({ ...newBranch, code: 'LHR' });
     expect(dup.status).toBe(409);
 
-    const head = await request(app)
-      .post('/api/v1/admin/branches')
+    const warehouse = await createBranch({ code: 'MAIN', name: 'Main Warehouse', kind: 'warehouse' });
+    expect(
+      (await request(app).post(`/api/v1/admin/branches/${warehouse.id}/deactivate`).set(bearer(superAdmin)))
+        .status,
+    ).toBe(409);
+    expect(
+      (await request(app).delete(`/api/v1/admin/branches/${warehouse.id}`).set(bearer(superAdmin))).status,
+    ).toBe(409);
+    const admin = await request(app)
+      .post(`/api/v1/admin/branches/${warehouse.id}/admin`)
       .set(bearer(superAdmin))
-      .send({ ...newBranch, code: 'KHI', isHeadOffice: true });
-    expect(head.status).toBe(409);
+      .send({
+        firstName: 'W',
+        lastName: 'H',
+        email: 'wh@test.dsm',
+        username: 'wh.admin',
+        password: 'Secret123!',
+      });
+    expect(admin.status).toBe(409);
   });
 
   it('validates input', async () => {

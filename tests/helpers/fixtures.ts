@@ -18,7 +18,6 @@ export async function createBranch(overrides: Partial<Branch> & { status?: Branc
       name: `Branch ${n}`,
       code: `B${n}`,
       city: 'Lahore',
-      isHeadOffice: false,
       status: 'active',
       ...overrides,
     }),

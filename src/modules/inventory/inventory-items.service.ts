@@ -85,8 +85,8 @@ async function recordEvents(
 ) {
   if (itemIds.length === 0) return;
   await manager.query(
-    `INSERT INTO inventory_item_events (item_id, branch_id, type, reference_type, reference_id, reference_label, note, created_by)
-     SELECT i.id, i.branch_id, $2, $3, $4, $5, $6, $7 FROM inventory_items i WHERE i.id = ANY($1)`,
+    `INSERT INTO inventory_item_events (item_id, branch_id, type, reference_type, reference_id, reference_label, note, created_by, created_at)
+     SELECT i.id, i.branch_id, $2, $3, $4, $5, $6, $7, clock_timestamp() FROM inventory_items i WHERE i.id = ANY($1)`,
     [itemIds, type, ref?.type ?? null, ref?.id ?? null, ref?.label ?? null, note ?? null, actor.userId],
   );
 }

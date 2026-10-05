@@ -4,12 +4,15 @@ import { BaseEntity } from '../../database/base.entity';
 export const BRANCH_STATUSES = ['active', 'inactive'] as const;
 export type BranchStatus = (typeof BRANCH_STATUSES)[number];
 
+export const BRANCH_KINDS = ['branch', 'warehouse'] as const;
+export type BranchKind = (typeof BRANCH_KINDS)[number];
+
 @Entity('branches')
 @Check('CHK_branches_code_format', `"code" ~ '^[A-Z0-9]{2,10}$'`)
 @Index('UQ_branches_code', ['code'], { unique: true, where: '"deleted_at" IS NULL' })
-@Index('UQ_branches_head_office', ['isHeadOffice'], {
+@Index('UQ_branches_single_warehouse', ['kind'], {
   unique: true,
-  where: '"is_head_office" = true AND "deleted_at" IS NULL',
+  where: `"kind" = 'warehouse' AND "deleted_at" IS NULL`,
 })
 export class Branch extends BaseEntity {
   @Column({ type: 'varchar', length: 150 })
@@ -33,8 +36,8 @@ export class Branch extends BaseEntity {
   @Column({ name: 'logo_path', type: 'text', nullable: true })
   logoPath: string | null;
 
-  @Column({ name: 'is_head_office', type: 'boolean', default: false })
-  isHeadOffice: boolean;
+  @Column({ type: 'enum', enum: BRANCH_KINDS, enumName: 'branch_kind', default: 'branch' })
+  kind: BranchKind;
 
   @Index()
   @Column({ type: 'enum', enum: BRANCH_STATUSES, enumName: 'branch_status', default: 'active' })

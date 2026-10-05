@@ -16,13 +16,12 @@ export const lahoreHeadOffice: Seed = {
     if (existing) return;
     await branches.save(
       branches.create({
-        name: 'Lahore Head Office',
+        name: 'Lahore',
         code: 'LHR',
         city: 'Lahore',
         address: '123 E Hali road, Gulberg Lahore, Pakistan',
         phone: '03284905049',
         email: 'info@drshawanamufti.com',
-        isHeadOffice: true,
         status: 'active',
       }),
     );

@@ -3,7 +3,7 @@ import { dataEnvelope, errorResponses, idParamsSchema, jsonContent, pageEnvelope
 import { bearerAuth, registry } from '../../lib/openapi';
 import { listQuerySchema } from '../../lib/pagination';
 import { createBranchAdminSchema, staffSchema } from '../staff/staff.schemas';
-import { BRANCH_STATUSES } from './branch.entity';
+import { BRANCH_KINDS, BRANCH_STATUSES } from './branch.entity';
 
 const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
 
@@ -19,7 +19,6 @@ const branchFields = z.object({
   phone: optionalText(30),
   email: z.email().trim().toLowerCase().max(150).nullable().optional(),
   logoPath: optionalText(500),
-  isHeadOffice: z.boolean().optional(),
 });
 
 export const createBranchSchema = registry.register('CreateBranch', branchFields);
@@ -44,14 +43,23 @@ export const branchSchema = registry.register(
     phone: z.string().nullable(),
     email: z.string().nullable(),
     logoPath: z.string().nullable(),
-    isHeadOffice: z.boolean(),
+    kind: z
+      .enum(BRANCH_KINDS)
+      .openapi({ description: 'warehouse: the Main Warehouse (Super Admin only); branch: a selling branch' }),
     status: z.enum(BRANCH_STATUSES),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   }),
 );
 
-const branchOptionSchema = branchSchema.pick({ id: true, name: true, code: true, city: true, status: true });
+const branchOptionSchema = branchSchema.pick({
+  id: true,
+  name: true,
+  code: true,
+  city: true,
+  status: true,
+  kind: true,
+});
 
 export type CreateBranchInput = z.output<typeof createBranchSchema>;
 export type UpdateBranchInput = z.output<typeof updateBranchSchema>;

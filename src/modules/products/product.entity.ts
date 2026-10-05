@@ -58,4 +58,8 @@ export class Product extends BranchScopedEntity {
 
   @Column({ name: 'track_serials', type: 'boolean', default: false })
   trackSerials: boolean;
+
+  @Index()
+  @Column({ name: 'origin_product_id', type: 'uuid', nullable: true })
+  originProductId: string | null;
 }

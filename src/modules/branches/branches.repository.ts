@@ -16,8 +16,8 @@ export const branchesRepository = {
     return repo(Branch, manager).findOne({ where: { code } });
   },
 
-  findHeadOffice(manager?: EntityManager) {
-    return repo(Branch, manager).findOne({ where: { isHeadOffice: true } });
+  findWarehouse(manager?: EntityManager) {
+    return repo(Branch, manager).findOne({ where: { kind: 'warehouse' } });
   },
 
   list(query: BranchListQuery, manager?: EntityManager) {
@@ -31,8 +31,8 @@ export const branchesRepository = {
 
   options(manager?: EntityManager) {
     return repo(Branch, manager).find({
-      select: { id: true, name: true, code: true, city: true, status: true },
-      order: { name: 'ASC' },
+      select: { id: true, name: true, code: true, city: true, status: true, kind: true },
+      order: { kind: 'DESC', name: 'ASC' },
     });
   },
 

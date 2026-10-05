@@ -94,12 +94,29 @@ export const createStockInSchema = registry.register(
 
 export const createStockOutSchema = registry.register(
   'CreateStockOut',
-  z.object({
-    dispatcherId: optionalUuid,
-    date: dateInput,
-    note: optionalText(1000),
-    items: itemsOf({ destination: requiredText(1, 150), serials: serialsInput.optional() }),
-  }),
+  z
+    .object({
+      dispatcherId: optionalUuid,
+      toBranchId: optionalUuid.openapi({
+        description:
+          'Main Warehouse only: the branch that receives the stock. Its Stock In is created automatically.',
+      }),
+      date: dateInput,
+      note: optionalText(1000),
+      items: itemsOf({ destination: optionalText(150), serials: serialsInput.optional() }),
+    })
+    .superRefine((value, ctx) => {
+      if (value.toBranchId) return;
+      value.items.forEach((item, index) => {
+        if (!item.destination) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['items', index, 'destination'],
+            message: 'Where does it go?',
+          });
+        }
+      });
+    }),
 );
 
 export const updateStockInSchema = registry.register(
@@ -190,6 +207,10 @@ export const stockInSchema = registry.register(
     supplier: partySchema,
     batch: z.string().nullable(),
     batchId: z.uuid().nullable(),
+    transferOutId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: 'Set when the stock came from the Main Warehouse' }),
     manufacturingDate: z.iso.date().nullable(),
     expiryDate: z.iso.date().nullable(),
     unitCost: moneyOutput.nullable(),
@@ -202,6 +223,8 @@ export const stockOutSchema = registry.register(
     dispatcherId: z.uuid().nullable(),
     dispatcher: partySchema,
     destination: z.string(),
+    toBranchId: z.uuid().nullable(),
+    toBranch: z.object({ id: z.uuid(), name: z.string() }).nullable(),
   }),
 );
 

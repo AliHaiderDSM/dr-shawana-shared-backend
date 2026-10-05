@@ -12,7 +12,8 @@ import { BUCKETS, createSignedUrl } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { type SupplierType } from '../suppliers/supplier.entity';
 import { suppliersService } from '../suppliers/suppliers.service';
-import { inventoryItemsService } from './inventory-items.service';
+import { inventoryItemsService, type TakenItem } from './inventory-items.service';
+import { transfersService } from './transfers.service';
 import { productBatchesService } from './product-batches.service';
 import { StockAttachment, type StockDocumentType } from './stock-attachment.entity';
 import { type StockIn } from './stock-in.entity';
@@ -39,6 +40,7 @@ interface CreateInput {
   note?: string | null;
   supplierId?: string | null;
   dispatcherId?: string | null;
+  toBranchId?: string | null;
   items: ({
     productId: string;
     qty: string;
@@ -164,21 +166,25 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
   function toDto(record: T, files: StockAttachment[] = [], labels: LabelRange | null = null) {
     const plain = withoutInternals(record) as Record<string, unknown>;
     const party = plain[config.partyRelation] as { id: string; name: string } | null | undefined;
+    const target = plain.toBranch as { id: string; name: string } | null | undefined;
     const product = record.product;
-    return {
+    const dto: Record<string, unknown> = {
       ...plain,
       product: product ? { id: product.id, name: product.name } : null,
       [config.partyRelation]: party ? { id: party.id, name: party.name } : null,
       attachments: files.map(toAttachmentDto),
       labels,
     };
+    if (config.kind === 'stock_out') dto.toBranch = target ? { id: target.id, name: target.name } : null;
+    return dto;
   }
 
   function detailed(branchId: string, manager?: EntityManager) {
-    return base
+    const qb = base
       .query(branchId, manager)
       .leftJoinAndSelect('d.product', 'product')
       .leftJoinAndSelect(`d.${config.partyRelation}`, 'party');
+    return config.kind === 'stock_out' ? qb.leftJoinAndSelect('d.toBranch', 'toBranch') : qb;
   }
 
   async function getRecord(branchId: string, id: string, manager?: EntityManager) {
@@ -230,7 +236,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     record: T,
     product: { name: string; trackSerials: boolean },
     pieces: { labels?: string; firstSerial?: string; serials?: string[] },
-  ) {
+  ): Promise<TakenItem[]> {
     const ref = ledgerRef(actor, record);
     if (config.kind === 'stock_in') {
       const stockIn = record as StockIn;
@@ -241,7 +247,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           `${product.name} is tracked by label: print new labels or enter the first label on the packs`,
         );
       }
-      if (mode === 'none') return;
+      if (mode === 'none') return [];
       const common = {
         branchId: record.branchId,
         productId: record.productId,
@@ -258,13 +264,13 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           ...common,
           firstSerial: pieces.firstSerial ?? '',
         });
-      return;
+      return [];
     }
     const serials = pieces.serials ?? [];
     if (!product.trackSerials) {
       if (serials.length > 0) throw AppError.badRequest(`${product.name} is not tracked by label`);
       await stockLedger.apply(manager, ref, [movementFor(record)]);
-      return;
+      return [];
     }
     if (!record.qty.equals(serials.length)) {
       throw AppError.unprocessable(
@@ -287,6 +293,15 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       ref,
       inventoryItemsService.movements(taken, -1, { type: 'stock_out', date: record.date, note: record.note }),
     );
+    return taken;
+  }
+
+  function assertNotTransferIn(record: T) {
+    if ((record as Partial<StockIn>).transferOutId) {
+      throw AppError.conflict(
+        'This stock came from the Main Warehouse. Only the Super Admin can cancel the transfer there.',
+      );
+    }
   }
 
   async function piecesOf(manager: EntityManager, record: T) {
@@ -330,6 +345,10 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         return await withTransaction(async (em) => {
           const partyId = input[config.partyKey] ?? null;
           await assertParty(branchId, partyId, em);
+          const route =
+            config.kind === 'stock_out' && input.toBranchId
+              ? await transfersService.assertRoute(em, branchId, input.toBranchId)
+              : null;
           const ids: string[] = [];
           for (const item of input.items) {
             const { labels, firstSerial, serials, ...fields } = item;
@@ -343,10 +362,12 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
                 [config.partyKey]: partyId,
                 date: input.date,
                 note: input.note ?? null,
+                ...(route ? { toBranchId: route.id, destination: route.name } : {}),
               } as unknown as Partial<T>,
               em,
             );
-            await postPieces(em, actor, record, product, { labels, firstSerial, serials });
+            const taken = await postPieces(em, actor, record, product, { labels, firstSerial, serials });
+            if (route) await transfersService.receive(em, actor, record as StockOut, route, taken);
             ids.push(record.id);
           }
           await saveAttachments(em, actor, branchId, ids, uploaded);
@@ -375,9 +396,11 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     async update(actor: Actor, branchId: string, id: string, input: UpdateInput) {
       return withTransaction(async (em) => {
         const record = await getRecord(branchId, id, em);
+        assertNotTransferIn(record);
         if (config.partyKey in input)
           await assertParty(branchId, input[config.partyKey] as string | null, em);
         const before = await getDto(branchId, id, em);
+        const transfer = Boolean((record as Partial<StockOut>).toBranchId);
         const pieces = await piecesOf(em, record);
         const previous = {
           productId: record.productId,
@@ -393,11 +416,17 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           record.productId !== previous.productId ||
           !new Decimal(record.qty).equals(previous.qty) ||
           ((record as Partial<StockIn>).batch ?? null) !== previous.batch;
+        if (changed && transfer) {
+          throw AppError.conflict(
+            'This is a transfer to a branch. Delete it and transfer again to change it.',
+          );
+        }
         if (changed && (pieces > 0 || tracked.size > 0)) {
           throw AppError.conflict(
             'This entry is for a product tracked by label. Delete it and enter it again to change the product, quantity or batch.',
           );
         }
+        if (transfer && 'destination' in input) delete (record as Partial<StockOut>).destination;
         Object.assign(
           record,
           await batchFieldsFor(
@@ -414,7 +443,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         delete record.product;
         delete (record as unknown as Record<string, unknown>)[config.partyRelation];
         const saved = await base.save(record, em);
-        if (pieces === 0 && tracked.size === 0) {
+        if (pieces === 0 && tracked.size === 0 && !transfer) {
           await stockLedger.replace(em, ledgerRef(actor, saved), [movementFor(saved)]);
         }
         const after = await getDto(branchId, id, em);
@@ -430,6 +459,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       await withTransaction(async (em) => {
         const before = await getDto(branchId, id, em);
         const record = await getRecord(branchId, id, em);
+        assertNotTransferIn(record);
+        if (config.kind === 'stock_out') await transfersService.undo(em, actor, record as StockOut);
         if (config.kind === 'stock_in') {
           const removed = await inventoryItemsService.removeUntouched(em, branchId, 'stock_in', record.id);
           const tracked = await inventoryItemsService.trackedProducts(em, branchId, [record.productId]);
