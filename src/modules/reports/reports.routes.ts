@@ -14,6 +14,7 @@ import {
   accountsBalanceQuerySchema,
   appointmentPaymentsReportQuerySchema,
   appointmentsReportQuerySchema,
+  branchStockQuerySchema,
   dashboardQuerySchema,
   doctorSalesQuerySchema,
   expensesReportQuerySchema,
@@ -58,6 +59,7 @@ const adminOrAccountant = requireRole('branch_admin', 'accountant');
 mount('sale-products', requirePermission('sales.view'), saleProductsQuerySchema, reportsService.saleProducts);
 mount('purchases', adminOrAccountant, purchasesQuerySchema, reportsService.purchases);
 mount('stock', adminOrAccountant, stockReportQuerySchema, reportsService.stock);
+mount('branch-stock', adminOrAccountant, branchStockQuerySchema, reportsService.branchStock);
 mount(
   'appointments',
   requirePermission('appointments.view'),

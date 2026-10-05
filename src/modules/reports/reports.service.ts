@@ -18,6 +18,7 @@ import {
   type PurchasesQuery,
   type SaleProductsQuery,
   type StockReportQuery,
+  type BranchStockQuery,
 } from './reports.schemas';
 
 export interface ReportScope {
@@ -62,7 +63,12 @@ export const reportsService = {
       .add('si.deleted_at IS NULL')
       .period('s.date', q)
       .when(q.patientId, 's.patient_id = ?', q.patientId)
-      .when(q.productId, 'si.product_id = ?', q.productId)
+      .when(
+        q.productId,
+        'si.product_id IN (SELECT id FROM products WHERE id = ? OR origin_product_id = ?)',
+        q.productId,
+        q.productId,
+      )
       .when(q.saleType, 's.sale_type = ?', q.saleType)
       .when(q.city, 's.city ILIKE ?', q.city)
       .when(q.patientCity, 's.patient_city ILIKE ?', q.patientCity)
@@ -123,7 +129,12 @@ export const reportsService = {
       .period('pe.date', q)
       .when(q.supplierId, 'pe.supplier_id = ?', q.supplierId)
       .when(q.categoryId, 'pr.category_id = ?', q.categoryId)
-      .when(q.productId, 'pe.product_id = ?', q.productId);
+      .when(
+        q.productId,
+        'pe.product_id IN (SELECT id FROM products WHERE id = ? OR origin_product_id = ?)',
+        q.productId,
+        q.productId,
+      );
     const rows = await query(
       `SELECT b.code AS branch, to_char(pe.date, 'YYYY-MM-DD') AS date, sup.name AS supplier, sup.phone AS "supplierPhone",
               pr.batch_no AS batch, pr.name AS product, c.name AS category, pe.quantity::text AS qty,
@@ -160,7 +171,12 @@ export const reportsService = {
     const f = scoped(scope, 'm.branch_id')
       .period('m.date', q)
       .when(q.categoryId, 'pr.category_id = ?', q.categoryId)
-      .when(q.productId, 'm.product_id = ?', q.productId);
+      .when(
+        q.productId,
+        'm.product_id IN (SELECT id FROM products WHERE id = ? OR origin_product_id = ?)',
+        q.productId,
+        q.productId,
+      );
     const rows = await query(
       `SELECT b.code AS branch, pr.batch_no AS batch, pr.name AS product, c.name AS category,
               to_char(m.date, 'YYYY-MM-DD') AS date,
@@ -196,6 +212,60 @@ export const reportsService = {
       ],
       rows,
       ['bought', 'stockIn', 'manufactured', 'stockOut', 'sold', 'returned'],
+      3,
+    );
+  },
+
+  async branchStock(scope: ReportScope, q: BranchStockQuery) {
+    const month = q.month ?? (q.from || q.to ? null : currentMonth());
+    const from = q.from ?? (month ? `${month}-01` : '2000-01-01');
+    const to =
+      q.to ??
+      (month
+        ? new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0))
+            .toISOString()
+            .slice(0, 10)
+        : today());
+    const f = new SqlFilter()
+      .add("b.kind = 'branch'")
+      .add('b.deleted_at IS NULL')
+      .add('pr.deleted_at IS NULL')
+      .when(scope.branchId, 'pr.branch_id = ?', scope.branchId)
+      .when(q.productId, '(pr.id = ? OR pr.origin_product_id = ?)', q.productId, q.productId);
+    const params = [...f.params, from, to];
+    const p = params.length;
+    const range = `m.date BETWEEN $${p - 1} AND $${p}`;
+    const rows = await query(
+      `SELECT * FROM (
+         SELECT b.code AS branch, pr.name AS product,
+                COALESCE((SELECT SUM(si.qty) FROM stock_ins si
+                           WHERE si.product_id = pr.id AND si.deleted_at IS NULL AND si.transfer_out_id IS NOT NULL
+                             AND si.date BETWEEN $${p - 1} AND $${p}), 0)::numeric(12,3)::text AS transferred,
+                COALESCE((SELECT -SUM(m.qty) FROM stock_movements m
+                           WHERE m.product_id = pr.id AND m.type IN ('sale', 'sale_edit_adjust') AND ${range}), 0)::numeric(12,3)::text AS sold,
+                COALESCE((SELECT SUM(m.qty) FROM stock_movements m
+                           WHERE m.product_id = pr.id AND m.type = 'sale_return' AND ${range}), 0)::numeric(12,3)::text AS returned,
+                COALESCE((SELECT SUM(m.qty) FROM stock_movements m
+                           WHERE m.product_id = pr.id AND m.date <= $${p}), 0)::numeric(12,3)::text AS "inBranch"
+           FROM products pr
+           JOIN branches b ON b.id = pr.branch_id
+          ${f.where}) t
+        WHERE t.transferred::numeric <> 0 OR t.sold::numeric <> 0 OR t.returned::numeric <> 0 OR t."inBranch"::numeric <> 0
+        ORDER BY t.branch, t.product`,
+      params,
+    );
+    return build(
+      scope,
+      'Branch Stock Report',
+      [
+        { key: 'product', label: 'Product Name' },
+        { key: 'transferred', label: 'Stock Out (received)' },
+        { key: 'sold', label: 'Sale Qty' },
+        { key: 'returned', label: 'Returned' },
+        { key: 'inBranch', label: 'In Branch' },
+      ],
+      rows,
+      ['transferred', 'sold', 'returned', 'inBranch'],
       3,
     );
   },
@@ -328,7 +398,8 @@ export const reportsService = {
                        WHERE a.patient_id = s.patient_id AND a.doctor_id = d.id AND a.deleted_at IS NULL)
          JOIN patients p ON p.id = s.patient_id
          JOIN sale_items si ON si.sale_id = s.id AND si.deleted_at IS NULL
-          AND ($${productParam}::uuid IS NULL OR si.product_id = $${productParam})
+          AND ($${productParam}::uuid IS NULL OR si.product_id IN (
+                SELECT id FROM products WHERE id = $${productParam} OR origin_product_id = $${productParam}))
          JOIN branches b ON b.id = s.branch_id
         ${f.where}
         GROUP BY b.code, d.id, s.id, p.id

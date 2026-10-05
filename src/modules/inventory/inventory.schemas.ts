@@ -30,7 +30,20 @@ const dateRange = {
 };
 
 export const inventoryReportQuerySchema = z
-  .object({ ...dateRange, categoryId: z.uuid().optional(), productId: z.uuid().optional() })
+  .object({
+    ...dateRange,
+    categoryId: z.uuid().optional(),
+    productId: z.uuid().optional(),
+    supplierId: z
+      .uuid()
+      .optional()
+      .openapi({ description: 'Only stock in and purchases from this supplier' }),
+    dispatcherId: z.uuid().optional().openapi({ description: 'Only stock out through this dispatcher' }),
+    toBranchId: z.uuid().optional().openapi({
+      description:
+        'Super Admin Stock: only transfers to this branch, plus its sales and stock left (posSoft Stock To)',
+    }),
+  })
   .refine((v) => !v.from || !v.to || v.from <= v.to, {
     path: ['to'],
     message: '"to" must be on or after "from"',
@@ -76,6 +89,10 @@ const reportRow = z.object({
   returned: quantityOutput,
   adjusted: quantityOutput,
   closing: quantityOutput,
+  branchSold: quantityOutput.openapi({ description: 'Sold at the toBranchId branch (0 without it)' }),
+  inBranch: quantityOutput.openapi({
+    description: 'Left at the toBranchId branch on the last day (0 without it)',
+  }),
 });
 
 export const inventoryReportSchema = registry.register(

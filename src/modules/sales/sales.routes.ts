@@ -28,10 +28,12 @@ const byPayment = validate({ params: salePaymentParamsSchema });
 const can = (action: 'view' | 'create' | 'update' | 'delete') => requirePermission(`sales.${action}`);
 const paymentOf = (req: Request) => validParams(req, salePaymentParamsSchema);
 
-salesRouter.use(path, authenticate, branchScope());
+salesRouter.use(path, authenticate, (req, res, next) =>
+  branchScope({ allowAllForSuperAdmin: req.method === 'GET' && req.path === '/' })(req, res, next),
+);
 
 salesRouter.get(path, can('view'), validate({ query: saleListQuerySchema }), async (req, res) => {
-  const { items, meta } = await salesService.list(branchIdOf(req), validQuery(req, saleListQuerySchema));
+  const { items, meta } = await salesService.list(req.branchId ?? null, validQuery(req, saleListQuerySchema));
   sendOk(res, items, meta);
 });
 

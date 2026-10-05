@@ -251,6 +251,63 @@ describe('Main Warehouse transfers to branches', () => {
     expect(longer.body.data.map((r: { batchNo: string }) => r.batchNo)).toEqual(['SOON-1', 'T-01']);
   });
 
+  it('reports per branch what was received, sold and is left, like the posSoft inventory report', async () => {
+    const all = await request(app)
+      .get(`/api/v1/branch/reports/branch-stock?from=2026-10-01&to=2026-12-31&productId=${serum}`)
+      .set(bearer(superAdmin));
+    expect(all.status).toBe(200);
+    expect(all.body.data.rows).toEqual([
+      {
+        branch: 'LHR',
+        product: 'Vitamin C Serum',
+        transferred: '4.000',
+        sold: '1.000',
+        returned: '0.000',
+        inBranch: '3.000',
+      },
+    ]);
+    expect(all.body.data.byBranch).toEqual([
+      { branch: 'LHR', transferred: '4.000', sold: '1.000', returned: '0.000', inBranch: '3.000' },
+    ]);
+    const own = await asBranch('get', '/branch/reports/branch-stock?from=2026-10-01&to=2026-12-31');
+    expect(own.status).toBe(200);
+    expect(own.body.data.rows.map((r: { product: string }) => r.product).sort()).toEqual([
+      'Vitamin C Serum',
+      'rose toner',
+    ]);
+  });
+
+  it('filters the inventory report by stock to, and lists every branch sale for the Super Admin', async () => {
+    const report = await asAdmin(
+      'get',
+      `/branch/inventory/report?from=2026-10-01&to=2026-12-31&toBranchId=${lahoreId}&productId=${serum}`,
+    );
+    expect(report.status).toBe(200);
+    expect(report.body.data.rows[0]).toMatchObject({
+      name: 'Vitamin C Serum',
+      stockOut: '4.000',
+      branchSold: '1.000',
+      inBranch: '3.000',
+    });
+    const otherDispatcher = await asAdmin(
+      'get',
+      `/branch/inventory/report?from=2026-10-01&to=2026-12-31&dispatcherId=${lahoreId}&productId=${serum}`,
+    );
+    expect(otherDispatcher.body.data.rows[0].stockOut).toBe('0.000');
+
+    const sales = await request(app).get('/api/v1/branch/sales').set(bearer(superAdmin));
+    expect(sales.status).toBe(200);
+    expect(sales.body.data).toHaveLength(1);
+    expect(sales.body.data[0].branch).toMatchObject({ code: 'LHR', name: 'Lahore' });
+    const byProduct = await request(app)
+      .get(`/api/v1/branch/sales?productId=${serum}`)
+      .set(bearer(superAdmin));
+    expect(byProduct.body.data).toHaveLength(1);
+    const byToner = await request(app).get(`/api/v1/branch/sales?productId=${toner}`).set(bearer(superAdmin));
+    expect(byToner.body.data).toHaveLength(0);
+    expect((await asBranch('get', `/branch/sales?branchId=${warehouseId}`)).status).toBe(403);
+  });
+
   it('only transfers from the warehouse to an active branch', async () => {
     const fromBranch = await asBranch('post', '/branch/stock-outs').send({
       date: '2026-10-04',

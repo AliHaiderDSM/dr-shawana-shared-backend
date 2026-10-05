@@ -1,4 +1,4 @@
-import { type EntityManager, type SelectQueryBuilder } from 'typeorm';
+import { In, type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
 import { AppDataSource } from '../../database/data-source';
@@ -365,7 +365,8 @@ function applyFilters(qb: SelectQueryBuilder<Sale>, query: SaleListQuery) {
   if (query.to) qb.andWhere('sale.date <= :to', { to: query.to });
   if (query.productId) {
     qb.andWhere(
-      'EXISTS (SELECT 1 FROM sale_items x WHERE x.sale_id = sale.id AND x.product_id = :productId AND x.deleted_at IS NULL)',
+      `EXISTS (SELECT 1 FROM sale_items x WHERE x.sale_id = sale.id AND x.deleted_at IS NULL
+          AND x.product_id IN (SELECT id FROM products WHERE id = :productId OR origin_product_id = :productId))`,
       { productId: query.productId },
     );
   }
@@ -401,9 +402,18 @@ export const salesService = {
   getRecord: getSale,
   toDto: toSaleDto,
 
-  async list(branchId: string, query: SaleListQuery) {
-    const qb = applyFilters(sales.query(branchId).leftJoinAndSelect('sale.patient', 'patient'), query);
-    const totals = await applyFilters(sales.query(branchId).leftJoin('sale.patient', 'patient'), query)
+  async list(branchId: string | null, query: SaleListQuery) {
+    const base = () =>
+      branchId
+        ? sales.query(branchId)
+        : repo(Sale)
+            .createQueryBuilder('sale')
+            .innerJoin('sale.branch', 'onlyBranches', "onlyBranches.kind = 'branch'");
+    const qb = applyFilters(
+      base().leftJoinAndSelect('sale.patient', 'patient').leftJoinAndSelect('sale.branch', 'saleBranch'),
+      query,
+    );
+    const totals = await applyFilters(base().leftJoin('sale.patient', 'patient'), query)
       .select('COUNT(*)', 'count')
       .addSelect('COALESCE(SUM(sale.totalQty), 0)', 'qty')
       .addSelect('COALESCE(SUM(sale.subtotal), 0)', 'subtotal')
@@ -421,10 +431,7 @@ export const salesService = {
     );
     const rows = await qb.getMany();
     const withPayments = rows.length
-      ? await salePayments
-          .query(branchId)
-          .andWhere('sp.saleId IN (:...ids)', { ids: rows.map((r) => r.id) })
-          .getMany()
+      ? await repo(SalePayment).find({ where: { saleId: In(rows.map((r) => r.id)) } })
       : [];
     return {
       items: rows.map((r) => {
@@ -437,7 +444,10 @@ export const salesService = {
           items: [],
           payments: withPayments.filter((p) => p.saleId === r.id),
         } as Sale);
-        return rest;
+        return {
+          ...rest,
+          branch: r.branch ? { id: r.branch.id, code: r.branch.code, name: r.branch.name } : null,
+        };
       }),
       meta: {
         ...pageMeta(query, Number(totals?.count ?? 0)),

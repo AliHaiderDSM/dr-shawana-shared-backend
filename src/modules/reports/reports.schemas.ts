@@ -39,6 +39,14 @@ export const stockReportQuerySchema = z.object({
   productId: z.uuid().optional(),
 });
 
+export const branchStockQuerySchema = z.object({
+  ...base,
+  productId: z
+    .uuid()
+    .optional()
+    .openapi({ description: 'A Super Admin Stock product matches the branch products made from it' }),
+});
+
 export const appointmentsReportQuerySchema = z.object({
   ...base,
   status: z.enum(APPOINTMENT_STATUSES).optional(),
@@ -104,6 +112,7 @@ export const dashboardQuerySchema = z
 export type SaleProductsQuery = z.output<typeof saleProductsQuerySchema>;
 export type PurchasesQuery = z.output<typeof purchasesQuerySchema>;
 export type StockReportQuery = z.output<typeof stockReportQuerySchema>;
+export type BranchStockQuery = z.output<typeof branchStockQuerySchema>;
 export type AppointmentsReportQuery = z.output<typeof appointmentsReportQuerySchema>;
 export type AppointmentPaymentsReportQuery = z.output<typeof appointmentPaymentsReportQuerySchema>;
 export type DoctorSalesQuery = z.output<typeof doctorSalesQuerySchema>;
@@ -136,6 +145,11 @@ const reports: [string, string, z.ZodObject][] = [
     'stock',
     'Stock report: per product and day, bought, stocked in/out, manufactured, sold and returned',
     stockReportQuerySchema,
+  ],
+  [
+    'branch-stock',
+    'Branch stock (posSoft inventory report): per branch and product, stock transferred in, sold, returned and now in the branch',
+    branchStockQuerySchema,
   ],
   ['appointments', 'Appointment report (doctors see only their own)', appointmentsReportQuerySchema],
   [

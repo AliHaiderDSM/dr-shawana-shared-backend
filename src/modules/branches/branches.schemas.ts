@@ -43,11 +43,9 @@ export const branchSchema = registry.register(
     phone: z.string().nullable(),
     email: z.string().nullable(),
     logoPath: z.string().nullable(),
-    kind: z
-      .enum(BRANCH_KINDS)
-      .openapi({
-        description: 'warehouse: the Super Admin stock (Super Admin only); branch: a selling branch',
-      }),
+    kind: z.enum(BRANCH_KINDS).openapi({
+      description: 'warehouse: the Super Admin stock (Super Admin only); branch: a selling branch',
+    }),
     status: z.enum(BRANCH_STATUSES),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),

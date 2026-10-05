@@ -225,6 +225,11 @@ export const saleSchema = registry.register(
     createdBy: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
+    branch: z
+      .object({ id: z.uuid(), code: z.string(), name: z.string() })
+      .nullable()
+      .optional()
+      .openapi({ description: 'The selling branch (list only)' }),
     serials: z
       .array(z.object({ serial: z.string(), productId: z.uuid(), status: z.enum(ITEM_STATUSES) }))
       .optional()

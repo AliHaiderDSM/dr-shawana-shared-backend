@@ -36,6 +36,8 @@ const REPORT_COLUMNS = [
   'returned',
   'adjusted',
   'closing',
+  'branchSold',
+  'inBranch',
 ] as const;
 type ReportColumn = (typeof REPORT_COLUMNS)[number];
 
@@ -127,8 +129,37 @@ export const inventoryService = {
       params.push(query.productId);
       filters.push(`p.id = $${params.length}`);
     }
-    const inRange = (types: StockMovementType[]) =>
-      `m.date BETWEEN $2 AND $3 AND m.type IN (${types.map((t) => `'${t}'`).join(', ')})`;
+    const inRange = (types: StockMovementType[], extra = '') =>
+      `m.date BETWEEN $2 AND $3 AND m.type IN (${types.map((t) => `'${t}'`).join(', ')})${extra}`;
+    const param = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+    const supplier = query.supplierId ? param(query.supplierId) : null;
+    const dispatcher = query.dispatcherId ? param(query.dispatcherId) : null;
+    const target = query.toBranchId ? param(query.toBranchId) : null;
+    const fromSupplier = (table: string) =>
+      supplier
+        ? ` AND EXISTS (SELECT 1 FROM ${table} d WHERE d.id = m.reference_id AND d.supplier_id = ${supplier})`
+        : '';
+    const outFilter = [
+      dispatcher ? `so.dispatcher_id = ${dispatcher}` : null,
+      target ? `so.to_branch_id = ${target}` : null,
+    ].filter(Boolean);
+    const toWhere = outFilter.length
+      ? ` AND EXISTS (SELECT 1 FROM stock_outs so WHERE so.id = m.reference_id AND ${outFilter.join(' AND ')})`
+      : '';
+    const branchProducts = target
+      ? `SELECT bp.id FROM products bp WHERE bp.branch_id = ${target} AND (bp.origin_product_id = p.id OR bp.id = p.id)`
+      : null;
+    const branchSold = branchProducts
+      ? `COALESCE((SELECT -SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
+            AND bm.type IN ('sale', 'sale_edit_adjust') AND bm.date BETWEEN $2 AND $3), 0)`
+      : '0';
+    const inBranch = branchProducts
+      ? `COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
+            AND bm.date <= $3), 0)`
+      : '0';
 
     const rows: (Record<ReportColumn, string> & {
       productId: string;
@@ -137,10 +168,12 @@ export const inventoryService = {
     })[] = await AppDataSource.query(
       `SELECT p.id AS "productId", p.name, c.name AS "categoryName",
                 COALESCE(SUM(m.qty) FILTER (WHERE m.date < $2), 0)::text AS opening,
-                COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['purchase_in'])}), 0)::text AS purchased,
-                COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['stock_in'])}), 0)::text AS "stockIn",
+                COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['purchase_in'], fromSupplier('product_purchase_entries'))}), 0)::text AS purchased,
+                COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['stock_in'], fromSupplier('stock_ins'))}), 0)::text AS "stockIn",
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['manufacturing_in'])}), 0)::text AS manufactured,
-                COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['stock_out'])}), 0)::text AS "stockOut",
+                COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['stock_out'], toWhere)}), 0)::text AS "stockOut",
+                (${branchSold})::text AS "branchSold",
+                (${inBranch})::text AS "inBranch",
                 COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['sale'])}), 0)::text AS sold,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_return'])}), 0)::text AS returned,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_edit_adjust', 'adjustment'])}), 0)::text AS adjusted,

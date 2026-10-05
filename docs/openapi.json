@@ -713,7 +713,7 @@
               "branch",
               "warehouse"
             ],
-            "description": "warehouse: the Main Warehouse (Super Admin only); branch: a selling branch"
+            "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch"
           },
           "status": {
             "type": "string",
@@ -2415,7 +2415,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "Main Warehouse only: the branch that receives the stock. Its Stock In is created automatically."
+            "description": "Super Admin stock only: the branch that receives the stock. Its Stock In is created automatically."
           },
           "date": {
             "type": "string",
@@ -2733,7 +2733,7 @@
               "null"
             ],
             "format": "uuid",
-            "description": "Set when the stock came from the Main Warehouse"
+            "description": "Set when the stock came from the Super Admin stock"
           },
           "manufacturingDate": {
             "type": [
@@ -3097,6 +3097,16 @@
                 "closing": {
                   "type": "string",
                   "example": "10.000"
+                },
+                "branchSold": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "Sold at the toBranchId branch (0 without it)"
+                },
+                "inBranch": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "Left at the toBranchId branch on the last day (0 without it)"
                 }
               },
               "required": [
@@ -3111,7 +3121,9 @@
                 "sold",
                 "returned",
                 "adjusted",
-                "closing"
+                "closing",
+                "branchSold",
+                "inBranch"
               ]
             }
           },
@@ -3153,6 +3165,16 @@
               "closing": {
                 "type": "string",
                 "example": "10.000"
+              },
+              "branchSold": {
+                "type": "string",
+                "example": "10.000",
+                "description": "Sold at the toBranchId branch (0 without it)"
+              },
+              "inBranch": {
+                "type": "string",
+                "example": "10.000",
+                "description": "Left at the toBranchId branch on the last day (0 without it)"
               }
             },
             "required": [
@@ -3164,7 +3186,9 @@
               "sold",
               "returned",
               "adjusted",
-              "closing"
+              "closing",
+              "branchSold",
+              "inBranch"
             ]
           }
         },
@@ -10766,6 +10790,30 @@
             "type": "string",
             "format": "date-time"
           },
+          "branch": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "The selling branch (list only)"
+          },
           "serials": {
             "type": "array",
             "items": {
@@ -13644,7 +13692,7 @@
                               "branch",
                               "warehouse"
                             ],
-                            "description": "warehouse: the Main Warehouse (Super Admin only); branch: a selling branch"
+                            "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch"
                           }
                         },
                         "required": [
@@ -22381,7 +22429,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Batches in stock that expire within the next days (default 90) or have expired. Super Admin without branchId gets every branch and the Main Warehouse.",
+        "summary": "Batches in stock that expire within the next days (default 90) or have expired. Super Admin without branchId gets every branch and the Super Admin stock.",
         "parameters": [
           {
             "schema": {
@@ -22536,6 +22584,39 @@
             },
             "required": false,
             "name": "productId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Only stock in and purchases from this supplier"
+            },
+            "required": false,
+            "description": "Only stock in and purchases from this supplier",
+            "name": "supplierId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Only stock out through this dispatcher"
+            },
+            "required": false,
+            "description": "Only stock out through this dispatcher",
+            "name": "dispatcherId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Super Admin Stock: only transfers to this branch, plus its sales and stock left (posSoft Stock To)"
+            },
+            "required": false,
+            "description": "Super Admin Stock: only transfers to this branch, plus its sales and stock left (posSoft Stock To)",
+            "name": "toBranchId",
             "in": "query"
           }
         ],
@@ -36204,6 +36285,30 @@
                             "type": "string",
                             "format": "date-time"
                           },
+                          "branch": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "description": "The selling branch (list only)"
+                          },
                           "serials": {
                             "type": "array",
                             "items": {
@@ -41215,6 +41320,160 @@
               "format": "uuid"
             },
             "required": false,
+            "name": "productId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Report (JSON) or CSV file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Report"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/reports/branch-stock": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Branch stock (posSoft inventory report): per branch and product, stock transferred in, sold, returned and now in the branch. Add format=csv to download. super_admin without branchId gets every branch with a branch breakdown.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "default": "json",
+              "description": "csv downloads the rows as a CSV file"
+            },
+            "required": false,
+            "description": "csv downloads the rows as a CSV file",
+            "name": "format",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "super_admin: one branch; leave out for every branch"
+            },
+            "required": false,
+            "description": "super_admin: one branch; leave out for every branch",
+            "name": "branchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            },
+            "required": false,
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "A Super Admin Stock product matches the branch products made from it"
+            },
+            "required": false,
+            "description": "A Super Admin Stock product matches the branch products made from it",
             "name": "productId",
             "in": "query"
           }
