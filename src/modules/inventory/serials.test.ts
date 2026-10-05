@@ -364,6 +364,27 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
     expect(n).toBe(0);
   });
 
+  it('groups labels by batch and lists the pieces of one batch', async () => {
+    const res = await api('get', `/branch/inventory/items/batches?productId=${serum}`);
+    expect(res.status).toBe(200);
+    const b001 = res.body.data.find((g: { batchNo: string }) => g.batchNo === 'B-001');
+    expect(b001).toMatchObject({ total: 100, firstSerial: 'DSM-000001', lastSerial: 'DSM-000100' });
+    expect(b001.inStock + b001.sold + b001.other).toBe(100);
+    expect(res.body.data.map((g: { batchNo: string }) => g.batchNo)).toEqual(['OLD', 'B-002', 'B-001']);
+
+    const one = await api('get', `/branch/inventory/items?batchId=${b001.batchId}&pageSize=100`);
+    expect(one.body.meta.total).toBe(100);
+    const sold = await api('get', `/branch/inventory/items/batches?productId=${serum}&status=sold`);
+    expect(sold.body.data.map((g: { batchNo: string }) => g.batchNo)).toEqual(['B-001']);
+    const noBatch = await api(
+      'get',
+      `/branch/inventory/items?productId=${toner}&withoutBatch=true&pageSize=1`,
+    );
+    expect(noBatch.body.meta.total).toBe(102);
+    const search = await api('get', '/branch/inventory/items/batches?search=B-002');
+    expect(search.body.data).toHaveLength(1);
+  });
+
   it('keeps the ledger and the pieces in step', async () => {
     const rows: { productId: string; ledger: string; pieces: number }[] = await AppDataSource.query(
       `SELECT p.id AS "productId",

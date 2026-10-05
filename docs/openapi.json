@@ -1814,6 +1814,73 @@
           "updatedAt"
         ]
       },
+      "LabelBatch": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "batchNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "inStock": {
+            "type": "integer"
+          },
+          "sold": {
+            "type": "integer"
+          },
+          "other": {
+            "type": "integer"
+          },
+          "firstSerial": {
+            "type": "string"
+          },
+          "lastSerial": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "productId",
+          "productName",
+          "batchId",
+          "batchNo",
+          "expiryDate",
+          "total",
+          "inStock",
+          "sold",
+          "other",
+          "firstSerial",
+          "lastSerial"
+        ]
+      },
       "RegisterLabels": {
         "type": "object",
         "properties": {
@@ -19437,6 +19504,20 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "Only pieces that have no batch"
+            },
+            "required": false,
+            "description": "Only pieces that have no batch",
+            "name": "withoutBatch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": false,
@@ -19530,6 +19611,176 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/InventoryItem"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PageMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/items/batches": {
+      "get": {
+        "tags": [
+          "Labelled pieces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Labelled pieces grouped by product and batch, with counts by status and the label range",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "productId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "batchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in_stock",
+                "sold",
+                "returned",
+                "quarantined",
+                "damaged",
+                "expired",
+                "supplier_returned",
+                "dispatched",
+                "written_off"
+              ],
+              "description": "Only batches that have pieces in this status"
+            },
+            "required": false,
+            "description": "Only batches that have pieces in this status",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabelBatch"
                       }
                     },
                     "meta": {

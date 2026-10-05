@@ -26,6 +26,11 @@ export const inventoryItemListQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
   productId: z.uuid().optional(),
   batchId: z.uuid().optional(),
+  withoutBatch: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional()
+    .openapi({ description: 'Only pieces that have no batch' }),
   saleId: z.uuid().optional(),
   status: z.enum(ITEM_STATUSES).optional(),
   source: z.enum(ITEM_SOURCES).optional(),
@@ -34,6 +39,39 @@ export const inventoryItemListQuerySchema = z.object({
   to: serialInput.optional().openapi({ description: 'Last label of a range' }),
   branchId: z.uuid().optional(),
 });
+
+export const labelBatchListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(20),
+  search: z.string().trim().max(100).optional(),
+  productId: z.uuid().optional(),
+  batchId: z.uuid().optional(),
+  status: z
+    .enum(ITEM_STATUSES)
+    .optional()
+    .openapi({ description: 'Only batches that have pieces in this status' }),
+  branchId: z.uuid().optional(),
+});
+
+export const labelBatchSchema = registry.register(
+  'LabelBatch',
+  z.object({
+    key: z.string(),
+    productId: z.uuid(),
+    productName: z.string(),
+    batchId: z.uuid().nullable(),
+    batchNo: z.string().nullable(),
+    expiryDate: z.iso.date().nullable(),
+    total: z.number().int(),
+    inStock: z.number().int(),
+    sold: z.number().int(),
+    other: z.number().int(),
+    firstSerial: z.string(),
+    lastSerial: z.string(),
+  }),
+);
+
+export type LabelBatchListQuery = z.output<typeof labelBatchListQuerySchema>;
 
 export const itemParamsSchema = z.object({ itemId: z.uuid() });
 export const serialParamsSchema = z.object({ serial: serialInput });
@@ -123,6 +161,17 @@ registry.registerPath({
   request: { query: inventoryItemListQuerySchema },
   responses: {
     200: { description: 'Pieces', ...jsonContent(pageEnvelope(inventoryItemSchema)) },
+    ...errorResponses,
+  },
+});
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/inventory/items/batches',
+  summary: 'Labelled pieces grouped by product and batch, with counts by status and the label range',
+  request: { query: labelBatchListQuerySchema },
+  responses: {
+    200: { description: 'Batches', ...jsonContent(pageEnvelope(labelBatchSchema)) },
     ...errorResponses,
   },
 });

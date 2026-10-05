@@ -16,6 +16,7 @@ import {
 import {
   inventoryItemListQuerySchema,
   itemParamsSchema,
+  labelBatchListQuerySchema,
   productSerialParamsSchema,
   registerLabelsSchema,
   serialParamsSchema,
@@ -141,6 +142,19 @@ inventoryRouter.get(
     const { items, meta } = await inventoryItemsService.list(
       branchIdOf(req),
       validQuery(req, inventoryItemListQuerySchema),
+    );
+    sendOk(res, items, meta);
+  },
+);
+
+inventoryRouter.get(
+  `${path}/items/batches`,
+  canFindPieces,
+  validate({ query: labelBatchListQuerySchema }),
+  async (req: Request, res: Response) => {
+    const { items, meta } = await inventoryItemsService.batches(
+      branchIdOf(req),
+      validQuery(req, labelBatchListQuerySchema),
     );
     sendOk(res, items, meta);
   },

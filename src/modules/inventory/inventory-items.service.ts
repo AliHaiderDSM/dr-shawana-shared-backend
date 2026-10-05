@@ -10,7 +10,11 @@ import { today } from '../../lib/validation';
 import { auditService } from '../audit/audit.service';
 import { type ItemEventType } from './inventory-item-event.entity';
 import { type ItemSource, type ItemStatus } from './inventory-item.entity';
-import { type InventoryItemListQuery, type RegisterLabelsInput } from './inventory-items.schemas';
+import {
+  type InventoryItemListQuery,
+  type LabelBatchListQuery,
+  type RegisterLabelsInput,
+} from './inventory-items.schemas';
 import { type StockMovementInput } from './stock-ledger';
 import { type StockMovementType } from './stock-movement.entity';
 
@@ -480,6 +484,7 @@ export const inventoryItemsService = {
     };
     if (query.productId) add('i.product_id = ?', query.productId);
     if (query.batchId) add('i.batch_id = ?', query.batchId);
+    if (query.withoutBatch) where.push('i.batch_id IS NULL');
     if (query.status) add('i.status = ?', query.status);
     if (query.saleId) add('i.sale_id = ?', query.saleId);
     if (query.source && query.sourceId) {
@@ -513,6 +518,79 @@ export const inventoryItemsService = {
       params,
     );
     return { items: rows, meta: pageMeta(query, total) };
+  },
+
+  async batches(branchId: string, query: LabelBatchListQuery) {
+    const params: unknown[] = [branchId];
+    const where = ['i.branch_id = $1', 'i.deleted_at IS NULL'];
+    if (query.productId) {
+      params.push(query.productId);
+      where.push(`i.product_id = $${params.length}`);
+    }
+    if (query.batchId) {
+      params.push(query.batchId);
+      where.push(`i.batch_id = $${params.length}`);
+    }
+    if (query.search) {
+      params.push(`%${escapeLike(query.search)}%`);
+      where.push(
+        `(b.batch_no ILIKE $${params.length} OR p.name ILIKE $${params.length} OR i.serial ILIKE $${params.length})`,
+      );
+    }
+    const having: string[] = [];
+    if (query.status) {
+      params.push(query.status);
+      having.push(`COUNT(*) FILTER (WHERE i.status = $${params.length}) > 0`);
+    }
+    const grouped = `SELECT i.product_id, i.batch_id, p.name, b.batch_no, b.expiry_date AS expiry,
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE i.status = 'in_stock')::int AS in_stock,
+           COUNT(*) FILTER (WHERE i.status = 'sold')::int AS sold,
+           MIN(i.serial_no) AS first_no, MAX(i.serial_no) AS last_no
+      FROM inventory_items i
+      JOIN products p ON p.id = i.product_id
+      LEFT JOIN product_batches b ON b.id = i.batch_id
+     WHERE ${where.join(' AND ')}
+     GROUP BY i.product_id, i.batch_id, p.name, b.batch_no, b.expiry_date
+     ${having.length ? `HAVING ${having.join(' AND ')}` : ''}`;
+    const [{ total }] = (await AppDataSource.query(
+      `SELECT COUNT(*)::int AS total FROM (${grouped}) g`,
+      params,
+    )) as [{ total: number }];
+    const rows: {
+      product_id: string;
+      batch_id: string | null;
+      name: string;
+      batch_no: string | null;
+      expiry_date: string | null;
+      total: number;
+      in_stock: number;
+      sold: number;
+      first_no: string;
+      last_no: string;
+    }[] = await AppDataSource.query(
+      `SELECT g.*, to_char(g.expiry, 'YYYY-MM-DD') AS expiry_date FROM (${grouped}) g
+        ORDER BY g.expiry ASC NULLS LAST, g.name ASC, g.batch_no ASC
+        LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
+      params,
+    );
+    return {
+      items: rows.map((r) => ({
+        key: `${r.product_id}:${r.batch_id ?? 'none'}`,
+        productId: r.product_id,
+        productName: r.name,
+        batchId: r.batch_id,
+        batchNo: r.batch_no,
+        expiryDate: r.expiry_date,
+        total: r.total,
+        inStock: r.in_stock,
+        sold: r.sold,
+        other: r.total - r.in_stock - r.sold,
+        firstSerial: formatSerial(r.first_no),
+        lastSerial: formatSerial(r.last_no),
+      })),
+      meta: pageMeta(query, total),
+    };
   },
 
   async get(branchId: string, ref: { id?: string; serial?: string }) {
