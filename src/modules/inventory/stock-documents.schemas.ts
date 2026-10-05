@@ -13,6 +13,8 @@ import { listQuerySchema } from '../../lib/pagination';
 import {
   atLeastOneField,
   dateInput,
+  moneyInput,
+  moneyOutput,
   optionalText,
   optionalUuid,
   positiveQuantityInput,
@@ -26,13 +28,47 @@ const itemsOf = <T extends z.ZodRawShape>(shape: T) =>
     .min(1)
     .max(50);
 
+const batchFields = {
+  batch: optionalText(100).openapi({
+    description: 'Batch number. Same number for the same product adds to that batch.',
+  }),
+  manufacturingDate: dateInput.nullable().optional(),
+  expiryDate: dateInput.nullable().optional(),
+  unitCost: moneyInput.nullable().optional().openapi({ description: 'Purchase price per unit' }),
+};
+
+interface BatchFieldValues {
+  batch?: string | null;
+  manufacturingDate?: string | null;
+  expiryDate?: string | null;
+}
+
+function batchIssues(item: BatchFieldValues) {
+  const issues: { path: string; message: string }[] = [];
+  if ((item.manufacturingDate || item.expiryDate) && !item.batch) {
+    issues.push({ path: 'batch', message: 'Enter the batch number for these dates' });
+  }
+  if (item.manufacturingDate && item.expiryDate && item.expiryDate < item.manufacturingDate) {
+    issues.push({ path: 'expiryDate', message: 'Expiry must be on or after the manufacturing date' });
+  }
+  return issues;
+}
+
+function checkBatchFields(items: BatchFieldValues[], ctx: z.RefinementCtx) {
+  items.forEach((item, index) => {
+    for (const issue of batchIssues(item)) {
+      ctx.addIssue({ code: 'custom', path: [index, issue.path], message: issue.message });
+    }
+  });
+}
+
 export const createStockInSchema = registry.register(
   'CreateStockIn',
   z.object({
     supplierId: optionalUuid,
     date: dateInput,
     note: optionalText(1000),
-    items: itemsOf({ batch: optionalText(100) }),
+    items: itemsOf(batchFields).superRefine(checkBatchFields),
   }),
 );
 
@@ -55,9 +91,16 @@ export const updateStockInSchema = registry.register(
       date: dateInput,
       qty: positiveQuantityInput,
       batch: z.string().trim().max(100).nullable(),
+      manufacturingDate: dateInput.nullable(),
+      expiryDate: dateInput.nullable(),
+      unitCost: moneyInput.nullable(),
       note: z.string().trim().max(1000).nullable(),
     }),
-  ),
+  ).superRefine((value, ctx) => {
+    for (const issue of batchIssues(value)) {
+      ctx.addIssue({ code: 'custom', path: [issue.path], message: issue.message });
+    }
+  }),
 );
 
 export const updateStockOutSchema = registry.register(
@@ -121,6 +164,10 @@ export const stockInSchema = registry.register(
     supplierId: z.uuid().nullable(),
     supplier: partySchema,
     batch: z.string().nullable(),
+    batchId: z.uuid().nullable(),
+    manufacturingDate: z.iso.date().nullable(),
+    expiryDate: z.iso.date().nullable(),
+    unitCost: moneyOutput.nullable(),
   }),
 );
 export const stockOutSchema = registry.register(

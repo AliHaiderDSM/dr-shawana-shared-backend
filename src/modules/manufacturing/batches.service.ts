@@ -8,6 +8,7 @@ import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
 import { paginate } from '../../lib/pagination';
 import { auditService } from '../audit/audit.service';
+import { productBatchesService } from '../inventory/product-batches.service';
 import { stockLedger } from '../inventory/stock-ledger';
 import { productsRepository } from '../products/products.repository';
 import { MaterialBatch, MaterialBatchItem, type BatchStage } from './material-batch.entity';
@@ -238,9 +239,14 @@ export const productionsService = {
         })),
       );
       if (input.productId && input.producedQty) {
+        const productBatch = await productBatchesService.resolve(em, actor, branchId, input.productId, {
+          batchNo: labBatch.batchNo,
+          manufacturingDate: input.date,
+        });
         await stockLedger.apply(em, reference, [
           {
             productId: input.productId,
+            batchId: productBatch.id,
             type: 'manufacturing_in',
             qty: input.producedQty,
             date: input.date,

@@ -201,10 +201,14 @@ describe('master data', () => {
         'Meezan Bank',
       ]);
 
-      const deskOptions = await request(app).get('/api/v1/branch/account-sheets/options').set(bearer(frontDesk));
+      const deskOptions = await request(app)
+        .get('/api/v1/branch/account-sheets/options')
+        .set(bearer(frontDesk));
       expect(deskOptions.status).toBe(200);
       expect(deskOptions.body.data).toHaveLength(2);
-      expect((await request(app).get('/api/v1/branch/account-sheets').set(bearer(frontDesk))).status).toBe(403);
+      expect((await request(app).get('/api/v1/branch/account-sheets').set(bearer(frontDesk))).status).toBe(
+        403,
+      );
     });
 
     it('does not let another branch use this branch bank', async () => {

@@ -5,7 +5,14 @@ import { quantityColumn } from '../../database/transformers';
 import { Product } from '../products/product.entity';
 import { SaleReturn } from './sale-return.entity';
 
-export const RETURN_DISPOSITIONS = ['pending', 'restocked', 'damaged', 'supplier'] as const;
+export const RETURN_DISPOSITIONS = [
+  'pending',
+  'quarantined',
+  'restocked',
+  'damaged',
+  'expired',
+  'supplier',
+] as const;
 export type ReturnDisposition = (typeof RETURN_DISPOSITIONS)[number];
 
 @Entity('sale_return_items')

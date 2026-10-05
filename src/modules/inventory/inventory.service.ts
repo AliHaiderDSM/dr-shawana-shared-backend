@@ -20,6 +20,7 @@ interface BalanceRow {
   categoryName: string | null;
   unit: string;
   quantity: string;
+  expiredQuantity: string;
   lowStockThreshold: string;
   isLowStock: boolean;
 }
@@ -73,6 +74,7 @@ export const inventoryService = {
     const rows: BalanceRow[] = await AppDataSource.query(
       `SELECT b.product_id AS "productId", b.name, b.batch_no AS "batchNo", b.category_id AS "categoryId",
               c.name AS "categoryName", b.unit, b.quantity::text AS quantity,
+              b.expired_quantity::text AS "expiredQuantity",
               b.low_stock_threshold::text AS "lowStockThreshold", b.is_low_stock AS "isLowStock"
          FROM product_stock_balances b
          LEFT JOIN categories c ON c.id = b.category_id
@@ -165,12 +167,14 @@ export const inventoryService = {
       referenceType: string;
       referenceId: string;
       reversalOfId: string | null;
+      batchNo: string | null;
       note: string | null;
     }[] = await AppDataSource.query(
-      `SELECT m.id, to_char(m.date, 'YYYY-MM-DD') AS date, m.type, m.qty::text AS qty,
+      `SELECT m.id, to_char(m.date, 'YYYY-MM-DD') AS date, m.type, m.qty::text AS qty, b.batch_no AS "batchNo",
               m.reference_type AS "referenceType", m.reference_id AS "referenceId",
               m.reversal_of_id AS "reversalOfId", m.note
          FROM stock_movements m
+         LEFT JOIN product_batches b ON b.id = m.batch_id
         WHERE m.branch_id = $1 AND m.product_id = $2 ${range.map((r) => `AND ${r}`).join(' ')}
         ORDER BY m.date ASC, m.created_at ASC`,
       params,
@@ -194,6 +198,7 @@ export const inventoryService = {
         referenceType: m.referenceType,
         referenceId: m.referenceId,
         isReversal: m.reversalOfId !== null,
+        batchNo: m.batchNo,
         note: m.note,
       };
     });

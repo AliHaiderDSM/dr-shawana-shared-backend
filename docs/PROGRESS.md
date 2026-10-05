@@ -13,9 +13,32 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 | B6    | POS sales, payments and delivery                                       | ✅ Done (2026-09-30) |
 | B7    | Accounts, finance, reports and dashboard KPIs                          | ✅ Done (2026-09-30) |
 | B6b   | Sale returns (inspection, refunds) and product barcodes                | ✅ Done (2026-10-01) |
+| B6c   | Product batches, expiry and FEFO allocation                            | ✅ Done (2026-10-05) |
 | B8    | Mobile app API (patients)                                              | ⏳ Next              |
 | B9    | Data migration from posSoft                                            | Not started          |
 | B10   | Hardening and deployment                                               | Not started          |
+
+---
+
+## B6c — Product batches, expiry and FEFO (done 2026-10-05)
+
+Added on request, from the piece-level tracking spec. The parts that fit this system are built at **batch level**. Per-piece serials (ITEM-000001), stock transfer between branches and printed labels are **not** built: without a label on each pack a serial cannot be read back at return time, and products are separate per branch.
+
+- **Batches:** a new `product_batches` table (product, batch number, manufacturing date, expiry, supplier, purchase price), unique per product and batch number.
+  - **Stock In** takes, per line, batch, manufacturing date, expiry and unit cost. A new batch number creates the batch; a repeated one adds to it (a different expiry is a 409; editing the stock-in entry corrects the batch). Dates need a batch number, and expiry cannot be before manufacturing.
+  - **Production** (finished product) creates a batch named after the lab batch, with the production date as manufacturing date.
+  - Purchase entries and older stock stay "no batch".
+- **Ledger:** `stock_movements.batch_id`. Every movement now belongs to a batch (or none).
+  - Sales, sale edits and stock outs that take stock are split across batches **FEFO**: the earliest expiry first, then old unbatched stock, then batches without expiry.
+  - Sales and stock outs **never take an expired batch**. The 422 shortage then also reports `expired`.
+  - Deleting or editing a document reverses into the same batches. Stock given back by a sale edit or a restocked return goes into the batches the sale took it from.
+  - Concurrent receipts of the same new batch create one batch (the product row is locked).
+- **Returns:** dispositions `quarantined` (held, decided later) and `expired` (written off). A return detail shows the batches the sale took (`soldBatches`) and where restocked items went (`restockedBatches`).
+- **Endpoints:** `GET /branch/inventory/batches` (filters: product, search, status active/expiring/expired, inStockOnly), `GET /branch/inventory/batches/:batchId` (with every movement), `POST /branch/inventory/batches/:batchId/write-off` (`stock.update`; reason expired/damaged/lost/adjustment; an audited `adjustment` movement). `GET /branch/sales/:id` adds `batches`; stock balances add `expiredQuantity`; the product ledger adds `batchNo`.
+- **Dashboard:** batch columns on Stock In, a "Batches & Expiry" page with batch history and write-off, batches on the product stock page and the sale page, expired stock on the Stock page, POS shows only sellable (not expired) stock, and the new return outcomes.
+- Migration `ProductBatches`: the table with RLS, the new columns, the enum values and the `product_stock_balances` view with `expired_quantity`. Tested up, down, up and for drift.
+
+**Verified:** lint, typecheck, build and `npm test` (21 suites, 191 tests) on the temporary local Postgres; the Stock In, Batches, batch detail, product stock and sale pages driven in a browser.
 
 ---
 

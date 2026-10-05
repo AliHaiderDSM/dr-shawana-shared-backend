@@ -23,7 +23,12 @@ mountBranchCrud(accountsRouter, {
   path: '/branch/account-sheets',
   module: 'accounts',
   service: accountSheetsService,
-  optionsAlsoFor: ['appointmentPayments.create', 'appointmentPayments.update', 'sales.create', 'sales.update'],
+  optionsAlsoFor: [
+    'appointmentPayments.create',
+    'appointmentPayments.update',
+    'sales.create',
+    'sales.update',
+  ],
   schemas: {
     list: accountSheetListQuerySchema,
     create: createAccountSheetSchema,

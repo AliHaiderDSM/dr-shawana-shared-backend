@@ -12,6 +12,7 @@ import {
 import { registry } from '../../lib/openapi';
 import { PAYMENT_METHODS } from '../appointments/appointment-payment.entity';
 import { patientFields } from '../patients/patients.schemas';
+import { allocatedBatchSchema } from '../inventory/product-batches.schemas';
 import { DELIVERY_STATUSES, PAYMENT_STATUSES, SALE_TYPES } from './sale.entity';
 
 const positiveMoney = moneyInput.refine((v) => Number(v) > 0, 'Must be greater than zero');
@@ -218,5 +219,8 @@ export const saleSchema = registry.register(
     createdBy: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
+    batches: z.array(allocatedBatchSchema).optional().openapi({
+      description: 'Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}.',
+    }),
   }),
 );

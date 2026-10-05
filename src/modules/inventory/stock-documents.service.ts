@@ -10,6 +10,7 @@ import { BUCKETS, createSignedUrl } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { type SupplierType } from '../suppliers/supplier.entity';
 import { suppliersService } from '../suppliers/suppliers.service';
+import { productBatchesService } from './product-batches.service';
 import { StockAttachment, type StockDocumentType } from './stock-attachment.entity';
 import { type StockIn } from './stock-in.entity';
 import { stockLedger } from './stock-ledger';
@@ -27,6 +28,7 @@ interface DocumentConfig<T extends StockDocument> {
   partyType: SupplierType;
   sign: 1 | -1;
   destinationFilter: boolean;
+  batched: boolean;
 }
 
 interface CreateInput {
@@ -71,7 +73,42 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     qty: record.qty.times(config.sign),
     date: record.date,
     note: record.note,
+    ...(config.batched
+      ? { batchId: (record as StockIn).batchId, unitCost: (record as StockIn).unitCost }
+      : {}),
   });
+
+  async function batchFieldsFor(
+    manager: EntityManager,
+    actor: Actor,
+    branchId: string,
+    productId: string,
+    values: Record<string, unknown>,
+    supplierId: string | null,
+    overwrite = false,
+  ) {
+    if (!config.batched) return {};
+    const batchNo = typeof values.batch === 'string' ? values.batch.trim() : '';
+    const manufacturingDate = (values.manufacturingDate as string | null | undefined) ?? null;
+    const expiryDate = (values.expiryDate as string | null | undefined) ?? null;
+    const unitCost = (values.unitCost as string | null | undefined) ?? null;
+    if (!batchNo) return { batch: null, batchId: null, manufacturingDate, expiryDate, unitCost };
+    const batch = await productBatchesService.resolve(
+      manager,
+      actor,
+      branchId,
+      productId,
+      { batchNo, manufacturingDate, expiryDate, supplierId, unitCost },
+      { overwrite },
+    );
+    return {
+      batch: batch.batchNo,
+      batchId: batch.id,
+      manufacturingDate: batch.manufacturingDate,
+      expiryDate: batch.expiryDate,
+      unitCost,
+    };
+  }
 
   async function attachmentsFor(branchId: string, ids: string[], manager?: EntityManager) {
     if (ids.length === 0) return new Map<string, StockAttachment[]>();
@@ -184,6 +221,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
               actor.userId,
               {
                 ...item,
+                ...(await batchFieldsFor(em, actor, branchId, item.productId, item, partyId)),
                 [config.partyKey]: partyId,
                 date: input.date,
                 note: input.note ?? null,
@@ -223,6 +261,19 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           await assertParty(branchId, input[config.partyKey] as string | null, em);
         const before = await getDto(branchId, id, em);
         Object.assign(record, input, { updatedBy: actor.userId });
+        Object.assign(
+          record,
+          await batchFieldsFor(
+            em,
+            actor,
+            branchId,
+            record.productId,
+            record as unknown as Record<string, unknown>,
+            (record as unknown as Record<string, unknown>)[config.partyKey] as string | null,
+            true,
+          ),
+        );
+        delete (record as Partial<StockIn>).productBatch;
         delete record.product;
         delete (record as unknown as Record<string, unknown>)[config.partyRelation];
         const saved = await base.save(record, em);

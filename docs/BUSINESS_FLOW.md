@@ -186,7 +186,8 @@ Delivery slips printed (Delivery Print role)
 
 - Products, categories and bundles are added by the **Branch Admin** and belong to that branch.
 - Purchase and price entries (quantity, price, supplier) are added per product.
-- **Stock In** records stock received from a supplier, with batch, file and note.
+- **Stock In** records stock received from a supplier, with batch, manufacturing date, expiry, purchase price, file and note. Each batch keeps its own stock.
+- **Sales take the batch that expires first**, and expired stock cannot be sold. Expired or damaged stock is removed with a write-off on the batch.
 - **Stock Out** records stock sent out through a dispatcher.
 - **Inventory Report** shows stock per product for the branch.
 - Stock is kept **per branch**. One branch's sales and stock never affect another branch.

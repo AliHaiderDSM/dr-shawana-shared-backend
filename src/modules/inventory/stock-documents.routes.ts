@@ -30,6 +30,7 @@ export const stockInService = createStockDocumentService({
   partyType: 'supplier',
   sign: 1,
   destinationFilter: false,
+  batched: true,
 });
 
 export const stockOutService = createStockDocumentService({
@@ -41,6 +42,7 @@ export const stockOutService = createStockDocumentService({
   partyType: 'dispatcher',
   sign: -1,
   destinationFilter: true,
+  batched: false,
 });
 
 type StockDocumentService = typeof stockInService;

@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from 'express';
+import { actorFrom } from '../../lib/actor';
 import { sendOk } from '../../lib/http';
 import { branchIdOf } from '../../lib/request';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
-import { validate, validParams, validQuery } from '../../middleware/validate';
+import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import {
   inventoryReportQuerySchema,
   productLedgerQuerySchema,
@@ -12,6 +13,8 @@ import {
   stockBalanceQuerySchema,
 } from './inventory.schemas';
 import { inventoryService } from './inventory.service';
+import { batchListQuerySchema, batchParamsSchema, writeOffSchema } from './product-batches.schemas';
+import { productBatchesService } from './product-batches.service';
 
 export const inventoryRouter = Router();
 
@@ -54,6 +57,47 @@ inventoryRouter.get(
         branchIdOf(req),
         productId,
         validQuery(req, productLedgerQuerySchema),
+      ),
+    );
+  },
+);
+
+inventoryRouter.get(
+  `${path}/batches`,
+  canViewStock,
+  validate({ query: batchListQuerySchema }),
+  async (req: Request, res: Response) => {
+    const { items, meta } = await productBatchesService.list(
+      branchIdOf(req),
+      validQuery(req, batchListQuerySchema),
+    );
+    sendOk(res, items, meta);
+  },
+);
+
+inventoryRouter.get(
+  `${path}/batches/:batchId`,
+  canViewStock,
+  validate({ params: batchParamsSchema }),
+  async (req: Request, res: Response) => {
+    const { batchId } = validParams(req, batchParamsSchema);
+    sendOk(res, await productBatchesService.get(branchIdOf(req), batchId));
+  },
+);
+
+inventoryRouter.post(
+  `${path}/batches/:batchId/write-off`,
+  requirePermission('stock.update'),
+  validate({ params: batchParamsSchema, body: writeOffSchema }),
+  async (req: Request, res: Response) => {
+    const { batchId } = validParams(req, batchParamsSchema);
+    sendOk(
+      res,
+      await productBatchesService.writeOff(
+        actorFrom(req),
+        branchIdOf(req),
+        batchId,
+        validBody(req, writeOffSchema),
       ),
     );
   },

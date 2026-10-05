@@ -12,6 +12,7 @@ import {
 import { moneyColumn, quantityColumn } from '../../database/transformers';
 import { Branch } from '../branches/branch.entity';
 import { Product } from '../products/product.entity';
+import { ProductBatch } from './product-batch.entity';
 
 export const STOCK_MOVEMENT_TYPES = [
   'purchase_in',
@@ -47,6 +48,14 @@ export class StockMovement {
   @ManyToOne(() => Product, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'product_id' })
   product?: Product;
+
+  @Index()
+  @Column({ name: 'batch_id', type: 'uuid', nullable: true })
+  batchId: string | null;
+
+  @ManyToOne(() => ProductBatch, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'batch_id' })
+  batch?: ProductBatch | null;
 
   @Index()
   @Column({ type: 'enum', enum: STOCK_MOVEMENT_TYPES, enumName: 'stock_movement_type' })

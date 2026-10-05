@@ -1850,7 +1850,29 @@
                     "string",
                     "null"
                   ],
-                  "maxLength": 100
+                  "maxLength": 100,
+                  "description": "Batch number. Same number for the same product adds to that batch."
+                },
+                "manufacturingDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "example": "2026-09-30"
+                },
+                "expiryDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "example": "2026-09-30"
+                },
+                "unitCost": {
+                  "type": "string",
+                  "example": "1250.50",
+                  "description": "Purchase price per unit"
                 }
               },
               "required": [
@@ -1952,6 +1974,26 @@
               "null"
             ],
             "maxLength": 100
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "unitCost": {
+            "type": "string",
+            "example": "1250.50"
           },
           "note": {
             "type": [
@@ -2125,6 +2167,34 @@
               "string",
               "null"
             ]
+          },
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "unitCost": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "1250.50"
           }
         },
         "required": [
@@ -2141,7 +2211,11 @@
           "updatedAt",
           "supplierId",
           "supplier",
-          "batch"
+          "batch",
+          "batchId",
+          "manufacturingDate",
+          "expiryDate",
+          "unitCost"
         ]
       },
       "StockOut": {
@@ -2319,6 +2393,11 @@
             "type": "string",
             "example": "10.000"
           },
+          "expiredQuantity": {
+            "type": "string",
+            "example": "10.000",
+            "description": "Part of quantity in batches past their expiry date"
+          },
           "lowStockThreshold": {
             "type": "string",
             "example": "10.000"
@@ -2335,6 +2414,7 @@
           "categoryName",
           "unit",
           "quantity",
+          "expiredQuantity",
           "lowStockThreshold",
           "isLowStock"
         ]
@@ -2566,6 +2646,12 @@
                 "isReversal": {
                   "type": "boolean"
                 },
+                "batchNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "note": {
                   "type": [
                     "string",
@@ -2583,6 +2669,7 @@
                 "referenceType",
                 "referenceId",
                 "isReversal",
+                "batchNo",
                 "note"
               ]
             }
@@ -8998,6 +9085,332 @@
           "sections"
         ]
       },
+      "WriteOff": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "expired",
+              "damaged",
+              "lost",
+              "adjustment"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "qty",
+          "reason"
+        ]
+      },
+      "ProductBatch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "batchNo": {
+            "type": "string"
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "supplierId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "supplierName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitCost": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "1250.50"
+          },
+          "received": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "quantity": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "expiring",
+              "expired",
+              "no_expiry"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productName",
+          "unit",
+          "batchNo",
+          "manufacturingDate",
+          "expiryDate",
+          "supplierId",
+          "supplierName",
+          "unitCost",
+          "received",
+          "quantity",
+          "status",
+          "createdAt"
+        ]
+      },
+      "ProductBatchDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "batchNo": {
+            "type": "string"
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "supplierId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "supplierName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitCost": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "1250.50"
+          },
+          "received": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "quantity": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "expiring",
+              "expired",
+              "no_expiry"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "movements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "referenceType": {
+                  "type": "string"
+                },
+                "referenceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "reference": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "date",
+                "type",
+                "qty",
+                "referenceType",
+                "referenceId",
+                "reference",
+                "note",
+                "createdAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "productName",
+          "unit",
+          "batchNo",
+          "manufacturingDate",
+          "expiryDate",
+          "supplierId",
+          "supplierName",
+          "unitCost",
+          "received",
+          "quantity",
+          "status",
+          "createdAt",
+          "movements"
+        ]
+      },
+      "AllocatedBatch": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "batchNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "qty": {
+            "type": "string",
+            "example": "10.000"
+          }
+        },
+        "required": [
+          "productId",
+          "batchId",
+          "batchNo",
+          "manufacturingDate",
+          "expiryDate",
+          "qty"
+        ]
+      },
       "SalePaymentInput": {
         "type": "object",
         "properties": {
@@ -9648,6 +10061,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocatedBatch"
+            },
+            "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
           }
         },
         "required": [
@@ -9778,8 +10198,10 @@
           "disposition": {
             "type": "string",
             "enum": [
+              "quarantined",
               "restocked",
               "damaged",
+              "expired",
               "supplier"
             ]
           },
@@ -10003,8 +10425,10 @@
                   "type": "string",
                   "enum": [
                     "pending",
+                    "quarantined",
                     "restocked",
                     "damaged",
+                    "expired",
                     "supplier"
                   ]
                 },
@@ -10055,6 +10479,20 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "soldBatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocatedBatch"
+            },
+            "description": "Batches the original sale took its stock from (detail only)"
+          },
+          "restockedBatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocatedBatch"
+            },
+            "description": "Batches restocked items went back to (detail only)"
           }
         },
         "required": [
@@ -33321,6 +33759,388 @@
         }
       }
     },
+    "/branch/inventory/batches": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Product batches with stock on hand and expiry status, earliest expiry first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "productId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "expiring",
+                "expired"
+              ],
+              "description": "active: not expired; expiring: expires within 90 days; expired: past expiry"
+            },
+            "required": false,
+            "description": "active: not expired; expiring: expires within 90 days; expired: past expiry",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "inStockOnly",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProductBatch"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PageMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/batches/{batchId}": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One batch with every stock movement that touched it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "batchId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Batch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProductBatchDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/batches/{batchId}/write-off": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove expired, damaged or lost stock of one batch (adjustment movement, audited)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "batchId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteOff"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch after the write-off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProductBatchDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/sales": {
       "get": {
         "tags": [
@@ -33657,6 +34477,13 @@
                           "updatedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "batches": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/AllocatedBatch"
+                            },
+                            "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
                           }
                         },
                         "required": [
@@ -35342,8 +36169,10 @@
               "type": "string",
               "enum": [
                 "pending",
+                "quarantined",
                 "restocked",
                 "damaged",
+                "expired",
                 "supplier"
               ]
             },

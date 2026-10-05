@@ -25,6 +25,15 @@ import {
 const returns = branchScopedRepository(SaleReturn, 'sr');
 const returnItems = branchScopedRepository(SaleReturnItem, 'ri');
 const REFERENCE = 'sale_return';
+const SALE_REFERENCE = 'sale';
+
+async function restoreSources(manager: EntityManager, saleId: string) {
+  const siblings = await repo(SaleReturn, manager).find({ where: { saleId }, select: { id: true } });
+  return [
+    { referenceType: SALE_REFERENCE, referenceIds: [saleId] },
+    { referenceType: REFERENCE, referenceIds: siblings.map((r) => r.id) },
+  ];
+}
 const SEQUENCE_KEY = 'sale_return';
 
 interface SaleLine {
@@ -251,7 +260,19 @@ export const returnsService = {
   },
 
   async get(branchId: string, id: string) {
-    return toReturnDto(await getReturn(branchId, id));
+    const record = await getReturn(branchId, id);
+    const manager = repo(SaleReturn).manager;
+    const sold = await stockLedger.batchesFor(manager, branchId, [
+      { referenceType: SALE_REFERENCE, referenceIds: [record.saleId] },
+    ]);
+    const restocked = await stockLedger.batchesFor(manager, branchId, [
+      { referenceType: REFERENCE, referenceIds: [record.id] },
+    ]);
+    return {
+      ...toReturnDto(record),
+      soldBatches: sold.map((b) => ({ ...b, qty: toQuantity(b.qty.negated()) })),
+      restockedBatches: restocked.map((b) => ({ ...b, qty: toQuantity(b.qty) })),
+    };
   },
 
   async returnable(branchId: string, saleId: string) {
@@ -333,7 +354,12 @@ export const returnsService = {
       const record = await getReturn(branchId, id, em);
       const item = record.items?.find((i) => i.id === itemId);
       if (!item) throw AppError.notFound('Return item');
-      if (item.disposition !== 'pending') throw AppError.conflict('This item has already been inspected');
+      if (item.disposition !== 'pending' && item.disposition !== 'quarantined') {
+        throw AppError.conflict('This item has already been inspected');
+      }
+      if (item.disposition === 'quarantined' && input.disposition === 'quarantined') {
+        throw AppError.conflict('This item is already in quarantine');
+      }
       if (input.disposition === 'restocked') {
         await stockLedger.apply(
           em,
@@ -343,6 +369,7 @@ export const returnsService = {
               productId: item.productId,
               type: 'sale_return',
               qty: item.qty,
+              restoreFrom: await restoreSources(em, record.saleId),
               date: today(),
               note: `${record.returnNo} restocked`,
             },
@@ -359,8 +386,10 @@ export const returnsService = {
           updatedBy: actor.userId,
         },
       );
-      const pending = (record.items ?? []).filter((i) => i.id !== item.id && i.disposition === 'pending');
-      if (pending.length === 0) {
+      const open = (record.items ?? []).filter(
+        (i) => i.id !== item.id && (i.disposition === 'pending' || i.disposition === 'quarantined'),
+      );
+      if (open.length === 0 && input.disposition !== 'quarantined') {
         await repo(SaleReturn, em).update(
           { id: record.id },
           { status: 'completed', updatedBy: actor.userId },
@@ -372,7 +401,7 @@ export const returnsService = {
         saved,
         `item:${input.disposition}`,
         em,
-        { itemId, disposition: 'pending' },
+        { itemId, disposition: item.disposition },
         {
           itemId,
           disposition: input.disposition,

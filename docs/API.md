@@ -101,3 +101,4 @@ Base URL: `/api/v1`. The interactive docs are at `/api/docs`, and the machine-re
 
 - Every stock or material change is a row in an append-only ledger. Editing or deleting a document adds reversing rows.
 - A change that would take a product (or a material at a location) below zero is rejected with `422 UNPROCESSABLE` and `details.shortages[]`.
+- Product stock is held per batch. Movements that take stock without naming a batch (sales, sale edits, stock out) are split first-expiry-first and skip expired batches; a shortage then also reports `expired`. Stock given back (sale edit, restocked return) returns to the batches the sale took it from.

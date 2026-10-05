@@ -49,6 +49,9 @@ export const stockBalanceSchema = registry.register(
     categoryName: z.string().nullable(),
     unit: z.string(),
     quantity: quantityOutput,
+    expiredQuantity: quantityOutput.openapi({
+      description: 'Part of quantity in batches past their expiry date',
+    }),
     lowStockThreshold: quantityOutput,
     isLowStock: z.boolean(),
   }),
@@ -100,6 +103,7 @@ export const productLedgerSchema = registry.register(
         referenceType: z.string(),
         referenceId: z.uuid(),
         isReversal: z.boolean(),
+        batchNo: z.string().nullable(),
         note: z.string().nullable(),
       }),
     ),

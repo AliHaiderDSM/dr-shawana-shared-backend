@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { allocatedBatchSchema } from '../inventory/product-batches.schemas';
 import { registry } from '../../lib/openapi';
 import { listQuerySchema } from '../../lib/pagination';
 import {
@@ -49,7 +50,13 @@ export const resolveItemSchema = registry.register(
   'ResolveReturnItem',
   z.object({
     disposition: z.enum(
-      RETURN_DISPOSITIONS.filter((d) => d !== 'pending') as ['restocked', 'damaged', 'supplier'],
+      RETURN_DISPOSITIONS.filter((d) => d !== 'pending') as [
+        'quarantined',
+        'restocked',
+        'damaged',
+        'expired',
+        'supplier',
+      ],
     ),
     note: optionalText(2000),
   }),
@@ -117,6 +124,14 @@ export const saleReturnSchema = registry.register(
     createdBy: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
+    soldBatches: z
+      .array(allocatedBatchSchema)
+      .optional()
+      .openapi({ description: 'Batches the original sale took its stock from (detail only)' }),
+    restockedBatches: z
+      .array(allocatedBatchSchema)
+      .optional()
+      .openapi({ description: 'Batches restocked items went back to (detail only)' }),
   }),
 );
 

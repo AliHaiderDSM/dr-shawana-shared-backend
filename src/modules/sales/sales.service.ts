@@ -1,7 +1,8 @@
 import { type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
-import { Decimal, toMoney, type DecimalInput } from '../../database/transformers';
+import { AppDataSource } from '../../database/data-source';
+import { Decimal, toMoney, toQuantity, type DecimalInput } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { removeQuietly, uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
@@ -399,7 +400,14 @@ export const salesService = {
   },
 
   async get(branchId: string, id: string) {
-    return toSaleDto(await getSale(branchId, id));
+    const sale = await getSale(branchId, id);
+    const batches = await stockLedger.batchesFor(AppDataSource.manager, branchId, [
+      { referenceType: REFERENCE, referenceIds: [id] },
+    ]);
+    return {
+      ...toSaleDto(sale),
+      batches: batches.map((b) => ({ ...b, qty: toQuantity(b.qty.negated()) })),
+    };
   },
 
   async create(actor: Actor, branchId: string, input: CreateSaleInput, proofs: Express.Multer.File[] = []) {
@@ -483,6 +491,7 @@ export const salesService = {
             qty: (wanted.get(productId) ?? new Decimal(0)).negated().minus(net.get(productId) ?? 0),
             date: input.date ?? sale.date,
             note: `${sale.invoiceNo} edited`,
+            restoreFrom: [{ referenceType: REFERENCE, referenceIds: [sale.id] }],
           }))
           .filter((m) => !m.qty.isZero());
         if (adjustments.length > 0) await stockLedger.apply(em, ledgerRef(actor, sale), adjustments);
