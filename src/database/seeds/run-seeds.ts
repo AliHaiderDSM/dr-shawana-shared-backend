@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 import { AppDataSource } from '../data-source';
-import { companyInfo, lahoreHeadOffice, prescriptionCatalog, type Seed } from './development.seeds';
+import { companyInfo, prescriptionCatalog, type Seed } from './development.seeds';
 
-const seeds: Seed[] = [companyInfo, lahoreHeadOffice, prescriptionCatalog];
+const seeds: Seed[] = [companyInfo, prescriptionCatalog];
 
 async function main() {
   await AppDataSource.initialize();

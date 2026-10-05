@@ -158,7 +158,7 @@ export const dashboardService = {
                   WHERE r.deleted_at IS NULL AND r.branch_id = br.id AND r.refund_date BETWEEN $1 AND $2))::numeric(12,2)::text AS "salesMonth",
                 (SELECT COALESCE(SUM(y.amount), 0) FROM appointment_payments y JOIN appointments a ON a.id = y.appointment_id
                   WHERE a.deleted_at IS NULL AND y.deleted_at IS NULL AND y.branch_id = br.id AND y.date BETWEEN $1 AND $2)::numeric(12,2)::text AS "appointmentsMonth"
-           FROM branches br WHERE br.deleted_at IS NULL ORDER BY br.code`,
+           FROM branches br WHERE br.deleted_at IS NULL AND br.kind = 'branch' ORDER BY br.code`,
         [from, to],
       );
     }

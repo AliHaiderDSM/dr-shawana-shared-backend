@@ -21,7 +21,7 @@ export const branchesRepository = {
   },
 
   list(query: BranchListQuery, manager?: EntityManager) {
-    const qb = repo(Branch, manager).createQueryBuilder('b');
+    const qb = repo(Branch, manager).createQueryBuilder('b').where("b.kind = 'branch'");
     if (query.status) qb.andWhere('b.status = :status', { status: query.status });
     return paginate(qb, query, {
       searchColumns: ['b.name', 'b.code', 'b.city'],

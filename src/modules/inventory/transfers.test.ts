@@ -78,6 +78,8 @@ describe('Main Warehouse transfers to branches', () => {
   it('keeps the warehouse to the Super Admin and out of selling', async () => {
     const options = await request(app).get('/api/v1/admin/branches/options').set(bearer(superAdmin));
     expect(options.body.data[0]).toMatchObject({ id: warehouseId, kind: 'warehouse' });
+    const list = await request(app).get('/api/v1/admin/branches').set(bearer(superAdmin));
+    expect(list.body.data.map((b: { id: string }) => b.id)).toEqual([lahoreId]);
     expect((await asBranch('get', `/branch/inventory/stock?branchId=${warehouseId}`)).status).toBe(403);
     const sale = await asAdmin('post', '/branch/sales').send({
       patientId,
@@ -255,7 +257,12 @@ describe('Main Warehouse transfers to branches', () => {
       toBranchId: warehouseId,
       items: [{ productId: lahoreToner, qty: '1' }],
     });
-    expect(fromBranch.status).toBe(400);
+    expect(fromBranch.status).toBe(409);
+    const dispatch = await asBranch('post', '/branch/stock-outs').send({
+      date: '2026-10-04',
+      items: [{ productId: lahoreToner, qty: '1', destination: 'Karachi Office' }],
+    });
+    expect(dispatch.status).toBe(409);
     const toWarehouse = await asAdmin('post', '/branch/stock-outs').send({
       date: '2026-10-04',
       toBranchId: warehouseId,

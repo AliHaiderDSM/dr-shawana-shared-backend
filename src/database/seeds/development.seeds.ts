@@ -8,26 +8,6 @@ export interface Seed {
   run: (manager: EntityManager) => Promise<void>;
 }
 
-export const lahoreHeadOffice: Seed = {
-  name: 'Lahore head-office branch',
-  async run(manager) {
-    const branches = manager.getRepository(Branch);
-    const existing = await branches.findOne({ where: { code: 'LHR' }, withDeleted: true });
-    if (existing) return;
-    await branches.save(
-      branches.create({
-        name: 'Lahore',
-        code: 'LHR',
-        city: 'Lahore',
-        address: '123 E Hali road, Gulberg Lahore, Pakistan',
-        phone: '03284905049',
-        email: 'info@drshawanamufti.com',
-        status: 'active',
-      }),
-    );
-  },
-};
-
 export const companyInfo: Seed = {
   name: 'Company info from posSoft',
   async run(manager) {
