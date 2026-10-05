@@ -99,7 +99,7 @@ export const createStockOutSchema = registry.register(
       dispatcherId: optionalUuid,
       toBranchId: optionalUuid.openapi({
         description:
-          'Main Warehouse only: the branch that receives the stock. Its Stock In is created automatically.',
+          'Super Admin stock only: the branch that receives the stock. Its Stock In is created automatically.',
       }),
       date: dateInput,
       note: optionalText(1000),
@@ -210,7 +210,7 @@ export const stockInSchema = registry.register(
     transferOutId: z
       .uuid()
       .nullable()
-      .openapi({ description: 'Set when the stock came from the Main Warehouse' }),
+      .openapi({ description: 'Set when the stock came from the Super Admin stock' }),
     manufacturingDate: z.iso.date().nullable(),
     expiryDate: z.iso.date().nullable(),
     unitCost: moneyOutput.nullable(),

@@ -130,7 +130,7 @@ export const transfersService = {
       [branchId],
     )) as { kind: string; hasWarehouse: boolean }[];
     if (row?.kind === 'branch' && row.hasWarehouse) {
-      throw AppError.conflict('Branches do not send stock out. Only the Main Warehouse transfers stock.');
+      throw AppError.conflict('Branches do not send stock out. Only the Super Admin stock transfers stock.');
     }
   },
 
@@ -143,7 +143,7 @@ export const transfersService = {
     )) as { kind: string; hasWarehouse: boolean }[];
     if (row?.kind === 'branch' && row.hasWarehouse) {
       throw AppError.conflict(
-        'Branches get their stock from the Main Warehouse. Ask the Super Admin to transfer it.',
+        'Branches get their stock from the Super Admin stock. Ask the Super Admin to transfer it.',
       );
     }
   },
@@ -151,7 +151,7 @@ export const transfersService = {
   async assertRoute(manager: EntityManager, fromBranchId: string, toBranchId: string) {
     const from = await branchOf(manager, fromBranchId);
     if (from?.kind !== 'warehouse') {
-      throw AppError.badRequest('Stock is transferred to branches from the Main Warehouse only');
+      throw AppError.badRequest('Stock is transferred to branches from the Super Admin stock only');
     }
     const to = await branchOf(manager, toBranchId);
     if (!to || to.kind !== 'branch') throw AppError.badRequest('Choose a branch to transfer to');
@@ -187,7 +187,7 @@ export const transfersService = {
           manufacturingDate: batch?.manufacturingDate ?? null,
           expiryDate: batch?.expiryDate ?? null,
           unitCost: batch?.unitCost ?? null,
-          note: ['From Main Warehouse', stockOut.note].filter(Boolean).join(' · '),
+          note: ['From Super Admin', stockOut.note].filter(Boolean).join(' · '),
           transferOutId: stockOut.id,
         },
         manager,
@@ -202,7 +202,7 @@ export const transfersService = {
             type: 'stock_in',
             qty: qty.negated(),
             date: stockOut.date,
-            note: 'From Main Warehouse',
+            note: 'From Super Admin',
           },
         ],
       );
@@ -216,7 +216,7 @@ export const transfersService = {
         );
         await manager.query(
           `INSERT INTO inventory_item_events (item_id, branch_id, type, reference_type, reference_id, reference_label, created_by, created_at)
-           SELECT id, branch_id, 'received', 'stock_in', $2, 'From Main Warehouse', $3, clock_timestamp() FROM inventory_items WHERE id = ANY($1)`,
+           SELECT id, branch_id, 'received', 'stock_in', $2, 'From Super Admin', $3, clock_timestamp() FROM inventory_items WHERE id = ANY($1)`,
           [moving, stockIn.id, actor.userId],
         );
         await manager.query('UPDATE products SET track_serials = true WHERE id = $1', [productId]);

@@ -473,7 +473,9 @@ export const salesService = {
       withTransaction(async (em) => {
         const branch = await repo(Branch, em).findOneByOrFail({ id: branchId });
         if (branch.kind === 'warehouse') {
-          throw AppError.conflict('The Main Warehouse does not sell. Transfer the stock to a branch first.');
+          throw AppError.conflict(
+            'The Super Admin stock does not sell. Transfer the stock to a branch first.',
+          );
         }
         const patient = input.patient
           ? await patientsService.createRecord(actor, branchId, input.patient, em)

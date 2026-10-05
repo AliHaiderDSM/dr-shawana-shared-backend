@@ -33,7 +33,7 @@ export class MainWarehouse1791193498334 implements MigrationInterface {
     );
     await queryRunner.query(
       `INSERT INTO "branches" ("name", "code", "city", "kind", "status")
-       SELECT 'Main Warehouse', 'MAINWH', COALESCE((SELECT city FROM branches WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1), 'Lahore'), 'warehouse', 'active'
+       SELECT 'Super Admin Stock', 'MAINWH', COALESCE((SELECT city FROM branches WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1), 'Lahore'), 'warehouse', 'active'
         WHERE NOT EXISTS (SELECT 1 FROM branches WHERE (kind = 'warehouse' OR code = 'MAINWH') AND deleted_at IS NULL)`,
     );
   }

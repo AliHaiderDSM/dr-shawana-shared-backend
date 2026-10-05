@@ -299,7 +299,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
   function assertNotTransferIn(record: T) {
     if ((record as Partial<StockIn>).transferOutId) {
       throw AppError.conflict(
-        'This stock came from the Main Warehouse. Only the Super Admin can cancel the transfer there.',
+        'This stock came from the Super Admin stock. Only the Super Admin can cancel the transfer there.',
       );
     }
   }

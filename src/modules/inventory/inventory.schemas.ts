@@ -156,7 +156,7 @@ registry.registerPath({
   method: 'get',
   path: '/branch/inventory/expiry-alerts',
   summary:
-    'Batches in stock that expire within the next days (default 90) or have expired. Super Admin without branchId gets every branch and the Main Warehouse.',
+    'Batches in stock that expire within the next days (default 90) or have expired. Super Admin without branchId gets every branch and the Super Admin stock.',
   request: { query: expiryAlertsQuerySchema },
   responses: {
     200: { description: 'Alerts, soonest first', ...jsonContent(dataEnvelope(z.array(expiryAlertSchema))) },

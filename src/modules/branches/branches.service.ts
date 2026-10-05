@@ -39,7 +39,7 @@ async function assertCodeAvailable(code: string, excludeId?: string, manager?: E
 }
 
 function assertNotWarehouse(branch: Branch, action: string) {
-  if (branch.kind === 'warehouse') throw AppError.conflict(`The Main Warehouse cannot be ${action}`);
+  if (branch.kind === 'warehouse') throw AppError.conflict(`The Super Admin stock cannot be ${action}`);
 }
 
 export const branchesService = {
