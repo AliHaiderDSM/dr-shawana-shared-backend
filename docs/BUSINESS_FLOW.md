@@ -188,6 +188,7 @@ Delivery slips printed (Delivery Print role)
 - Purchase and price entries (quantity, price, supplier) are added per product.
 - **Stock In** records stock received from a supplier, with batch, manufacturing date, expiry, purchase price, file and note. Each batch keeps its own stock.
 - **Sales take the batch that expires first**, and expired stock cannot be sold. Expired or damaged stock is removed with a write-off on the batch.
+- **Labelled products:** every pack carries a DSM label (`DSM-000001`). Stock In prints new labels (or records the labels already on the packs); stock out, sales and returns scan them, so each piece's history (received, sold to whom, returned, restocked) is kept.
 - **Stock Out** records stock sent out through a dispatcher.
 - **Inventory Report** shows stock per product for the branch.
 - Stock is kept **per branch**. One branch's sales and stock never affect another branch.

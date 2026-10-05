@@ -14,9 +14,34 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 | B7    | Accounts, finance, reports and dashboard KPIs                          | ✅ Done (2026-09-30) |
 | B6b   | Sale returns (inspection, refunds) and product barcodes                | ✅ Done (2026-10-01) |
 | B6c   | Product batches, expiry and FEFO allocation                            | ✅ Done (2026-10-05) |
+| B6d   | Labelled pieces (DSM serials), label printing and scanning             | ✅ Done (2026-10-05) |
 | B8    | Mobile app API (patients)                                              | ⏳ Next              |
 | B9    | Data migration from posSoft                                            | Not started          |
 | B10   | Hardening and deployment                                               | Not started          |
+
+---
+
+## B6d — Labelled pieces: DSM serials (done 2026-10-05)
+
+Added on request: the packs carry printed labels `DSM-000001`, `DSM-000002`, … and every physical piece is tracked.
+
+- **Tables:** `inventory_items` (one row per piece: serial, product, batch, current branch, status, sale, stock out, return line) and `inventory_item_events` (the history of each piece). The sequence `inventory_item_serial_seq` numbers new labels; serials are unique across all branches. `products.track_serials` turns on the first time a product gets labels.
+- **Statuses:** in_stock, sold, returned (awaiting inspection), quarantined, damaged, expired, supplier_returned, dispatched, written_off.
+- **Stock In:** each line chooses labels `none`, `generate` (the system numbers one label per piece) or `existing` (packs already carry consecutive labels from `firstSerial`). A labelled product cannot be received without labels. Quantities are whole pieces. Overlapping labels are a 409 listing the clashes.
+- **Labels already on the shelf:** `POST /branch/inventory/items/register` (product, batch, first label, count) labels stock that is on hand, up to the stock that has no label yet.
+- **Sale:** `serials` on create and edit. A labelled product needs one scanned label per piece (422 `details.labels`); a label that is sold, of another product or branch, or of an expired batch is refused (422 `details.serials`). The stock comes from the scanned pieces' batches. Editing swaps pieces; deleting frees them.
+- **Stock Out:** `serials` per line for labelled products; removing the entry brings the pieces back.
+- **Returns:** labelled products need the returned labels, which must be sold on that sale. Each label becomes its own return line, so each piece is inspected on its own; restocking puts that exact piece back into its batch.
+- **Production** of a labelled product numbers labels for the produced pieces. **Write-off** of a labelled batch takes the scanned labels. **Purchase entries** cannot add stock to a labelled product (use Stock In).
+- Editing the product, quantity or batch of a stock entry of a labelled product is refused (delete and enter again). A stock in can be deleted only while none of its pieces has moved.
+- **Endpoints:** `GET /branch/inventory/items`, `GET /branch/inventory/items/serial/:serial` (with history), `GET /branch/inventory/items/:itemId`, `POST /branch/inventory/items/register`, `GET /branch/inventory/products/:productId/serials`.
+- **Locking:** the stock ledger now locks products `FOR NO KEY UPDATE`, so two receipts of the same product at the same moment no longer deadlock.
+- **Dashboard:** Labels column on Stock In, a label print page (38×25 mm roll or A4 sheet, Code 128), scanning on Stock Out, POS, returns and write-off, a Labels page with each piece's history, label registration, and labels on the sale, return and product pages.
+- Migration `SerialItems`, tested up, down, up and for drift.
+
+**Important on go-live:** register the labels already stuck on packs **before** printing new labels from Stock In, so new numbers continue after the existing ones.
+
+**Verified:** lint, typecheck, build and `npm test` (22 suites, 204 tests); Stock In with new labels, label printing, POS scanning, the label history and the product page driven in a browser.
 
 ---
 
