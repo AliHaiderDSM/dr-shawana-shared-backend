@@ -19,11 +19,14 @@ export class FakeSupabase {
   private readonly refreshTokens = new Map<string, string>();
   failNextCreate = false;
   readonly objects = new Map<string, { contentType: string; size: number }>();
+  readonly missingBuckets = new Set<string>();
+  readonly createdBuckets: { name: string; options: { public: boolean } }[] = [];
 
   private bucket(name: string) {
     const key = (path: string) => `${name}/${path}`;
     return {
       upload: async (path: string, body: Buffer, options: { contentType: string }) => {
+        if (this.missingBuckets.has(name)) return { data: null, error: { message: 'Bucket not found' } };
         this.objects.set(key(path), { contentType: options.contentType, size: body.length });
         return { data: { path }, error: null };
       },
@@ -62,7 +65,14 @@ export class FakeSupabase {
   }
 
   readonly admin = {
-    storage: { from: (name: string) => this.bucket(name) },
+    storage: {
+      from: (name: string) => this.bucket(name),
+      createBucket: async (name: string, options: { public: boolean }) => {
+        this.missingBuckets.delete(name);
+        this.createdBuckets.push({ name, options });
+        return { data: { name }, error: null };
+      },
+    },
     auth: {
       getUser: async (token: string) => {
         const user = this.users.get(token);

@@ -180,6 +180,19 @@ describe('products and purchase entries', () => {
     expect(bad.status).toBe(400);
   });
 
+  it('creates a missing storage bucket on the first upload', async () => {
+    const product = (await createProduct({ name: 'Shampoo', categoryId })).body.data;
+    fake.missingBuckets.add('product-images');
+    const res = await request(app)
+      .post(`/api/v1/branch/products/${product.id}/image`)
+      .set(bearer(lahoreAdmin))
+      .attach('image', Buffer.from('fake-png'), { filename: 'shampoo.png', contentType: 'image/png' });
+    expect(res.status).toBe(200);
+    expect(fake.createdBuckets).toEqual([
+      expect.objectContaining({ name: 'product-images', options: expect.objectContaining({ public: true }) }),
+    ]);
+  });
+
   describe('roles', () => {
     it('lets store keeper and front desk read but not create', async () => {
       expect((await request(app).get('/api/v1/branch/products').set(bearer(storeKeeper))).status).toBe(200);

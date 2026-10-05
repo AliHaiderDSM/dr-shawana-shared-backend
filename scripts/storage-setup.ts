@@ -1,36 +1,5 @@
-import { BUCKETS } from '../src/lib/storage';
+import { BUCKET_SETTINGS, type BucketName } from '../src/lib/storage';
 import { getSupabaseAdmin } from '../src/lib/supabase';
-
-const MB = 1024 * 1024;
-const IMAGES = ['image/jpeg', 'image/png', 'image/webp'];
-
-const bucketConfig = [
-  { name: BUCKETS.productImages, public: true, fileSizeLimit: 5 * MB, allowedMimeTypes: IMAGES },
-  {
-    name: BUCKETS.stockFiles,
-    public: false,
-    fileSizeLimit: 10 * MB,
-    allowedMimeTypes: [...IMAGES, 'application/pdf'],
-  },
-  {
-    name: BUCKETS.paymentProofs,
-    public: false,
-    fileSizeLimit: 10 * MB,
-    allowedMimeTypes: [...IMAGES, 'application/pdf'],
-  },
-  {
-    name: BUCKETS.doctorSignatures,
-    public: false,
-    fileSizeLimit: 2 * MB,
-    allowedMimeTypes: IMAGES,
-  },
-  {
-    name: BUCKETS.medicalRecords,
-    public: false,
-    fileSizeLimit: 10 * MB,
-    allowedMimeTypes: [...IMAGES, 'application/pdf'],
-  },
-];
 
 async function main() {
   const storage = getSupabaseAdmin().storage;
@@ -38,7 +7,10 @@ async function main() {
   if (error) throw error;
   const names = new Set(existing.map((b) => b.name));
 
-  for (const { name, ...options } of bucketConfig) {
+  for (const [name, options] of Object.entries(BUCKET_SETTINGS) as [
+    BucketName,
+    (typeof BUCKET_SETTINGS)[BucketName],
+  ][]) {
     const result = names.has(name)
       ? await storage.updateBucket(name, options)
       : await storage.createBucket(name, options);
