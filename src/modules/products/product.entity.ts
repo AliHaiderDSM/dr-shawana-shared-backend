@@ -55,4 +55,7 @@ export class Product extends BranchScopedEntity {
   @Index()
   @Column({ type: 'enum', enum: PRODUCT_STATUSES, enumName: 'product_status', default: 'active' })
   status: ProductStatus;
+
+  @Column({ name: 'track_serials', type: 'boolean', default: false })
+  trackSerials: boolean;
 }

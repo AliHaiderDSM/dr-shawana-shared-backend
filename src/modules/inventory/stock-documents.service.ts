@@ -1,4 +1,6 @@
+import Decimal from 'decimal.js';
 import { type EntityManager, type EntityTarget } from 'typeorm';
+import { AppDataSource } from '../../database/data-source';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
@@ -10,6 +12,7 @@ import { BUCKETS, createSignedUrl } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { type SupplierType } from '../suppliers/supplier.entity';
 import { suppliersService } from '../suppliers/suppliers.service';
+import { inventoryItemsService } from './inventory-items.service';
 import { productBatchesService } from './product-batches.service';
 import { StockAttachment, type StockDocumentType } from './stock-attachment.entity';
 import { type StockIn } from './stock-in.entity';
@@ -36,7 +39,19 @@ interface CreateInput {
   note?: string | null;
   supplierId?: string | null;
   dispatcherId?: string | null;
-  items: ({ productId: string; qty: string } & Record<string, unknown>)[];
+  items: ({
+    productId: string;
+    qty: string;
+    labels?: 'none' | 'generate' | 'existing';
+    firstSerial?: string;
+    serials?: string[];
+  } & Record<string, unknown>)[];
+}
+
+interface LabelRange {
+  count: number;
+  firstSerial: string;
+  lastSerial: string;
 }
 
 type UpdateInput = Partial<Record<string, unknown>> & { productId?: string; qty?: string; date?: string };
@@ -123,7 +138,30 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     return grouped;
   }
 
-  function toDto(record: T, files: StockAttachment[] = []) {
+  async function labelsFor(ids: string[], manager?: EntityManager) {
+    const labels = new Map<string, LabelRange>();
+    if (ids.length === 0) return labels;
+    const key = config.kind === 'stock_in' ? 'source_id' : 'stock_out_id';
+    const extra = config.kind === 'stock_in' ? "AND source_type = 'stock_in'" : '';
+    const rows: (LabelRange & { id: string })[] = await (manager ?? AppDataSource).query(
+      `SELECT ${key} AS id, COUNT(*)::int AS count, MIN(serial) AS "firstSerial", MAX(serial) AS "lastSerial"
+         FROM inventory_items WHERE ${key} = ANY($1) ${extra} GROUP BY ${key}`,
+      [ids],
+    );
+    for (const { id, ...range } of rows) labels.set(id, range);
+    return labels;
+  }
+
+  async function productInfo(manager: EntityManager, branchId: string, productId: string) {
+    const [row] = (await manager.query(
+      'SELECT name, track_serials AS "trackSerials" FROM products WHERE id = $1 AND branch_id = $2',
+      [productId, branchId],
+    )) as { name: string; trackSerials: boolean }[];
+    if (!row) throw AppError.badRequest('The product was not found in this branch');
+    return row;
+  }
+
+  function toDto(record: T, files: StockAttachment[] = [], labels: LabelRange | null = null) {
     const plain = withoutInternals(record) as Record<string, unknown>;
     const party = plain[config.partyRelation] as { id: string; name: string } | null | undefined;
     const product = record.product;
@@ -132,6 +170,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       product: product ? { id: product.id, name: product.name } : null,
       [config.partyRelation]: party ? { id: party.id, name: party.name } : null,
       attachments: files.map(toAttachmentDto),
+      labels,
     };
   }
 
@@ -151,7 +190,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
   async function getDto(branchId: string, id: string, manager?: EntityManager) {
     const record = await getRecord(branchId, id, manager);
     const files = await attachmentsFor(branchId, [id], manager);
-    return toDto(record, files.get(id));
+    const labels = await labelsFor([id], manager);
+    return toDto(record, files.get(id), labels.get(id) ?? null);
   }
 
   async function assertParty(branchId: string, partyId: string | null | undefined, manager: EntityManager) {
@@ -184,6 +224,81 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     }
   }
 
+  async function postPieces(
+    manager: EntityManager,
+    actor: Actor,
+    record: T,
+    product: { name: string; trackSerials: boolean },
+    pieces: { labels?: string; firstSerial?: string; serials?: string[] },
+  ) {
+    const ref = ledgerRef(actor, record);
+    if (config.kind === 'stock_in') {
+      const stockIn = record as StockIn;
+      await stockLedger.apply(manager, ref, [movementFor(record)]);
+      const mode = pieces.labels ?? 'none';
+      if (mode === 'none' && product.trackSerials) {
+        throw AppError.unprocessable(
+          `${product.name} is tracked by label: print new labels or enter the first label on the packs`,
+        );
+      }
+      if (mode === 'none') return;
+      const common = {
+        branchId: record.branchId,
+        productId: record.productId,
+        batchId: stockIn.batchId,
+        qty: record.qty,
+        date: record.date,
+        source: 'stock_in' as const,
+        ref: { type: 'stock_in', id: record.id, label: stockIn.batch },
+        event: 'received' as const,
+      };
+      if (mode === 'generate') await inventoryItemsService.generate(manager, actor, common);
+      else
+        await inventoryItemsService.register(manager, actor, {
+          ...common,
+          firstSerial: pieces.firstSerial ?? '',
+        });
+      return;
+    }
+    const serials = pieces.serials ?? [];
+    if (!product.trackSerials) {
+      if (serials.length > 0) throw AppError.badRequest(`${product.name} is not tracked by label`);
+      await stockLedger.apply(manager, ref, [movementFor(record)]);
+      return;
+    }
+    if (!record.qty.equals(serials.length)) {
+      throw AppError.unprocessable(
+        `Scan the label of every ${product.name} that goes out (${serials.length} of ${record.qty.toString()} scanned)`,
+      );
+    }
+    const taken = await inventoryItemsService.take(manager, actor, {
+      branchId: record.branchId,
+      serials,
+      from: ['in_stock'],
+      to: 'dispatched',
+      event: 'dispatched',
+      ref: { type: 'stock_out', id: record.id, label: (record as StockOut).destination },
+      date: record.date,
+      sellableOnly: true,
+      productIds: new Set([record.productId]),
+    });
+    await stockLedger.apply(
+      manager,
+      ref,
+      inventoryItemsService.movements(taken, -1, { type: 'stock_out', date: record.date, note: record.note }),
+    );
+  }
+
+  async function piecesOf(manager: EntityManager, record: T) {
+    if (config.kind === 'stock_in')
+      return inventoryItemsService.countFromSource(manager, 'stock_in', record.id);
+    const [row] = (await manager.query(
+      'SELECT COUNT(*)::int AS n FROM inventory_items WHERE stock_out_id = $1',
+      [record.id],
+    )) as [{ n: number }];
+    return row.n;
+  }
+
   return {
     async list(branchId: string, query: StockDocumentListQuery) {
       const qb = detailed(branchId);
@@ -203,7 +318,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         branchId,
         items.map((i) => i.id),
       );
-      return { items: items.map((i) => toDto(i, files.get(i.id))), meta };
+      const labels = await labelsFor(items.map((i) => i.id));
+      return { items: items.map((i) => toDto(i, files.get(i.id), labels.get(i.id) ?? null)), meta };
     },
 
     get: getDto,
@@ -216,11 +332,13 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           await assertParty(branchId, partyId, em);
           const ids: string[] = [];
           for (const item of input.items) {
+            const { labels, firstSerial, serials, ...fields } = item;
+            const product = await productInfo(em, branchId, item.productId);
             const record = await base.create(
               branchId,
               actor.userId,
               {
-                ...item,
+                ...fields,
                 ...(await batchFieldsFor(em, actor, branchId, item.productId, item, partyId)),
                 [config.partyKey]: partyId,
                 date: input.date,
@@ -228,7 +346,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
               } as unknown as Partial<T>,
               em,
             );
-            await stockLedger.apply(em, ledgerRef(actor, record), [movementFor(record)]);
+            await postPieces(em, actor, record, product, { labels, firstSerial, serials });
             ids.push(record.id);
           }
           await saveAttachments(em, actor, branchId, ids, uploaded);
@@ -260,7 +378,26 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         if (config.partyKey in input)
           await assertParty(branchId, input[config.partyKey] as string | null, em);
         const before = await getDto(branchId, id, em);
+        const pieces = await piecesOf(em, record);
+        const previous = {
+          productId: record.productId,
+          qty: record.qty,
+          batch: (record as Partial<StockIn>).batch ?? null,
+        };
         Object.assign(record, input, { updatedBy: actor.userId });
+        const tracked = await inventoryItemsService.trackedProducts(em, branchId, [
+          previous.productId,
+          record.productId,
+        ]);
+        const changed =
+          record.productId !== previous.productId ||
+          !new Decimal(record.qty).equals(previous.qty) ||
+          ((record as Partial<StockIn>).batch ?? null) !== previous.batch;
+        if (changed && (pieces > 0 || tracked.size > 0)) {
+          throw AppError.conflict(
+            'This entry is for a product tracked by label. Delete it and enter it again to change the product, quantity or batch.',
+          );
+        }
         Object.assign(
           record,
           await batchFieldsFor(
@@ -277,7 +414,9 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         delete record.product;
         delete (record as unknown as Record<string, unknown>)[config.partyRelation];
         const saved = await base.save(record, em);
-        await stockLedger.replace(em, ledgerRef(actor, saved), [movementFor(saved)]);
+        if (pieces === 0 && tracked.size === 0) {
+          await stockLedger.replace(em, ledgerRef(actor, saved), [movementFor(saved)]);
+        }
         const after = await getDto(branchId, id, em);
         await auditService.record(
           { actor, branchId, action: 'update', entity: config.kind, entityId: id, before, after },
@@ -291,6 +430,30 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       await withTransaction(async (em) => {
         const before = await getDto(branchId, id, em);
         const record = await getRecord(branchId, id, em);
+        if (config.kind === 'stock_in') {
+          const removed = await inventoryItemsService.removeUntouched(em, branchId, 'stock_in', record.id);
+          const tracked = await inventoryItemsService.trackedProducts(em, branchId, [record.productId]);
+          if (removed === 0 && tracked.size > 0) {
+            const free = await inventoryItemsService.unlabelled(
+              em,
+              branchId,
+              record.productId,
+              (record as StockIn).batchId,
+            );
+            if (free.lt(record.qty)) {
+              throw AppError.conflict('Its stock already carries labels. Remove those pieces first.');
+            }
+          }
+        } else {
+          await inventoryItemsService.release(em, actor, {
+            where: { stockOutId: record.id },
+            from: ['dispatched'],
+            to: 'in_stock',
+            event: 'dispatch_cancelled',
+            ref: { type: config.kind, id: record.id, label: `${config.label} removed` },
+            clear: ['stockOut'],
+          });
+        }
         await stockLedger.reverse(em, ledgerRef(actor, record), `${config.label} removed`);
         await base.softDelete(record, actor.userId, em);
         await auditService.record(

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { allocatedBatchSchema } from '../inventory/product-batches.schemas';
 import { registry } from '../../lib/openapi';
+import { serialsInput } from '../inventory/inventory-items.schemas';
 import { listQuerySchema } from '../../lib/pagination';
 import {
   dateInput,
@@ -35,7 +36,9 @@ export const createReturnSchema = registry.register(
       reason: z.enum(RETURN_REASONS),
       note: optionalText(5000),
       items: z
-        .array(z.object({ productId: z.uuid(), qty: positiveQuantityInput }))
+        .array(
+          z.object({ productId: z.uuid(), qty: positiveQuantityInput, serials: serialsInput.optional() }),
+        )
         .min(1)
         .max(100),
       refund: refundInputSchema.optional(),
@@ -92,6 +95,7 @@ export const returnItemSchema = z.object({
   resolvedAt: z.iso.datetime().nullable(),
   resolvedBy: z.uuid().nullable(),
   resolutionNote: z.string().nullable(),
+  serial: z.string().nullable().optional().openapi({ description: 'The returned label (detail only)' }),
 });
 
 export const saleReturnSchema = registry.register(
@@ -149,6 +153,8 @@ export const returnableSchema = registry.register(
         sold: quantityOutput,
         returned: quantityOutput,
         returnable: quantityOutput,
+        trackSerials: z.boolean(),
+        serials: z.array(z.string()).openapi({ description: 'Labels sold on the sale and not returned yet' }),
       }),
     ),
   }),

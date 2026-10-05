@@ -8,6 +8,7 @@ import {
   pageEnvelope,
 } from '../../lib/http';
 import { registry } from '../../lib/openapi';
+import { serialInput, serialsInput } from './inventory-items.schemas';
 import { multipartFiles, securedDocs } from '../../lib/openapi-crud';
 import { listQuerySchema } from '../../lib/pagination';
 import {
@@ -68,7 +69,26 @@ export const createStockInSchema = registry.register(
     supplierId: optionalUuid,
     date: dateInput,
     note: optionalText(1000),
-    items: itemsOf(batchFields).superRefine(checkBatchFields),
+    items: itemsOf({
+      ...batchFields,
+      labels: z.enum(['none', 'generate', 'existing']).optional().openapi({
+        description:
+          'generate: the system numbers a new label for every piece; existing: the packs already carry consecutive labels starting at firstSerial',
+      }),
+      firstSerial: serialInput.optional(),
+    })
+      .superRefine(checkBatchFields)
+      .superRefine((items, ctx) =>
+        items.forEach((item, index) => {
+          if (item.labels === 'existing' && !item.firstSerial) {
+            ctx.addIssue({
+              code: 'custom',
+              path: [index, 'firstSerial'],
+              message: 'Enter the first label number',
+            });
+          }
+        }),
+      ),
   }),
 );
 
@@ -78,7 +98,7 @@ export const createStockOutSchema = registry.register(
     dispatcherId: optionalUuid,
     date: dateInput,
     note: optionalText(1000),
-    items: itemsOf({ destination: requiredText(1, 150) }),
+    items: itemsOf({ destination: requiredText(1, 150), serials: serialsInput.optional() }),
   }),
 );
 
@@ -142,6 +162,10 @@ const attachmentSchema = z.object({
   createdAt: z.iso.datetime(),
 });
 
+const labelRangeSchema = z
+  .object({ count: z.number().int(), firstSerial: z.string(), lastSerial: z.string() })
+  .nullable()
+  .openapi({ description: 'Labelled pieces of this entry' });
 const documentBase = {
   id: z.uuid(),
   branchId: z.uuid(),
@@ -151,6 +175,7 @@ const documentBase = {
   qty: quantityOutput,
   note: z.string().nullable(),
   attachments: z.array(attachmentSchema),
+  labels: labelRangeSchema,
   createdBy: z.uuid().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

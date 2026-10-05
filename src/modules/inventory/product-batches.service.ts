@@ -12,6 +12,7 @@ import { today } from '../../lib/validation';
 import { auditService } from '../audit/audit.service';
 import { type BatchListQuery, type WriteOffInput } from './product-batches.schemas';
 import { ProductBatch } from './product-batch.entity';
+import { inventoryItemsService } from './inventory-items.service';
 import { stockLedger } from './stock-ledger';
 
 export interface BatchDetails {
@@ -100,7 +101,7 @@ export const productBatchesService = {
   ) {
     const overwrite = options.overwrite ?? false;
     const batchNo = details.batchNo.trim();
-    await manager.query('SELECT id FROM products WHERE id = $1 AND branch_id = $2 FOR UPDATE', [
+    await manager.query('SELECT id FROM products WHERE id = $1 AND branch_id = $2 FOR NO KEY UPDATE', [
       productId,
       branchId,
     ]);
@@ -210,22 +211,53 @@ export const productBatchesService = {
       const batch = await batches.findById(branchId, id, em);
       if (!batch) throw AppError.notFound('Batch');
       const referenceId = randomUUID();
-      await stockLedger.apply(
-        em,
-        { branchId, referenceType: WRITE_OFF_REFERENCE, referenceId, actorId: actor.userId },
-        [
+      const date = input.date ?? today();
+      const note = [`Write-off (${input.reason}) of batch ${batch.batchNo}`, input.note]
+        .filter(Boolean)
+        .join(': ');
+      const ref = { branchId, referenceType: WRITE_OFF_REFERENCE, referenceId, actorId: actor.userId };
+      const serials = input.serials ?? [];
+      const tracked = await inventoryItemsService.trackedProducts(em, branchId, [batch.productId]);
+      if (serials.length > 0) {
+        if (tracked.size === 0) throw AppError.badRequest('This product is not tracked by label');
+        if (!new Decimal(input.qty).equals(serials.length)) {
+          throw AppError.unprocessable(`Scan ${input.qty} labels (${serials.length} scanned)`);
+        }
+        const pieces = await inventoryItemsService.take(em, actor, {
+          branchId,
+          serials,
+          from: ['in_stock'],
+          to: input.reason === 'expired' ? 'expired' : input.reason === 'damaged' ? 'damaged' : 'written_off',
+          event:
+            input.reason === 'expired' ? 'expired' : input.reason === 'damaged' ? 'damaged' : 'written_off',
+          ref: { type: WRITE_OFF_REFERENCE, id: referenceId, label: input.reason },
+          date,
+          batchId: batch.id,
+          note: input.note ?? null,
+        });
+        await stockLedger.apply(
+          em,
+          ref,
+          inventoryItemsService.movements(pieces, -1, { type: 'adjustment', date, note }),
+        );
+      } else {
+        if (tracked.size > 0) {
+          const free = await inventoryItemsService.unlabelled(em, branchId, batch.productId, batch.id);
+          if (free.lt(input.qty)) {
+            throw AppError.unprocessable('Scan the label of every piece you write off');
+          }
+        }
+        await stockLedger.apply(em, ref, [
           {
             productId: batch.productId,
             batchId: batch.id,
             type: 'adjustment',
             qty: new Decimal(input.qty).negated(),
-            date: input.date ?? today(),
-            note: [`Write-off (${input.reason}) of batch ${batch.batchNo}`, input.note]
-              .filter(Boolean)
-              .join(': '),
+            date,
+            note,
           },
-        ],
-      );
+        ]);
+      }
       const after = await this.get(branchId, id, em);
       await auditService.record(
         {

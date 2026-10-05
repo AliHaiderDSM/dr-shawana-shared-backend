@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { branchQuerySchema, dataEnvelope, errorResponses, jsonContent, pageEnvelope } from '../../lib/http';
 import { registry } from '../../lib/openapi';
+import { serialsInput } from './inventory-items.schemas';
 import { securedDocs } from '../../lib/openapi-crud';
 import { MAX_PAGE_SIZE } from '../../lib/pagination';
 import { dateInput, moneyOutput, optionalText, quantityInput, quantityOutput } from '../../lib/validation';
@@ -33,6 +34,7 @@ export const writeOffSchema = registry.register(
     reason: z.enum(WRITE_OFF_REASONS),
     date: dateInput.optional(),
     note: optionalText(500),
+    serials: serialsInput.optional(),
   }),
 );
 

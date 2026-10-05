@@ -12,6 +12,8 @@ import {
 import { registry } from '../../lib/openapi';
 import { PAYMENT_METHODS } from '../appointments/appointment-payment.entity';
 import { patientFields } from '../patients/patients.schemas';
+import { ITEM_STATUSES } from '../inventory/inventory-item.entity';
+import { serialsInput } from '../inventory/inventory-items.schemas';
 import { allocatedBatchSchema } from '../inventory/product-batches.schemas';
 import { DELIVERY_STATUSES, PAYMENT_STATUSES, SALE_TYPES } from './sale.entity';
 
@@ -71,6 +73,7 @@ export const createSaleSchema = registry.register(
         .openapi({ description: 'Defaults to the branch city' }),
       note: optionalText(2000),
       items: z.array(saleItemInputSchema).min(1).max(100),
+      serials: serialsInput.optional(),
       payments: z.array(salePaymentInputSchema).max(10).default([]),
       ...discountFields,
     })
@@ -94,6 +97,9 @@ export const updateSaleSchema = registry.register(
       city: z.string().trim().min(1).max(100),
       note: z.string().trim().max(2000).nullable(),
       items: z.array(saleItemInputSchema).min(1).max(100),
+      serials: serialsInput.openapi({
+        description: 'Every label on the sale after the edit. Leave out to keep the labels already sold.',
+      }),
       discountPercent: percentInput,
     }),
   ),
@@ -219,6 +225,10 @@ export const saleSchema = registry.register(
     createdBy: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
+    serials: z
+      .array(z.object({ serial: z.string(), productId: z.uuid(), status: z.enum(ITEM_STATUSES) }))
+      .optional()
+      .openapi({ description: 'Labelled pieces sold on this sale (detail only)' }),
     batches: z.array(allocatedBatchSchema).optional().openapi({
       description: 'Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}.',
     }),

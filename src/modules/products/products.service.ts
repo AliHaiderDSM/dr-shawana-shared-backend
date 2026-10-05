@@ -8,6 +8,7 @@ import { type ListQuery } from '../../lib/pagination';
 import { BUCKETS, publicUrl, replaceFile } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { categoriesRepository } from '../categories/categories.repository';
+import { inventoryItemsService } from '../inventory/inventory-items.service';
 import { stockLedger } from '../inventory/stock-ledger';
 import { suppliersRepository } from '../suppliers/suppliers.repository';
 import { type ProductPurchaseEntry } from './product-purchase-entry.entity';
@@ -94,6 +95,31 @@ async function syncSalePriceWithLatestEntry(branchId: string, product: Product, 
   if (latest && !new Decimal(latest.unitPrice).equals(product.salePrice)) {
     product.salePrice = latest.unitPrice;
     await productsRepository.save(product, manager);
+  }
+}
+
+async function assertUnlabelledRoom(
+  manager: EntityManager,
+  branchId: string,
+  productId: string,
+  qty: Decimal.Value,
+) {
+  const tracked = await inventoryItemsService.trackedProducts(manager, branchId, [productId]);
+  if (tracked.size === 0) return;
+  const free = await inventoryItemsService.unlabelled(manager, branchId, productId, null);
+  if (free.lt(qty)) {
+    throw AppError.conflict(
+      'This product is tracked by label. Receive or remove its stock through Stock In.',
+    );
+  }
+}
+
+async function assertNotTracked(manager: EntityManager, branchId: string, productId: string) {
+  const tracked = await inventoryItemsService.trackedProducts(manager, branchId, [productId]);
+  if (tracked.size > 0) {
+    throw AppError.conflict(
+      'This product is tracked by label. Receive its stock through Stock In so labels are made.',
+    );
   }
 }
 
@@ -265,6 +291,7 @@ export const productsService = {
   async addPurchase(actor: Actor, branchId: string, productId: string, input: CreatePurchaseInput) {
     return withTransaction(async (em) => {
       const product = await getProduct(branchId, productId, em);
+      await assertNotTracked(em, branchId, productId);
       const entry = await insertPurchase(em, actor, branchId, product, input);
       return toPurchaseDto(await getEntry(branchId, productId, entry.id, em));
     });
@@ -282,7 +309,12 @@ export const productsService = {
       const entry = await getEntry(branchId, productId, id, em);
       await assertSupplier(branchId, input.supplierId, em);
       const before = toPurchaseDto(entry);
+      const previousQty = new Decimal(entry.quantity);
       Object.assign(entry, input, { updatedBy: actor.userId });
+      if (!new Decimal(entry.quantity).equals(previousQty)) {
+        if (new Decimal(entry.quantity).gt(previousQty)) await assertNotTracked(em, branchId, productId);
+        else await assertUnlabelledRoom(em, branchId, productId, previousQty.minus(entry.quantity));
+      }
       delete entry.supplier;
       await purchaseEntriesRepository.save(entry, em);
       await postPurchase(em, actor, entry, 'replace');
@@ -308,6 +340,7 @@ export const productsService = {
     await withTransaction(async (em) => {
       const product = await getProduct(branchId, productId, em);
       const entry = await getEntry(branchId, productId, id, em);
+      await assertUnlabelledRoom(em, branchId, productId, entry.quantity);
       await stockLedger.reverse(
         em,
         { branchId, referenceType: PURCHASE_REFERENCE, referenceId: id, actorId: actor.userId },

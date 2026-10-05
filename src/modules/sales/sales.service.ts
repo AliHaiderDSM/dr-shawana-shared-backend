@@ -15,6 +15,11 @@ import { auditService } from '../audit/audit.service';
 import { Branch } from '../branches/branch.entity';
 import { BundleItem } from '../bundles/bundle-item.entity';
 import { Bundle } from '../bundles/bundle.entity';
+import {
+  inventoryItemsService,
+  normalizeSerials,
+  type TakenItem,
+} from '../inventory/inventory-items.service';
 import { stockLedger } from '../inventory/stock-ledger';
 import { StockMovement } from '../inventory/stock-movement.entity';
 import { patientsService } from '../patients/patients.service';
@@ -263,6 +268,55 @@ async function netStock(manager: EntityManager, sale: Sale) {
   return net;
 }
 
+async function takeForSale(
+  manager: EntityManager,
+  actor: Actor,
+  sale: Sale,
+  serials: string[],
+  tracked: Set<string>,
+  date: string = sale.date,
+) {
+  if (serials.length === 0) return [];
+  return inventoryItemsService.take(manager, actor, {
+    branchId: sale.branchId,
+    serials,
+    from: ['in_stock'],
+    to: 'sold',
+    event: 'sold',
+    ref: { type: REFERENCE, id: sale.id, label: sale.invoiceNo },
+    date,
+    sellableOnly: true,
+    productIds: tracked,
+  });
+}
+
+async function assertScanned(
+  manager: EntityManager,
+  wanted: Map<string, Decimal>,
+  tracked: Set<string>,
+  items: TakenItem[],
+) {
+  const counts = inventoryItemsService.countByProduct(items);
+  const short = [...tracked].filter((id) => !(wanted.get(id) ?? new Decimal(0)).equals(counts.get(id) ?? 0));
+  if (short.length === 0) return;
+  const names: { id: string; name: string }[] = await manager.query(
+    'SELECT id, name FROM products WHERE id = ANY($1)',
+    [short],
+  );
+  const labels = short.map((productId) => ({
+    productId,
+    productName: names.find((n) => n.id === productId)?.name ?? productId,
+    required: (wanted.get(productId) ?? new Decimal(0)).toString(),
+    scanned: String(counts.get(productId) ?? 0),
+  }));
+  throw AppError.unprocessable(
+    labels.length === 1
+      ? `Scan the label of every ${labels[0]!.productName} (${labels[0]!.scanned} of ${labels[0]!.required} scanned)`
+      : 'Scan the label of every labelled product',
+    { labels },
+  );
+}
+
 const ledgerRef = (actor: Actor, sale: Sale) => ({
   branchId: sale.branchId,
   referenceType: REFERENCE,
@@ -404,9 +458,11 @@ export const salesService = {
     const batches = await stockLedger.batchesFor(AppDataSource.manager, branchId, [
       { referenceType: REFERENCE, referenceIds: [id] },
     ]);
+    const pieces = await inventoryItemsService.itemsOf(AppDataSource.manager, { saleId: id });
     return {
       ...toSaleDto(sale),
       batches: batches.map((b) => ({ ...b, qty: toQuantity(b.qty.negated()) })),
+      serials: pieces.map((p) => ({ serial: p.serial, productId: p.productId, status: p.status })),
     };
   },
 
@@ -447,17 +503,22 @@ export const salesService = {
           const proof = payment.proofIndex === undefined ? undefined : uploaded[payment.proofIndex];
           await insertPayment(em, actor, sale, payment, proof);
         }
-        await stockLedger.apply(
-          em,
-          ledgerRef(actor, sale),
-          [...soldByProduct(lines)].map(([productId, qty]) => ({
-            productId,
-            type: 'sale' as const,
-            qty: qty.negated(),
-            date,
-            note: sale.invoiceNo,
-          })),
-        );
+        const wanted = soldByProduct(lines);
+        const tracked = await inventoryItemsService.trackedProducts(em, branchId, [...wanted.keys()]);
+        const taken = await takeForSale(em, actor, sale, input.serials ?? [], tracked);
+        await assertScanned(em, wanted, tracked, taken);
+        await stockLedger.apply(em, ledgerRef(actor, sale), [
+          ...[...wanted]
+            .filter(([productId]) => !tracked.has(productId))
+            .map(([productId, qty]) => ({
+              productId,
+              type: 'sale' as const,
+              qty: qty.negated(),
+              date,
+              note: sale.invoiceNo,
+            })),
+          ...inventoryItemsService.movements(taken, -1, { type: 'sale', date, note: sale.invoiceNo }),
+        ]);
         const dto = toSaleDto(await getSale(branchId, sale.id, em));
         await audit(actor, sale, 'create', em, null, dto);
         return dto;
@@ -483,7 +544,34 @@ export const salesService = {
         await insertItems(em, actor, sale, lines);
         const wanted = soldByProduct(lines);
         const net = await netStock(em, sale);
-        const productIds = new Set([...wanted.keys(), ...net.keys()]);
+        const editDate = input.date ?? sale.date;
+        const note = `${sale.invoiceNo} edited`;
+        const old = (await inventoryItemsService.itemsOf(em, { saleId: sale.id })).filter(
+          (i) => i.status === 'sold',
+        );
+        const tracked = await inventoryItemsService.trackedProducts(em, branchId, [
+          ...new Set([...wanted.keys(), ...net.keys(), ...old.map((i) => i.productId)]),
+        ]);
+        const keep = new Set(input.serials ? normalizeSerials(input.serials) : old.map((i) => i.serial));
+        const oldSerials = new Set(old.map((i) => i.serial));
+        const released = await inventoryItemsService.release(em, actor, {
+          where: { ids: old.filter((i) => !keep.has(i.serial)).map((i) => i.id) },
+          from: ['sold'],
+          to: 'in_stock',
+          event: 'sale_edited',
+          ref: { type: REFERENCE, id: sale.id, label: sale.invoiceNo },
+          clear: ['sale'],
+        });
+        const added = await takeForSale(
+          em,
+          actor,
+          sale,
+          [...keep].filter((serial) => !oldSerials.has(serial)),
+          tracked,
+          editDate,
+        );
+        await assertScanned(em, wanted, tracked, [...old.filter((i) => keep.has(i.serial)), ...added]);
+        const productIds = new Set([...wanted.keys(), ...net.keys()].filter((id) => !tracked.has(id)));
         const adjustments = [...productIds]
           .map((productId) => ({
             productId,
@@ -494,7 +582,13 @@ export const salesService = {
             restoreFrom: [{ referenceType: REFERENCE, referenceIds: [sale.id] }],
           }))
           .filter((m) => !m.qty.isZero());
-        if (adjustments.length > 0) await stockLedger.apply(em, ledgerRef(actor, sale), adjustments);
+        const pieceMoves = [
+          ...inventoryItemsService.movements(released, 1, { type: 'sale_edit_adjust', date: editDate, note }),
+          ...inventoryItemsService.movements(added, -1, { type: 'sale_edit_adjust', date: editDate, note }),
+        ];
+        if (adjustments.length + pieceMoves.length > 0) {
+          await stockLedger.apply(em, ledgerRef(actor, sale), [...adjustments, ...pieceMoves]);
+        }
       }
       if (input.patientId && input.patientId !== sale.patientId) {
         const patient = await patientsService.require(input.patientId, em);
@@ -540,6 +634,14 @@ export const salesService = {
         throw AppError.conflict('A sale with returns cannot be deleted; delete its returns first');
       }
       const before = toSaleDto(sale);
+      await inventoryItemsService.release(em, actor, {
+        where: { saleId: sale.id },
+        from: ['sold'],
+        to: 'in_stock',
+        event: 'sale_deleted',
+        ref: { type: REFERENCE, id: sale.id, label: sale.invoiceNo },
+        clear: ['sale'],
+      });
       await stockLedger.reverse(em, ledgerRef(actor, sale), `${sale.invoiceNo} removed`);
       for (const item of sale.items ?? []) await saleItems.softDelete(item, actor.userId, em);
       for (const payment of sale.payments ?? []) await salePayments.softDelete(payment, actor.userId, em);

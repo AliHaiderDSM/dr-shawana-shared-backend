@@ -107,6 +107,9 @@ export const productSchema = registry.register(
     lowStockThreshold: quantityOutput,
     salePrice: moneyOutput,
     status: z.enum(PRODUCT_STATUSES),
+    trackSerials: z
+      .boolean()
+      .openapi({ description: 'Every piece carries a DSM label; sales, stock out and returns scan them' }),
     imagePath: z.string().nullable(),
     imageUrl: z.string().nullable(),
     createdAt: z.iso.datetime(),

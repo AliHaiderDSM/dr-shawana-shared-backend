@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { actorFrom } from '../../lib/actor';
-import { sendOk } from '../../lib/http';
+import { sendCreated, sendOk } from '../../lib/http';
 import { branchIdOf } from '../../lib/request';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
@@ -12,6 +12,14 @@ import {
   productParamsSchema,
   stockBalanceQuerySchema,
 } from './inventory.schemas';
+import {
+  inventoryItemListQuerySchema,
+  itemParamsSchema,
+  productSerialParamsSchema,
+  registerLabelsSchema,
+  serialParamsSchema,
+} from './inventory-items.schemas';
+import { inventoryItemsService } from './inventory-items.service';
 import { inventoryService } from './inventory.service';
 import { batchListQuerySchema, batchParamsSchema, writeOffSchema } from './product-batches.schemas';
 import { productBatchesService } from './product-batches.service';
@@ -100,5 +108,71 @@ inventoryRouter.post(
         validBody(req, writeOffSchema),
       ),
     );
+  },
+);
+
+const canFindPieces = requirePermission(
+  'stock.view',
+  'inventoryReport.view',
+  'sales.create',
+  'returns.create',
+);
+
+inventoryRouter.get(
+  `${path}/items`,
+  canFindPieces,
+  validate({ query: inventoryItemListQuerySchema }),
+  async (req: Request, res: Response) => {
+    const { items, meta } = await inventoryItemsService.list(
+      branchIdOf(req),
+      validQuery(req, inventoryItemListQuerySchema),
+    );
+    sendOk(res, items, meta);
+  },
+);
+
+inventoryRouter.post(
+  `${path}/items/register`,
+  requirePermission('stock.create'),
+  validate({ body: registerLabelsSchema }),
+  async (req: Request, res: Response) => {
+    sendCreated(
+      res,
+      await inventoryItemsService.registerExisting(
+        actorFrom(req),
+        branchIdOf(req),
+        validBody(req, registerLabelsSchema),
+      ),
+    );
+  },
+);
+
+inventoryRouter.get(
+  `${path}/items/serial/:serial`,
+  canFindPieces,
+  validate({ params: serialParamsSchema }),
+  async (req: Request, res: Response) => {
+    const { serial } = validParams(req, serialParamsSchema);
+    sendOk(res, await inventoryItemsService.get(branchIdOf(req), { serial }));
+  },
+);
+
+inventoryRouter.get(
+  `${path}/items/:itemId`,
+  canFindPieces,
+  validate({ params: itemParamsSchema }),
+  async (req: Request, res: Response) => {
+    const { itemId } = validParams(req, itemParamsSchema);
+    sendOk(res, await inventoryItemsService.get(branchIdOf(req), { id: itemId }));
+  },
+);
+
+inventoryRouter.get(
+  `${path}/products/:productId/serials`,
+  canViewStock,
+  validate({ params: productSerialParamsSchema }),
+  async (req: Request, res: Response) => {
+    const { productId } = validParams(req, productSerialParamsSchema);
+    sendOk(res, await inventoryItemsService.summary(branchIdOf(req), productId));
   },
 );

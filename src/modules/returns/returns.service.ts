@@ -10,6 +10,7 @@ import { today } from '../../lib/validation';
 import { accountSheetsRepository } from '../accounts/accounts.repository';
 import { auditService } from '../audit/audit.service';
 import { Branch } from '../branches/branch.entity';
+import { inventoryItemsService } from '../inventory/inventory-items.service';
 import { stockLedger } from '../inventory/stock-ledger';
 import { Sale } from '../sales/sale.entity';
 import { nextSequence } from '../sequences/sequences';
@@ -26,6 +27,22 @@ const returns = branchScopedRepository(SaleReturn, 'sr');
 const returnItems = branchScopedRepository(SaleReturnItem, 'ri');
 const REFERENCE = 'sale_return';
 const SALE_REFERENCE = 'sale';
+
+const PIECE_STATUS = {
+  quarantined: 'quarantined',
+  restocked: 'in_stock',
+  damaged: 'damaged',
+  expired: 'expired',
+  supplier: 'supplier_returned',
+} as const;
+
+const PIECE_EVENT = {
+  quarantined: 'quarantined',
+  restocked: 'restocked',
+  damaged: 'damaged',
+  expired: 'expired',
+  supplier: 'supplier_returned',
+} as const;
 
 async function restoreSources(manager: EntityManager, saleId: string) {
   const siblings = await repo(SaleReturn, manager).find({ where: { saleId }, select: { id: true } });
@@ -190,7 +207,7 @@ async function insertReturn(
   actor: Actor,
   sale: Sale,
   fields: { date: string; reason: ReturnReason; note: string | null },
-  items: { productId: string; qty: Decimal }[],
+  items: { productId: string; qty: Decimal; serials?: string[] }[],
   refund: Awaited<ReturnType<typeof refundFields>>,
 ) {
   const branch = await repo(Branch, manager).findOneByOrFail({ id: sale.branchId });
@@ -208,18 +225,42 @@ async function insertReturn(
     },
     manager,
   );
+  const ref = { type: REFERENCE, id: created.id, label: created.returnNo };
   for (const item of items) {
-    await returnItems.create(
-      sale.branchId,
-      actor.userId,
-      {
-        saleReturnId: created.id,
-        productId: item.productId,
-        qty: toQuantity(item.qty),
-        disposition: 'pending',
-      },
-      manager,
-    );
+    if (!item.serials?.length) {
+      await returnItems.create(
+        sale.branchId,
+        actor.userId,
+        {
+          saleReturnId: created.id,
+          productId: item.productId,
+          qty: toQuantity(item.qty),
+          disposition: 'pending',
+        },
+        manager,
+      );
+      continue;
+    }
+    const pieces = await inventoryItemsService.take(manager, actor, {
+      branchId: sale.branchId,
+      serials: item.serials,
+      from: ['sold'],
+      to: 'returned',
+      event: 'returned',
+      ref,
+      date: fields.date,
+      saleId: sale.id,
+      productIds: new Set([item.productId]),
+    });
+    for (const piece of pieces) {
+      const line = await returnItems.create(
+        sale.branchId,
+        actor.userId,
+        { saleReturnId: created.id, productId: item.productId, qty: toQuantity(1), disposition: 'pending' },
+        manager,
+      );
+      await inventoryItemsService.linkReturnItem(manager, piece.id, line.id);
+    }
   }
   const saved = await getReturn(sale.branchId, created.id, manager);
   await audit(actor, saved, 'create', manager, null, toReturnDto(saved));
@@ -268,8 +309,16 @@ export const returnsService = {
     const restocked = await stockLedger.batchesFor(manager, branchId, [
       { referenceType: REFERENCE, referenceIds: [record.id] },
     ]);
+    const pieces = await inventoryItemsService.itemsOf(manager, {
+      saleReturnItemIds: (record.items ?? []).map((i) => i.id),
+    });
+    const dto = toReturnDto(record);
     return {
-      ...toReturnDto(record),
+      ...dto,
+      items: dto.items.map((i) => ({
+        ...i,
+        serial: pieces.find((p) => p.saleReturnItemId === i.id)?.serial ?? null,
+      })),
       soldBatches: sold.map((b) => ({ ...b, qty: toQuantity(b.qty.negated()) })),
       restockedBatches: restocked.map((b) => ({ ...b, qty: toQuantity(b.qty) })),
     };
@@ -280,6 +329,10 @@ export const returnsService = {
     const sale = await repo(Sale).findOneBy({ id: saleId, branchId });
     if (!sale) throw AppError.notFound('Sale');
     const lines = await saleLines(manager, saleId);
+    const sold = (await inventoryItemsService.itemsOf(manager, { saleId })).filter(
+      (i) => i.status === 'sold',
+    );
+    const tracked = await inventoryItemsService.trackedProducts(manager, branchId, [...lines.keys()]);
     return {
       saleId,
       invoiceNo: sale.invoiceNo,
@@ -291,6 +344,8 @@ export const returnsService = {
         sold: toQuantity(l.sold),
         returned: toQuantity(l.returned),
         returnable: toQuantity(Decimal.max(l.sold.minus(l.returned), 0)),
+        trackSerials: tracked.has(l.productId),
+        serials: sold.filter((i) => i.productId === l.productId).map((i) => i.serial),
       })),
     };
   },
@@ -316,13 +371,37 @@ export const returnsService = {
       if (problems.length) {
         throw AppError.unprocessable('More was returned than the sale still holds', { items: problems });
       }
+      const tracked = await inventoryItemsService.trackedProducts(
+        em,
+        branchId,
+        input.items.map((i) => i.productId),
+      );
+      const unscanned = input.items.filter(
+        (i) => tracked.has(i.productId) && !new Decimal(i.qty).equals(i.serials?.length ?? 0),
+      );
+      if (unscanned.length > 0) {
+        throw AppError.unprocessable('Scan or pick the label of every returned piece', {
+          items: unscanned.map((i) => ({
+            productId: i.productId,
+            productName: lines.get(i.productId)?.name ?? null,
+            required: toQuantity(i.qty).toFixed(0),
+            scanned: String(i.serials?.length ?? 0),
+          })),
+        });
+      }
+      const loose = input.items.filter((i) => !tracked.has(i.productId) && i.serials?.length);
+      if (loose.length > 0) {
+        throw AppError.badRequest(
+          `${lines.get(loose[0]!.productId)?.name ?? 'This product'} is not tracked by label`,
+        );
+      }
       const refund = await refundFields(em, branchId, sale, input.refund);
       const saved = await insertReturn(
         em,
         actor,
         sale,
         { date: input.date ?? today(), reason: input.reason, note: input.note ?? null },
-        input.items.map((i) => ({ productId: i.productId, qty: new Decimal(i.qty) })),
+        input.items.map((i) => ({ productId: i.productId, qty: new Decimal(i.qty), serials: i.serials })),
         refund,
       );
       return toReturnDto(saved);
@@ -331,8 +410,18 @@ export const returnsService = {
 
   async createForReturnedDelivery(manager: EntityManager, actor: Actor, sale: Sale) {
     const lines = await saleLines(manager, sale.id);
+    const sold = (await inventoryItemsService.itemsOf(manager, { saleId: sale.id })).filter(
+      (i) => i.status === 'sold',
+    );
     const remaining = [...lines.values()]
-      .map((l) => ({ productId: l.productId, qty: l.sold.minus(l.returned) }))
+      .map((l) => {
+        const serials = sold.filter((i) => i.productId === l.productId).map((i) => i.serial);
+        return {
+          productId: l.productId,
+          qty: l.sold.minus(l.returned),
+          serials: serials.length ? serials : undefined,
+        };
+      })
       .filter((l) => l.qty.greaterThan(0));
     if (remaining.length === 0) return null;
     return insertReturn(
@@ -360,7 +449,30 @@ export const returnsService = {
       if (item.disposition === 'quarantined' && input.disposition === 'quarantined') {
         throw AppError.conflict('This item is already in quarantine');
       }
-      if (input.disposition === 'restocked') {
+      const pieces = (await inventoryItemsService.itemsOf(em, { saleReturnItemIds: [item.id] })).filter((p) =>
+        ['returned', 'quarantined'].includes(p.status),
+      );
+      const pieceRef = { type: REFERENCE, id: record.id, label: record.returnNo };
+      if (pieces.length > 0) {
+        await inventoryItemsService.setStatus(em, actor, {
+          ids: pieces.map((p) => p.id),
+          to: PIECE_STATUS[input.disposition],
+          event: PIECE_EVENT[input.disposition],
+          ref: pieceRef,
+          note: input.note ?? null,
+        });
+        if (input.disposition === 'restocked') {
+          await stockLedger.apply(
+            em,
+            { branchId, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
+            inventoryItemsService.movements(pieces, 1, {
+              type: 'sale_return',
+              date: today(),
+              note: `${record.returnNo} restocked`,
+            }),
+          );
+        }
+      } else if (input.disposition === 'restocked') {
         await stockLedger.apply(
           em,
           { branchId, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
@@ -431,6 +543,16 @@ export const returnsService = {
         throw AppError.conflict('A return cannot be deleted after its items have been inspected');
       }
       const before = toReturnDto(record);
+      for (const item of record.items ?? []) {
+        await inventoryItemsService.release(em, actor, {
+          where: { saleReturnItemId: item.id },
+          from: ['returned'],
+          to: 'sold',
+          event: 'return_cancelled',
+          ref: { type: REFERENCE, id: record.id, label: record.returnNo },
+          clear: ['saleReturnItem'],
+        });
+      }
       for (const item of record.items ?? []) await returnItems.softDelete(item, actor.userId, em);
       await returns.softDelete(record, actor.userId, em);
       await audit(actor, record, 'delete', em, before);

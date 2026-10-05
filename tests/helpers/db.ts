@@ -11,4 +11,5 @@ export async function truncateAllTables(): Promise<void> {
   await AppDataSource.query(
     `TRUNCATE ${tables.map((t) => `"public"."${t}"`).join(', ')} RESTART IDENTITY CASCADE`,
   );
+  await AppDataSource.query('ALTER SEQUENCE IF EXISTS inventory_item_serial_seq RESTART');
 }

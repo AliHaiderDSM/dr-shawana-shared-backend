@@ -1298,6 +1298,10 @@
               "inactive"
             ]
           },
+          "trackSerials": {
+            "type": "boolean",
+            "description": "Every piece carries a DSM label; sales, stock out and returns scan them"
+          },
           "imagePath": {
             "type": [
               "string",
@@ -1333,6 +1337,7 @@
           "lowStockThreshold",
           "salePrice",
           "status",
+          "trackSerials",
           "imagePath",
           "imageUrl",
           "createdAt",
@@ -1810,6 +1815,431 @@
           "updatedAt"
         ]
       },
+      "RegisterLabels": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "firstSerial": {
+            "type": "string",
+            "pattern": "^DSM-\\d{1,12}$",
+            "example": "DSM-000001"
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "productId",
+          "firstSerial",
+          "qty"
+        ]
+      },
+      "InventoryItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_stock",
+              "sold",
+              "returned",
+              "quarantined",
+              "damaged",
+              "expired",
+              "supplier_returned",
+              "dispatched",
+              "written_off"
+            ]
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "batchNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "receivedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "saleId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "soldOn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          }
+        },
+        "required": [
+          "id",
+          "serial",
+          "status",
+          "productId",
+          "productName",
+          "batchId",
+          "batchNo",
+          "manufacturingDate",
+          "expiryDate",
+          "receivedOn",
+          "saleId",
+          "invoiceNo",
+          "soldOn"
+        ]
+      },
+      "InventoryItemDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serial": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_stock",
+              "sold",
+              "returned",
+              "quarantined",
+              "damaged",
+              "expired",
+              "supplier_returned",
+              "dispatched",
+              "written_off"
+            ]
+          },
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "batchNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manufacturingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "receivedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "saleId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "soldOn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchName": {
+            "type": "string"
+          },
+          "salePrice": {
+            "type": "string"
+          },
+          "patientId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "patientName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "received",
+                    "produced",
+                    "labelled",
+                    "sold",
+                    "sale_edited",
+                    "sale_deleted",
+                    "returned",
+                    "return_cancelled",
+                    "quarantined",
+                    "restocked",
+                    "damaged",
+                    "expired",
+                    "supplier_returned",
+                    "dispatched",
+                    "dispatch_cancelled",
+                    "written_off"
+                  ]
+                },
+                "referenceType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "referenceId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "referenceLabel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "branchName": {
+                  "type": "string"
+                },
+                "by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "referenceType",
+                "referenceId",
+                "referenceLabel",
+                "note",
+                "branchName",
+                "by",
+                "createdAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "serial",
+          "status",
+          "productId",
+          "productName",
+          "batchId",
+          "batchNo",
+          "manufacturingDate",
+          "expiryDate",
+          "receivedOn",
+          "saleId",
+          "invoiceNo",
+          "soldOn",
+          "branchId",
+          "branchName",
+          "salePrice",
+          "patientId",
+          "patientName",
+          "history"
+        ]
+      },
+      "SerialSummary": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trackSerials": {
+            "type": "boolean"
+          },
+          "byStatus": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "unlabelled": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "batchId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "batchNo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                }
+              },
+              "required": [
+                "batchId",
+                "batchNo",
+                "qty"
+              ]
+            }
+          }
+        },
+        "required": [
+          "productId",
+          "trackSerials",
+          "byStatus",
+          "unlabelled"
+        ]
+      },
+      "RegisteredLabels": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "firstSerial": {
+            "type": "string"
+          },
+          "lastSerial": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "count",
+          "firstSerial",
+          "lastSerial"
+        ]
+      },
       "CreateStockIn": {
         "type": "object",
         "properties": {
@@ -1873,6 +2303,20 @@
                   "type": "string",
                   "example": "1250.50",
                   "description": "Purchase price per unit"
+                },
+                "labels": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "generate",
+                    "existing"
+                  ],
+                  "description": "generate: the system numbers a new label for every piece; existing: the packs already carry consecutive labels starting at firstSerial"
+                },
+                "firstSerial": {
+                  "type": "string",
+                  "pattern": "^DSM-\\d{1,12}$",
+                  "example": "DSM-000001"
                 }
               },
               "required": [
@@ -1928,6 +2372,16 @@
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 150
+                },
+                "serials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^DSM-\\d{1,12}$",
+                    "example": "DSM-000001"
+                  },
+                  "maxItems": 5000,
+                  "description": "Scanned piece labels. Required for products tracked by label."
                 }
               },
               "required": [
@@ -2121,6 +2575,29 @@
               ]
             }
           },
+          "labels": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "firstSerial": {
+                "type": "string"
+              },
+              "lastSerial": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "count",
+              "firstSerial",
+              "lastSerial"
+            ],
+            "description": "Labelled pieces of this entry"
+          },
           "createdBy": {
             "type": [
               "string",
@@ -2206,6 +2683,7 @@
           "qty",
           "note",
           "attachments",
+          "labels",
           "createdBy",
           "createdAt",
           "updatedAt",
@@ -2298,6 +2776,29 @@
               ]
             }
           },
+          "labels": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer"
+              },
+              "firstSerial": {
+                "type": "string"
+              },
+              "lastSerial": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "count",
+              "firstSerial",
+              "lastSerial"
+            ],
+            "description": "Labelled pieces of this entry"
+          },
           "createdBy": {
             "type": [
               "string",
@@ -2352,6 +2853,7 @@
           "qty",
           "note",
           "attachments",
+          "labels",
           "createdBy",
           "createdAt",
           "updatedAt",
@@ -9112,6 +9614,16 @@
               "null"
             ],
             "maxLength": 500
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "maxItems": 5000,
+            "description": "Scanned piece labels. Required for products tracked by label."
           }
         },
         "required": [
@@ -9575,6 +10087,16 @@
             "minItems": 1,
             "maxItems": 100
           },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "maxItems": 5000,
+            "description": "Scanned piece labels. Required for products tracked by label."
+          },
           "payments": {
             "type": "array",
             "items": {
@@ -9652,6 +10174,16 @@
             },
             "minItems": 1,
             "maxItems": 100
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "maxItems": 5000,
+            "description": "Every label on the sale after the edit. Leave out to keep the labels already sold."
           },
           "discountPercent": {
             "type": "string",
@@ -10062,6 +10594,41 @@
             "type": "string",
             "format": "date-time"
           },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serial": {
+                  "type": "string"
+                },
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "in_stock",
+                    "sold",
+                    "returned",
+                    "quarantined",
+                    "damaged",
+                    "expired",
+                    "supplier_returned",
+                    "dispatched",
+                    "written_off"
+                  ]
+                }
+              },
+              "required": [
+                "serial",
+                "productId",
+                "status"
+              ]
+            },
+            "description": "Labelled pieces sold on this sale (detail only)"
+          },
           "batches": {
             "type": "array",
             "items": {
@@ -10172,6 +10739,16 @@
                 "qty": {
                   "type": "string",
                   "example": "10.000"
+                },
+                "serials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^DSM-\\d{1,12}$",
+                    "example": "DSM-000001"
+                  },
+                  "maxItems": 5000,
+                  "description": "Scanned piece labels. Required for products tracked by label."
                 }
               },
               "required": [
@@ -10451,6 +11028,13 @@
                     "string",
                     "null"
                   ]
+                },
+                "serial": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The returned label (detail only)"
                 }
               },
               "required": [
@@ -10581,6 +11165,16 @@
                 "returnable": {
                   "type": "string",
                   "example": "10.000"
+                },
+                "trackSerials": {
+                  "type": "boolean"
+                },
+                "serials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Labels sold on the sale and not returned yet"
                 }
               },
               "required": [
@@ -10588,7 +11182,9 @@
                 "product",
                 "sold",
                 "returned",
-                "returnable"
+                "returnable",
+                "trackSerials",
+                "serials"
               ]
             }
           }
@@ -18598,6 +19194,654 @@
         "responses": {
           "204": {
             "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/items": {
+      "get": {
+        "tags": [
+          "Labelled pieces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Labelled pieces (one row per DSM-xxxxxx label) with product, batch, status and sale",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "serial",
+                "-serial"
+              ]
+            },
+            "required": false,
+            "name": "sort",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "productId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "batchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "saleId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in_stock",
+                "sold",
+                "returned",
+                "quarantined",
+                "damaged",
+                "expired",
+                "supplier_returned",
+                "dispatched",
+                "written_off"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "stock_in",
+                "production",
+                "labelled"
+              ]
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "sourceId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001",
+              "description": "First label of a range"
+            },
+            "required": false,
+            "description": "First label of a range",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001",
+              "description": "Last label of a range"
+            },
+            "required": false,
+            "description": "Last label of a range",
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pieces",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/InventoryItem"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PageMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/items/serial/{serial}": {
+      "get": {
+        "tags": [
+          "Labelled pieces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Find a piece by its scanned label, with its full history",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "required": true,
+            "name": "serial",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InventoryItemDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/items/{itemId}": {
+      "get": {
+        "tags": [
+          "Labelled pieces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One piece with its full history",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/InventoryItemDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/items/register": {
+      "post": {
+        "tags": [
+          "Labelled pieces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Register labels already stuck on stock that is on hand: a run of consecutive numbers from firstSerial. The product becomes tracked by label.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterLabels"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/RegisteredLabels"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/products/{productId}/serials": {
+      "get": {
+        "tags": [
+          "Labelled pieces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Pieces of a product by status, and stock still without labels per batch",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "productId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SerialSummary"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
           },
           "400": {
             "description": "Validation error",
@@ -34477,6 +35721,41 @@
                           "updatedAt": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "serials": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "serial": {
+                                  "type": "string"
+                                },
+                                "productId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "in_stock",
+                                    "sold",
+                                    "returned",
+                                    "quarantined",
+                                    "damaged",
+                                    "expired",
+                                    "supplier_returned",
+                                    "dispatched",
+                                    "written_off"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "serial",
+                                "productId",
+                                "status"
+                              ]
+                            },
+                            "description": "Labelled pieces sold on this sale (detail only)"
                           },
                           "batches": {
                             "type": "array",

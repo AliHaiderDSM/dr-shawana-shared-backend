@@ -72,7 +72,7 @@ async function lockProducts(manager: EntityManager, branchId: string, productIds
   return manager
     .getRepository(Product)
     .createQueryBuilder('p')
-    .setLock('pessimistic_write')
+    .setLock('for_no_key_update')
     .where('p.branchId = :branchId', { branchId })
     .andWhere('p.id IN (:...productIds)', { productIds })
     .orderBy('p.id')

@@ -8,6 +8,7 @@ import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
 import { paginate } from '../../lib/pagination';
 import { auditService } from '../audit/audit.service';
+import { inventoryItemsService } from '../inventory/inventory-items.service';
 import { productBatchesService } from '../inventory/product-batches.service';
 import { stockLedger } from '../inventory/stock-ledger';
 import { productsRepository } from '../products/products.repository';
@@ -125,7 +126,10 @@ async function removeBatch(actor: Actor, branchId: string, stage: BatchStage, id
     }
     const reference = ref(actor, branchId, stage, id);
     await materialLedger.reverse(em, reference, `${LABEL[stage]} removed`);
-    if (stage === 'finished_product') await stockLedger.reverse(em, reference, 'Production batch removed');
+    if (stage === 'finished_product') {
+      await inventoryItemsService.removeUntouched(em, branchId, 'production', id);
+      await stockLedger.reverse(em, reference, 'Production batch removed');
+    }
     await batchesRepository.softDelete(batch, actor.userId, em);
     await auditService.record(
       {
@@ -253,6 +257,19 @@ export const productionsService = {
             note: `Production batch ${labBatch.batchNo}`,
           },
         ]);
+        const tracked = await inventoryItemsService.trackedProducts(em, branchId, [input.productId]);
+        if (tracked.size > 0) {
+          await inventoryItemsService.generate(em, actor, {
+            branchId,
+            productId: input.productId,
+            batchId: productBatch.id,
+            qty: input.producedQty,
+            date: input.date,
+            source: 'production',
+            ref: { type: 'production', id: batch.id, label: labBatch.batchNo },
+            event: 'produced',
+          });
+        }
       }
       const dto = toBatchDto(await getBatch(branchId, 'finished_product', batch.id, em));
       await auditService.record(
