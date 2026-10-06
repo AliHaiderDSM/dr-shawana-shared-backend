@@ -1,7 +1,5 @@
-import { type Decimal } from 'decimal.js';
 import { Check, Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BranchScopedEntity } from '../../database/branch-scoped.entity';
-import { moneyColumn } from '../../database/transformers';
 import { Bank } from './bank.entity';
 
 export const ACCOUNT_TYPES = ['cash', 'bank'] as const;
@@ -27,9 +25,6 @@ export class AccountSheet extends BranchScopedEntity {
   @Index()
   @Column({ type: 'enum', enum: ACCOUNT_TYPES, enumName: 'account_type' })
   type: AccountType;
-
-  @Column({ name: 'opening_balance', ...moneyColumn({ default: '0' }) })
-  openingBalance: Decimal;
 
   @Column({ type: 'date' })
   date: string;

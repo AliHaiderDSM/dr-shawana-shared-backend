@@ -180,16 +180,15 @@ describe('master data', () => {
         accountCode: '0101',
         type: 'bank',
         bankId: bank.id,
-        openingBalance: '5000',
       });
       expect(sheet.status).toBe(201);
-      expect(sheet.body.data).toMatchObject({ openingBalance: '5000.00', bank: { name: 'Meezan Bank' } });
+      expect(sheet.body.data).toMatchObject({ bank: { name: 'Meezan Bank' } });
 
       const cash = await request(app)
         .post('/api/v1/branch/account-sheets')
         .set(bearer(admin))
         .send({ accountName: 'Cash in hand', accountCode: 'CASH', type: 'cash' });
-      expect(cash.body.data).toMatchObject({ bankId: null, openingBalance: '0.00' });
+      expect(cash.body.data).toMatchObject({ bankId: null });
 
       expect((await request(app).delete(`/api/v1/branch/banks/${bank.id}`).set(bearer(admin))).status).toBe(
         409,

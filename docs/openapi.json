@@ -1699,10 +1699,6 @@
             ],
             "format": "uuid"
           },
-          "openingBalance": {
-            "type": "string",
-            "example": "1250.50"
-          },
           "date": {
             "type": "string",
             "format": "date",
@@ -1727,10 +1723,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100
-          },
-          "openingBalance": {
-            "type": "string",
-            "example": "1250.50"
           }
         }
       },
@@ -1784,10 +1776,6 @@
               "name"
             ]
           },
-          "openingBalance": {
-            "type": "string",
-            "example": "1250.50"
-          },
           "date": {
             "type": "string",
             "format": "date"
@@ -1808,7 +1796,6 @@
           "accountCode",
           "type",
           "bankId",
-          "openingBalance",
           "date",
           "createdAt",
           "updatedAt"

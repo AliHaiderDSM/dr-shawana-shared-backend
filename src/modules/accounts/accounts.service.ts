@@ -108,7 +108,6 @@ export const accountSheetsService = {
           accountCode: input.accountCode,
           type: input.type,
           bankId,
-          openingBalance: (input.openingBalance ?? '0') as never,
           date: input.date ?? today(),
         },
         em,

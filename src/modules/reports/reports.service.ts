@@ -624,8 +624,8 @@ export const reportsService = {
 
     if (q.accountSheetId) {
       const [sheet] = await query(
-        `SELECT sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.opening_balance::text AS "openingBalance",
-                (sh.opening_balance + COALESCE((SELECT SUM(m.debit - m.credit) FROM account_movements m
+        `SELECT sh.account_name AS "accountName", sh.account_code AS "accountCode",
+                (COALESCE((SELECT SUM(m.debit - m.credit) FROM account_movements m
                   WHERE m.account_sheet_id = sh.id AND $${startParam}::date IS NOT NULL AND m.date < $${startParam}::date), 0))::numeric(12,2)::text AS opening
            FROM account_sheets sh ${f.where}`,
         [...f.params, start ?? null],
@@ -665,10 +665,10 @@ export const reportsService = {
 
     const rows = await query(
       `SELECT b.code AS branch, sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.type,
-              (sh.opening_balance + COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${startParam}::date IS NOT NULL AND m.date < $${startParam}::date), 0))::numeric(12,2)::text AS opening,
+              (COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${startParam}::date IS NOT NULL AND m.date < $${startParam}::date), 0))::numeric(12,2)::text AS opening,
               COALESCE(SUM(m.debit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS debit,
               COALESCE(SUM(m.credit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS credit,
-              (sh.opening_balance + COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${endParam}::date IS NULL OR m.date <= $${endParam}::date), 0))::numeric(12,2)::text AS closing
+              (COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${endParam}::date IS NULL OR m.date <= $${endParam}::date), 0))::numeric(12,2)::text AS closing
          FROM account_sheets sh
          LEFT JOIN account_movements m ON m.account_sheet_id = sh.id
          JOIN branches b ON b.id = sh.branch_id

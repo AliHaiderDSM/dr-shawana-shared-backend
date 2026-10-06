@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Account opening balance removed (done 2026-10-06)
+
+- `account_sheets.opening_balance` was dropped (migration `DropAccountOpeningBalance`). posSoft has no such field.
+- An account balance is now only its movements: sale and appointment payments (debit), journal lines and expenses, and refunds (credit, `sale_refund` in `account_movements`).
+- The "Opening" column of the accounts balance report is still there. It is the balance before the chosen period.
+
 ## Product trail, label lookup and line discounts (done 2026-10-06)
 
 - **Product ledger:** each movement now has `detail` (where it came from or went), plus the batch's `manufacturingDate` and `expiryDate`.

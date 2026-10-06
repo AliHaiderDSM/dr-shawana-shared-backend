@@ -2,14 +2,7 @@ import { z } from 'zod';
 import { registry } from '../../lib/openapi';
 import { registerCrudDocs } from '../../lib/openapi-crud';
 import { listQuerySchema } from '../../lib/pagination';
-import {
-  atLeastOneField,
-  dateInput,
-  moneyInput,
-  moneyOutput,
-  optionalUuid,
-  requiredText,
-} from '../../lib/validation';
+import { atLeastOneField, dateInput, optionalUuid, requiredText } from '../../lib/validation';
 import { ACCOUNT_TYPES } from './account-sheet.entity';
 
 const bankFields = z.object({ name: requiredText(1, 150) });
@@ -39,7 +32,6 @@ export const createAccountSheetSchema = registry.register(
       accountCode: requiredText(1, 100),
       type: z.enum(ACCOUNT_TYPES),
       bankId: optionalUuid,
-      openingBalance: moneyInput.optional(),
       date: dateInput.optional(),
     })
     .refine((v) => v.type === 'cash' || Boolean(v.bankId), {
@@ -54,7 +46,6 @@ export const updateAccountSheetSchema = registry.register(
     z.object({
       accountName: requiredText(1, 150),
       accountCode: requiredText(1, 100),
-      openingBalance: moneyInput,
     }),
   ),
 );
@@ -78,7 +69,6 @@ export const accountSheetSchema = registry.register(
     type: z.enum(ACCOUNT_TYPES),
     bankId: z.uuid().nullable(),
     bank: z.object({ id: z.uuid(), name: z.string() }).nullable().optional(),
-    openingBalance: moneyOutput,
     date: z.iso.date(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),

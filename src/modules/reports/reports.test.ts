@@ -47,7 +47,6 @@ describe('accounts, expenses, reports and dashboard', () => {
         accountName: 'Cash',
         accountCode: 'C1',
         type: 'cash',
-        openingBalance: '1000',
         date: '2026-08-01',
       })
     ).body.data.id;
@@ -257,15 +256,15 @@ describe('accounts, expenses, reports and dashboard', () => {
   });
 
   describe('reports', () => {
-    it('computes account balances with the opening balance, sale and appointment payments, journal and expenses', async () => {
+    it('computes account balances from sale and appointment payments, journal and expenses', async () => {
       const res = await report('accounts-balance', accountant, 'month=2026-09');
       expect(res.status).toBe(200);
       const cash = res.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1');
       expect(cash).toMatchObject({
-        opening: '1000.00',
+        opening: '0.00',
         debit: '5000.00',
         credit: '1350.00',
-        closing: '4650.00',
+        closing: '3650.00',
       });
       const bank = res.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'B1');
       expect(bank).toMatchObject({ debit: '2600.00', closing: '2600.00' });
@@ -274,9 +273,9 @@ describe('accounts, expenses, reports and dashboard', () => {
       expect(
         october.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1'),
       ).toMatchObject({
-        opening: '4650.00',
+        opening: '3650.00',
         debit: '0.00',
-        closing: '4650.00',
+        closing: '3650.00',
       });
 
       const ledger = await report('accounts-balance', accountant, `accountSheetId=${cashSheet}`);
@@ -286,8 +285,8 @@ describe('accounts, expenses, reports and dashboard', () => {
         'journal',
         'journal',
       ]);
-      expect(ledger.body.data.summary).toEqual({ opening: '1000.00', closing: '4650.00' });
-      expect(ledger.body.data.rows[3].balance).toBe('4650.00');
+      expect(ledger.body.data.summary).toEqual({ opening: '0.00', closing: '3650.00' });
+      expect(ledger.body.data.rows[3].balance).toBe('3650.00');
     });
 
     it('lists the finance report (journal lines) and the expenses report', async () => {
