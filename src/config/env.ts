@@ -40,6 +40,7 @@ const envSchema = z
     SUPABASE_URL: isProd ? z.url() : z.url().optional(),
     SUPABASE_SERVICE_ROLE_KEY: supabaseVar,
     SUPABASE_ANON_KEY: supabaseVar,
+    PATIENT_LINK_SECRET: z.string().min(32).optional(),
 
     CORS_ORIGINS: z
       .string()

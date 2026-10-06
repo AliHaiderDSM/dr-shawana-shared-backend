@@ -22,6 +22,25 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient history links (done 2026-10-06)
+
+This is posSoft "Copy Link", made safe. posSoft's link carried only base64 of the patient's name and phone, so anyone could build a link for another patient.
+
+- `GET /branch/appointments/{id}/patient-link` returns a signed token for that appointment's patient.
+  - It needs `consultations.view` and an appointment in the caller's branch.
+  - The token is HMAC-SHA256 signed (`lib/signed-token.ts`) and expires after 30 days.
+  - It holds no names or phone numbers, and it is not stored.
+- `GET /public/patient-history/{token}` works without login. It returns:
+  - the clinic name, phone and address;
+  - the patient's name and city;
+  - appointments;
+  - prescriptions with their items;
+  - blood work, BHRT and medical records.
+  The response carries `Cache-Control: no-store`. It leaves out internal ids, phone numbers and staff ids.
+- `GET /public/patient-history/{token}/files/{fileId}` returns a 5-minute signed URL. It only works for a file that belongs to the linked patient.
+- A tampered or expired token returns 404 "This link is invalid or has expired".
+- The signing key comes from `PATIENT_LINK_SECRET`. If that is not set, it is derived from the service role key.
+
 ## Performance pass (done 2026-10-05)
 
 - Root cause: every query is one network round trip to Supabase in ap-south-1 (Mumbai), about 70 ms from Pakistan. Production also ran the function in `iad1` (Washington), which put about 250 ms of round trip on every query. `vercel.json` now sets `"regions": ["bom1"]`.

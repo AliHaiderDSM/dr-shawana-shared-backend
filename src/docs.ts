@@ -16,6 +16,7 @@ import './modules/manufacturing/manufacturing.schemas';
 import './modules/patients/patients.schemas';
 import './modules/doctors/doctors.schemas';
 import './modules/appointments/appointments.schemas';
+import './modules/patient-links/patient-links.schemas';
 import './modules/consultations/consultations.schemas';
 import './modules/clinical-records/clinical-records.schemas';
 import './modules/prescriptions/prescriptions.schemas';

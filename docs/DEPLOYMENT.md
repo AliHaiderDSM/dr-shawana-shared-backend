@@ -24,6 +24,7 @@ The API runs on Vercel as one serverless function:
 | `SUPABASE_URL` | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only) |
 | `SUPABASE_ANON_KEY` | Anon key |
+| `PATIENT_LINK_SECRET` | Optional, at least 32 characters. Signs the patient history links. If it is not set, the links are signed with a key derived from the service role key, and rotating that key ends every open link. |
 | `CORS_ORIGINS` | The dashboard URL(s), comma separated, e.g. `https://dsm-dashboard.vercel.app` |
 | `LOG_LEVEL` | `info` |
 
