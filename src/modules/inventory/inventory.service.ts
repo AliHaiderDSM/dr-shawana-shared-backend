@@ -71,6 +71,32 @@ function balanceFilters(branchId: string, query: StockBalanceQuery) {
   return { where: where.join(' AND '), params };
 }
 
+function movementDetail(m: {
+  referenceType: string;
+  fromTransfer: boolean | null;
+  refName: string | null;
+  refParty: string | null;
+}) {
+  const withParty = (text: string, joiner = ' · ') => (m.refParty ? `${text}${joiner}${m.refParty}` : text);
+  switch (m.referenceType) {
+    case 'stock_in':
+      if (m.fromTransfer) return 'From Super Admin Stock';
+      return m.refName ? `From ${m.refName}` : 'Stock in';
+    case 'stock_out':
+      return m.refName ? withParty(`To ${m.refName}`, ' · by ') : 'Stock out';
+    case 'sale':
+      return m.refName ? withParty(`Invoice ${m.refName}`) : 'Sale';
+    case 'sale_return':
+      return m.refName ? `Return ${m.refName}` : 'Return';
+    case 'product_purchase':
+      return m.refName ? `Purchase from ${m.refName}` : 'Purchase';
+    case 'production':
+      return m.refName ? `Production batch ${m.refName}` : 'Production';
+    default:
+      return null;
+  }
+}
+
 export const inventoryService = {
   async expiryAlerts(branchId: string | null, query: ExpiryAlertsQuery) {
     const params: unknown[] = [query.days];
@@ -229,13 +255,33 @@ export const inventoryService = {
       referenceId: string;
       reversalOfId: string | null;
       batchNo: string | null;
+      manufacturingDate: string | null;
+      expiryDate: string | null;
+      fromTransfer: boolean | null;
+      refName: string | null;
+      refParty: string | null;
       note: string | null;
     }[] = await AppDataSource.query(
       `SELECT m.id, to_char(m.date, 'YYYY-MM-DD') AS date, m.type, m.qty::text AS qty, b.batch_no AS "batchNo",
+              to_char(b.manufacturing_date, 'YYYY-MM-DD') AS "manufacturingDate",
+              to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate",
               m.reference_type AS "referenceType", m.reference_id AS "referenceId",
-              m.reversal_of_id AS "reversalOfId", m.note
+              m.reversal_of_id AS "reversalOfId", m.note,
+              si.transfer_out_id IS NOT NULL AS "fromTransfer",
+              COALESCE(sis.name, so.destination, s.invoice_no, r.return_no, pps.name, mb.batch_no) AS "refName",
+              COALESCE(sod.name, sp.name) AS "refParty"
          FROM stock_movements m
          LEFT JOIN product_batches b ON b.id = m.batch_id
+         LEFT JOIN stock_ins si ON m.reference_type = 'stock_in' AND si.id = m.reference_id
+         LEFT JOIN suppliers sis ON sis.id = si.supplier_id
+         LEFT JOIN stock_outs so ON m.reference_type = 'stock_out' AND so.id = m.reference_id
+         LEFT JOIN suppliers sod ON sod.id = so.dispatcher_id
+         LEFT JOIN sales s ON m.reference_type = 'sale' AND s.id = m.reference_id
+         LEFT JOIN patients sp ON sp.id = s.patient_id
+         LEFT JOIN sale_returns r ON m.reference_type = 'sale_return' AND r.id = m.reference_id
+         LEFT JOIN product_purchase_entries pp ON m.reference_type = 'product_purchase' AND pp.id = m.reference_id
+         LEFT JOIN suppliers pps ON pps.id = pp.supplier_id
+         LEFT JOIN material_batches mb ON m.reference_type = 'production' AND mb.id = m.reference_id
         WHERE m.branch_id = $1 AND m.product_id = $2 ${range.map((r) => `AND ${r}`).join(' ')}
         ORDER BY m.date ASC, m.created_at ASC`,
       params,
@@ -260,6 +306,9 @@ export const inventoryService = {
         referenceId: m.referenceId,
         isReversal: m.reversalOfId !== null,
         batchNo: m.batchNo,
+        manufacturingDate: m.manufacturingDate,
+        expiryDate: m.expiryDate,
+        detail: movementDetail(m),
         note: m.note,
       };
     });

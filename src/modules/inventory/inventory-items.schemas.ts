@@ -180,7 +180,12 @@ registry.registerPath({
   method: 'get',
   path: '/branch/inventory/items/serial/{serial}',
   summary: 'Find a piece by its scanned label, with its full history',
-  request: { params: serialParamsSchema, query: branchQuerySchema },
+  request: {
+    params: serialParamsSchema,
+    query: branchQuerySchema.extend({
+      scope: z.enum(['all']).optional().openapi({ description: 'super_admin only: look in every branch' }),
+    }),
+  },
   responses: {
     200: { description: 'Piece', ...jsonContent(dataEnvelope(inventoryItemDetailSchema)) },
     ...errorResponses,

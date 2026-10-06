@@ -3327,6 +3327,27 @@
                     "null"
                   ]
                 },
+                "manufacturingDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date"
+                },
+                "expiryDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date"
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Where it came from or went: supplier, branch, invoice and customer, return"
+                },
                 "note": {
                   "type": [
                     "string",
@@ -3345,6 +3366,9 @@
                 "referenceId",
                 "isReversal",
                 "batchNo",
+                "manufacturingDate",
+                "expiryDate",
+                "detail",
                 "note"
               ]
             }
@@ -10632,6 +10656,11 @@
                 "qty": {
                   "type": "string",
                   "example": "10.000"
+                },
+                "discountPercent": {
+                  "type": "string",
+                  "example": "10",
+                  "description": "Discount on this line only, before the sale discount"
                 }
               },
               "required": [
@@ -10720,6 +10749,11 @@
                 "qty": {
                   "type": "string",
                   "example": "10.000"
+                },
+                "discountPercent": {
+                  "type": "string",
+                  "example": "10",
+                  "description": "Discount on this line only, before the sale discount"
                 }
               },
               "required": [
@@ -11134,6 +11168,13 @@
                   "type": "string",
                   "example": "1250.50"
                 },
+                "discountPercent": {
+                  "type": "string"
+                },
+                "discountAmount": {
+                  "type": "string",
+                  "example": "1250.50"
+                },
                 "lineTotal": {
                   "type": "string",
                   "example": "1250.50"
@@ -11147,6 +11188,8 @@
                 "bundle",
                 "qty",
                 "unitPrice",
+                "discountPercent",
+                "discountAmount",
                 "lineTotal"
               ]
             }
@@ -20311,6 +20354,19 @@
             },
             "required": false,
             "name": "branchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all"
+              ],
+              "description": "super_admin only: look in every branch"
+            },
+            "required": false,
+            "description": "super_admin only: look in every branch",
+            "name": "scope",
             "in": "query"
           }
         ],

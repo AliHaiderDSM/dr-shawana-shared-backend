@@ -4,6 +4,7 @@ import { type PaymentStatus } from './sale.entity';
 export interface PricedLine {
   qty: DecimalInput;
   unitPrice: DecimalInput;
+  discountPercent?: DecimalInput;
 }
 
 export interface DiscountChoice {
@@ -11,8 +12,13 @@ export interface DiscountChoice {
   discountPercent?: DecimalInput;
 }
 
+export function lineDiscount(line: PricedLine) {
+  const gross = new Decimal(line.qty).times(line.unitPrice);
+  return toMoney(gross.times(line.discountPercent ?? 0).div(100));
+}
+
 export function lineTotal(line: PricedLine) {
-  return toMoney(new Decimal(line.qty).times(line.unitPrice));
+  return toMoney(new Decimal(line.qty).times(line.unitPrice).minus(lineDiscount(line)));
 }
 
 export function saleTotals(lines: PricedLine[], received: DecimalInput, discount: DiscountChoice) {

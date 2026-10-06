@@ -67,6 +67,8 @@ export const saleDocumentsService = {
         bundle: i.bundle?.name ?? null,
         qty: i.qty,
         unitPrice: i.unitPrice,
+        discountPercent: i.discountPercent,
+        discountAmount: i.discountAmount,
         lineTotal: i.lineTotal,
       })),
       payments: {

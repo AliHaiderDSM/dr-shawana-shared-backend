@@ -29,7 +29,7 @@ import { nextSequence } from '../sequences/sequences';
 import { SaleItem } from './sale-item.entity';
 import { SalePaymentProof } from './sale-payment-proof.entity';
 import { SalePayment } from './sale-payment.entity';
-import { lineTotal, saleTotals } from './sale-totals';
+import { lineDiscount, lineTotal, saleTotals } from './sale-totals';
 import { Sale, type DeliveryStatus } from './sale.entity';
 import {
   type CreateSaleInput,
@@ -53,6 +53,7 @@ interface Line {
   bundleId: string | null;
   qty: Decimal;
   unitPrice: Decimal;
+  discountPercent: string;
 }
 
 const CASH_CLEARED = {
@@ -122,6 +123,8 @@ function toSaleDto(sale: Sale) {
         bundle: i.bundle ? { id: i.bundle.id, name: i.bundle.name } : null,
         qty: i.qty,
         unitPrice: i.unitPrice,
+        discountPercent: i.discountPercent,
+        discountAmount: i.discountAmount,
         lineTotal: i.lineTotal,
       })),
     payments: livePayments.map(toSalePaymentDto),
@@ -172,12 +175,19 @@ async function resolveLines(
   const lines: Line[] = [];
   inputs.forEach((input, index) => {
     const qty = new Decimal(input.qty);
+    const discountPercent = new Decimal(input.discountPercent ?? 0).toFixed(2);
     if (input.productId) {
       const product = products.find((p) => p.id === input.productId);
       if (!product) throw AppError.badRequest(`Item ${index + 1}: the product was not found in this branch`);
       if (product.status !== 'active')
         throw AppError.badRequest(`Item ${index + 1}: "${product.name}" is not active`);
-      lines.push({ productId: product.id, bundleId: null, qty, unitPrice: toMoney(product.salePrice) });
+      lines.push({
+        productId: product.id,
+        bundleId: null,
+        qty,
+        unitPrice: toMoney(product.salePrice),
+        discountPercent,
+      });
       return;
     }
     const bundle = bundles.find((b) => b.id === input.bundleId);
@@ -191,6 +201,7 @@ async function resolveLines(
         bundleId: bundle.id,
         qty: qty.times(part.qty),
         unitPrice: toMoney(part.price),
+        discountPercent,
       });
     }
   });
@@ -295,6 +306,8 @@ async function insertItems(manager: EntityManager, actor: Actor, sale: Sale, lin
         bundleId: line.bundleId,
         qty: line.qty,
         unitPrice: line.unitPrice,
+        discountPercent: line.discountPercent,
+        discountAmount: lineDiscount(line),
         lineTotal: lineTotal(line),
       },
       manager,

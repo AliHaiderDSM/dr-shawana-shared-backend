@@ -127,6 +127,11 @@ export const productLedgerSchema = registry.register(
         referenceId: z.uuid(),
         isReversal: z.boolean(),
         batchNo: z.string().nullable(),
+        manufacturingDate: z.iso.date().nullable(),
+        expiryDate: z.iso.date().nullable(),
+        detail: z.string().nullable().openapi({
+          description: 'Where it came from or went: supplier, branch, invoice and customer, return',
+        }),
         note: z.string().nullable(),
       }),
     ),

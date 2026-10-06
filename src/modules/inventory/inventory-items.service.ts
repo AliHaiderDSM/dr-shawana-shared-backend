@@ -593,7 +593,7 @@ export const inventoryItemsService = {
     };
   },
 
-  async get(branchId: string, ref: { id?: string; serial?: string }) {
+  async get(branchId: string | null, ref: { id?: string; serial?: string }) {
     const [item] = (await AppDataSource.query(
       `SELECT i.id, i.serial, i.status, i.branch_id AS "branchId", br.name AS "branchName",
               i.product_id AS "productId", p.name AS "productName", p.sale_price::text AS "salePrice",
@@ -609,7 +609,8 @@ export const inventoryItemsService = {
          LEFT JOIN product_batches b ON b.id = i.batch_id
          LEFT JOIN sales s ON s.id = i.sale_id
          LEFT JOIN patients pt ON pt.id = s.patient_id
-        WHERE i.branch_id = $1 AND i.deleted_at IS NULL AND ${ref.id ? 'i.id = $2' : 'i.serial = $2'}`,
+        WHERE ($1::uuid IS NULL OR i.branch_id = $1) AND i.deleted_at IS NULL
+          AND ${ref.id ? 'i.id = $2' : 'i.serial = $2'}`,
       [branchId, ref.id ?? ref.serial?.trim().toUpperCase()],
     )) as Record<string, unknown>[];
     if (!item) throw AppError.notFound('Label');

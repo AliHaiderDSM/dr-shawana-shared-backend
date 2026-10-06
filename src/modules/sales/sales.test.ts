@@ -405,4 +405,36 @@ describe('POS sales', () => {
     });
     expect(next.body.data.invoiceNo).toBe('LHR-000003');
   });
+
+  it('takes a discount on one line and the sale discount on top', async () => {
+    const res = await api('post', '/branch/sales', admin).send({
+      patientId,
+      saleType: 'office',
+      discountPercent: '10',
+      items: [
+        { productId: serum, qty: '2', discountPercent: '25' },
+        { productId: serum, qty: '1' },
+      ],
+      payments: [],
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.items.map((i: { discountAmount: string; lineTotal: string }) => i)).toEqual([
+      expect.objectContaining({ discountPercent: '25.00', discountAmount: '500.00', lineTotal: '1500.00' }),
+      expect.objectContaining({ discountPercent: '0.00', discountAmount: '0.00', lineTotal: '1000.00' }),
+    ]);
+    expect(res.body.data).toMatchObject({
+      subtotal: '2500.00',
+      discountAmount: '250.00',
+      total: '2250.00',
+    });
+    const bill = await api('get', `/branch/sales/${res.body.data.id}/bill`, admin);
+    expect(bill.body.data.items[0]).toMatchObject({ discountPercent: '25.00', lineTotal: '1500.00' });
+    const tooMuch = await api('post', '/branch/sales', admin).send({
+      patientId,
+      saleType: 'office',
+      items: [{ productId: serum, qty: '1', discountPercent: '120' }],
+      payments: [],
+    });
+    expect(tooMuch.status).toBe(400);
+  });
 });

@@ -161,6 +161,15 @@ describe('Main Warehouse transfers to branches', () => {
       piece.body.data.history.map((h: { type: string; branchName: string }) => `${h.type}@${h.branchName}`),
     ).toEqual(['received@Main Warehouse', 'dispatched@Main Warehouse', 'received@Lahore']);
     expect((await asAdmin('get', `/branch/inventory/items/serial/${serials[0]}`)).status).toBe(404);
+    const anywhere = await asAdmin('get', `/branch/inventory/items/serial/${serials[0]}?scope=all`);
+    expect(anywhere.body.data).toMatchObject({
+      branchName: 'Lahore',
+      batchNo: 'B-001',
+      expiryDate: '2028-01-31',
+    });
+    expect((await asBranch('get', `/branch/inventory/items/serial/${serials[6]}?scope=all`)).status).toBe(
+      404,
+    );
   });
 
   it('corrects batch dates from the warehouse entry everywhere the batch went', async () => {
@@ -205,6 +214,18 @@ describe('Main Warehouse transfers to branches', () => {
     const products = (await asBranch('get', '/branch/products?search=Vitamin')).body.data;
     expect(products).toHaveLength(1);
     expect(await stockOf(lahoreSerum, lahoreId)).toBe('5.000');
+
+    const trail = (await asBranch('get', `/branch/inventory/products/${lahoreSerum}/ledger`)).body.data
+      .movements as { detail: string; batchNo: string; expiryDate: string }[];
+    expect(trail.map((m) => m.detail)).toEqual([
+      'From Super Admin Stock',
+      'From Super Admin Stock',
+      `Invoice ${sale.body.data.invoiceNo} · Sana`,
+    ]);
+    expect(trail[0]).toMatchObject({ batchNo: 'B-001', expiryDate: '2028-01-31' });
+    const warehouseTrail = (await asAdmin('get', `/branch/inventory/products/${serum}/ledger`)).body.data
+      .movements as { detail: string }[];
+    expect(warehouseTrail.map((m) => m.detail)).toEqual(['Stock in', 'To Lahore', 'To Lahore']);
   });
 
   it('cancels a transfer only while the branch has not touched it', async () => {

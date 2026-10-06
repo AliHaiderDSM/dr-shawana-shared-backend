@@ -29,6 +29,9 @@ export const saleItemInputSchema = z
     productId: z.uuid().optional(),
     bundleId: z.uuid().optional(),
     qty: positiveQuantityInput,
+    discountPercent: percentInput
+      .optional()
+      .openapi({ description: 'Discount on this line only, before the sale discount' }),
   })
   .refine((v) => (v.productId ? 1 : 0) + (v.bundleId ? 1 : 0) === 1, {
     message: 'Give either productId or bundleId',
@@ -225,6 +228,8 @@ export const saleSchema = registry.register(
         bundle: ref.nullable(),
         qty: quantityOutput,
         unitPrice: moneyOutput,
+        discountPercent: z.string(),
+        discountAmount: moneyOutput,
         lineTotal: moneyOutput,
       }),
     ),

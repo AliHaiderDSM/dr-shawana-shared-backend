@@ -22,6 +22,18 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Product trail, label lookup and line discounts (done 2026-10-06)
+
+- **Product ledger:** each movement now has `detail` (where it came from or went), plus the batch's `manufacturingDate` and `expiryDate`.
+  - `detail` reads like: `From <supplier>`, `From Super Admin Stock`, `To <branch> · by <dispatcher>`, `Invoice <no> · <customer>`, `Return <no>`, `Purchase from <supplier>`, `Production batch <no>`.
+  - The text is built in TypeScript, not SQL.
+- **Label lookup:** `GET /branch/inventory/items/serial/{serial}?scope=all` lets the super_admin find a piece in any branch. Other roles still only see their own branch.
+- **Line discounts:** sale items take `discountPercent` (0–100).
+  - Each `sale_items` row stores `discount_percent` and `discount_amount` (migration `SaleItemDiscount`).
+  - `line_total` is the amount after the line discount.
+  - The sale subtotal is the sum of the line totals. The sale discount (percent or Auto) applies on top of it.
+  - The bill shows each line's discount.
+
 ## Stock batches and sale screenshots (done 2026-10-06)
 
 - **Stock out batches:** a stock out takes its batch from each scanned DSM label. Without labels, it takes the batch that expires first (FEFO). `StockOut.batches` lists the batches an entry took: batch no, mfg date, expiry date and qty.

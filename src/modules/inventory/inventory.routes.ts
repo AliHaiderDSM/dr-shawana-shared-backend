@@ -32,7 +32,9 @@ const path = '/branch/inventory';
 const canViewStock = requirePermission('stock.view', 'inventoryReport.view');
 
 inventoryRouter.use(path, authenticate, (req, res, next) =>
-  branchScope({ allowAllForSuperAdmin: req.path === '/expiry-alerts' })(req, res, next),
+  branchScope({
+    allowAllForSuperAdmin: req.path === '/expiry-alerts' || req.path.startsWith('/items/serial/'),
+  })(req, res, next),
 );
 
 inventoryRouter.get(
@@ -182,7 +184,8 @@ inventoryRouter.get(
   validate({ params: serialParamsSchema }),
   async (req: Request, res: Response) => {
     const { serial } = validParams(req, serialParamsSchema);
-    sendOk(res, await inventoryItemsService.get(branchIdOf(req), { serial }));
+    const everywhere = req.query.scope === 'all' && actorFrom(req).role === 'super_admin';
+    sendOk(res, await inventoryItemsService.get(everywhere ? null : branchIdOf(req), { serial }));
   },
 );
 

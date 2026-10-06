@@ -8,6 +8,7 @@ import { Sale } from './sale.entity';
 
 @Entity('sale_items')
 @Check('CHK_sale_items_qty', `"qty" > 0`)
+@Check('CHK_sale_items_discount', `"discount_percent" >= 0 AND "discount_percent" <= 100`)
 export class SaleItem extends BranchScopedEntity {
   @Index()
   @Column({ name: 'sale_id', type: 'uuid' })
@@ -38,6 +39,12 @@ export class SaleItem extends BranchScopedEntity {
 
   @Column({ ...moneyColumn(), name: 'unit_price' })
   unitPrice: Decimal;
+
+  @Column({ name: 'discount_percent', type: 'numeric', precision: 5, scale: 2, default: 0 })
+  discountPercent: string;
+
+  @Column({ ...moneyColumn(), name: 'discount_amount', default: 0 })
+  discountAmount: Decimal;
 
   @Column({ ...moneyColumn(), name: 'line_total' })
   lineTotal: Decimal;
