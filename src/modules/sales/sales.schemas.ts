@@ -46,6 +46,11 @@ export const salePaymentInputSchema = registry.register(
     senderAccountTitle: optionalText(150),
     senderAccountNo: optionalText(100),
     proofIndex: z.number().int().min(0).max(9).optional(),
+    proofIndexes: z
+      .array(z.number().int().min(0).max(9))
+      .max(5)
+      .optional()
+      .openapi({ description: 'Positions in "paymentProofs" of the screenshots for this payment' }),
   }),
 );
 
@@ -110,7 +115,7 @@ export const deliveryStatusSchema = registry.register(
   z.object({ status: z.enum(DELIVERY_STATUSES) }),
 );
 
-export const createSalePaymentSchema = salePaymentInputSchema.omit({ proofIndex: true });
+export const createSalePaymentSchema = salePaymentInputSchema.omit({ proofIndex: true, proofIndexes: true });
 export const updateSalePaymentSchema = registry.register(
   'UpdateSalePayment',
   atLeastOneField(
@@ -154,6 +159,7 @@ export const deliverySlipsQuerySchema = z.object({
 });
 
 export const salePaymentParamsSchema = z.object({ id: z.uuid(), paymentId: z.uuid() });
+export const salePaymentProofParamsSchema = salePaymentParamsSchema.extend({ proofId: z.uuid() });
 
 export type SaleItemInput = z.output<typeof saleItemInputSchema>;
 export type SalePaymentInput = z.output<typeof salePaymentInputSchema>;
@@ -180,6 +186,7 @@ export const salePaymentSchema = registry.register(
     senderAccountNo: z.string().nullable(),
     hasProof: z.boolean(),
     proofOriginalName: z.string().nullable(),
+    proofs: z.array(z.object({ id: z.uuid(), originalName: z.string(), contentType: z.string() })),
     createdBy: z.uuid().nullable(),
     createdAt: z.iso.datetime(),
   }),

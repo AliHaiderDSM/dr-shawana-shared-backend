@@ -39,7 +39,7 @@ export const productsRepository = {
   options(branchId: string, manager?: EntityManager) {
     return base
       .query(branchId, manager)
-      .select(['p.id', 'p.name', 'p.salePrice', 'p.batchNo', 'p.barcode'])
+      .select(['p.id', 'p.name', 'p.salePrice', 'p.batchNo', 'p.barcode', 'p.trackSerials'])
       .andWhere("p.status = 'active'")
       .orderBy('p.name', 'ASC')
       .getMany();

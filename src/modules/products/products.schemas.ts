@@ -137,6 +137,7 @@ registerCrudDocs({
     salePrice: moneyOutput,
     batchNo: z.string().nullable(),
     barcode: z.string().nullable(),
+    trackSerials: z.boolean(),
   }),
   imageUpload: true,
 });

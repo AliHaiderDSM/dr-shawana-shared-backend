@@ -235,6 +235,61 @@ describe('POS sales', () => {
     expect(added.body.data).toMatchObject({ received: '1000.00', remaining: '0.00', paymentStatus: 'paid' });
   });
 
+  it('keeps several screenshots on an online payment', async () => {
+    const online = (await api('get', `/branch/sales/${saleId}`, frontDesk)).body.data.payments.find(
+      (p: { method: string }) => p.method === 'online',
+    );
+    expect(online.proofs).toHaveLength(1);
+    const png = (name: string) => [Buffer.from('png'), { filename: name, contentType: 'image/png' }] as const;
+    const added = await request(app)
+      .post(`/api/v1/branch/sales/${saleId}/payments/${online.id}/proof`)
+      .set(bearer(frontDesk))
+      .attach('proof', ...png('a.png'))
+      .attach('proof', ...png('b.png'));
+    expect(added.status).toBe(200);
+    const proofs = added.body.data.payments.find((p: { id: string }) => p.id === online.id).proofs;
+    expect(proofs.map((p: { originalName: string }) => p.originalName)).toEqual(['p.png', 'a.png', 'b.png']);
+
+    const url = await api(
+      'get',
+      `/branch/sales/${saleId}/payments/${online.id}/proofs/${proofs[2].id}/url`,
+      frontDesk,
+    );
+    expect(url.status).toBe(200);
+    const removed = await api(
+      'delete',
+      `/branch/sales/${saleId}/payments/${online.id}/proofs/${proofs[0].id}`,
+      frontDesk,
+    );
+    expect(removed.body.data.payments.find((p: { id: string }) => p.id === online.id)).toMatchObject({
+      hasProof: true,
+      proofOriginalName: 'a.png',
+    });
+
+    const tooMany = await request(app)
+      .post(`/api/v1/branch/sales/${saleId}/payments/${online.id}/proof`)
+      .set(bearer(frontDesk))
+      .attach('proof', ...png('c.png'))
+      .attach('proof', ...png('d.png'))
+      .attach('proof', ...png('e.png'))
+      .attach('proof', ...png('f.png'));
+    expect(tooMany.status).toBe(400);
+
+    const sale = await request(app)
+      .post(`/api/v1/branch/sales/${saleId}/payments`)
+      .set(bearer(frontDesk))
+      .field(
+        'data',
+        JSON.stringify({ method: 'online', amount: '1', accountSheetId: bankSheet, senderBank: 'MCB' }),
+      )
+      .attach('proof', ...png('x.png'))
+      .attach('proof', ...png('y.png'));
+    expect(sale.status).toBe(201);
+    const newest = sale.body.data.payments.find((p: { senderBank: string }) => p.senderBank === 'MCB');
+    expect(newest.proofs).toHaveLength(2);
+    await api('delete', `/branch/sales/${saleId}/payments/${newest.id}`, frontDesk);
+  });
+
   it('returns an online sale into the returns section, once, and restocks it after inspection', async () => {
     expect(
       (await api('post', `/branch/sales/${saleId}/delivery`, admin).send({ status: 'delivered' })).status,

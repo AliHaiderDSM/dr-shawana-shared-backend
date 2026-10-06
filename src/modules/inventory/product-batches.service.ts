@@ -76,6 +76,25 @@ function mergeDate(
   batch[key] = value;
 }
 
+async function syncBatchDates(manager: EntityManager, batch: ProductBatch) {
+  const dates = [batch.manufacturingDate, batch.expiryDate];
+  await manager.query(
+    `UPDATE product_batches c SET manufacturing_date = $3, expiry_date = $4, updated_at = now()
+       FROM products p
+      WHERE c.product_id = p.id AND p.origin_product_id = $1 AND c.batch_no = $2 AND c.deleted_at IS NULL`,
+    [batch.productId, batch.batchNo, ...dates],
+  );
+  await manager.query(
+    `UPDATE stock_ins s SET manufacturing_date = $3, expiry_date = $4
+      WHERE s.deleted_at IS NULL AND s.batch_id IN (
+        SELECT $1::uuid
+        UNION
+        SELECT c.id FROM product_batches c JOIN products p ON p.id = c.product_id
+         WHERE p.origin_product_id = $2 AND c.batch_no = $5 AND c.deleted_at IS NULL)`,
+    [batch.id, batch.productId, ...dates, batch.batchNo],
+  );
+}
+
 const BATCH_SELECT = `
   SELECT b.id, b.product_id AS "productId", p.name AS "productName", p.unit, b.batch_no AS "batchNo",
          to_char(b.manufacturing_date, 'YYYY-MM-DD') AS "manufacturingDate",
@@ -136,7 +155,9 @@ export const productBatchesService = {
       existing.unitCost = toMoney(details.unitCost);
     }
     existing.updatedBy = actor.userId;
-    return batches.save(existing, manager);
+    const saved = await batches.save(existing, manager);
+    if (overwrite) await syncBatchDates(manager, saved);
+    return saved;
   },
 
   async list(branchId: string, query: BatchListQuery) {

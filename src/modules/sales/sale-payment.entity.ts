@@ -1,16 +1,17 @@
 import { type Decimal } from 'decimal.js';
-import { Check, Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Check, Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BranchScopedEntity } from '../../database/branch-scoped.entity';
 import { moneyColumn } from '../../database/transformers';
 import { AccountSheet } from '../accounts/account-sheet.entity';
 import { PAYMENT_METHODS, type PaymentMethod } from '../appointments/appointment-payment.entity';
+import { SalePaymentProof } from './sale-payment-proof.entity';
 import { Sale } from './sale.entity';
 
 @Entity('sale_payments')
 @Check('CHK_sale_payments_amount', `"amount" > 0`)
 @Check(
   'CHK_sale_payments_cash_fields',
-  `"method" = 'online' OR ("sender_bank" IS NULL AND "sender_account_title" IS NULL AND "sender_account_no" IS NULL AND "proof_file_path" IS NULL)`,
+  `"method" = 'online' OR ("sender_bank" IS NULL AND "sender_account_title" IS NULL AND "sender_account_no" IS NULL)`,
 )
 export class SalePayment extends BranchScopedEntity {
   @Index()
@@ -49,12 +50,6 @@ export class SalePayment extends BranchScopedEntity {
   @Column({ name: 'sender_account_no', type: 'varchar', length: 100, nullable: true })
   senderAccountNo: string | null;
 
-  @Column({ name: 'proof_file_path', type: 'text', nullable: true })
-  proofFilePath: string | null;
-
-  @Column({ name: 'proof_original_name', type: 'varchar', length: 255, nullable: true })
-  proofOriginalName: string | null;
-
-  @Column({ name: 'proof_content_type', type: 'varchar', length: 100, nullable: true })
-  proofContentType: string | null;
+  @OneToMany(() => SalePaymentProof, (proof) => proof.payment)
+  proofs?: SalePaymentProof[];
 }

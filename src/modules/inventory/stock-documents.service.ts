@@ -50,6 +50,13 @@ interface CreateInput {
   } & Record<string, unknown>)[];
 }
 
+interface OutBatch {
+  batchNo: string;
+  manufacturingDate: string | null;
+  expiryDate: string | null;
+  qty: string;
+}
+
 interface LabelRange {
   count: number;
   firstSerial: string;
@@ -154,6 +161,23 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     return labels;
   }
 
+  async function batchesFor(ids: string[], manager?: EntityManager) {
+    const batches = new Map<string, OutBatch[]>();
+    if (config.kind !== 'stock_out' || ids.length === 0) return batches;
+    const rows: (OutBatch & { id: string })[] = await (manager ?? AppDataSource).query(
+      `SELECT m.reference_id AS id, b.batch_no AS "batchNo",
+              to_char(b.manufacturing_date, 'YYYY-MM-DD') AS "manufacturingDate",
+              to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate", (-SUM(m.qty))::numeric(12,3)::text AS qty
+         FROM stock_movements m JOIN product_batches b ON b.id = m.batch_id
+        WHERE m.reference_type = $1 AND m.reference_id = ANY($2)
+        GROUP BY m.reference_id, b.id HAVING SUM(m.qty) <> 0
+        ORDER BY b.expiry_date NULLS LAST, b.batch_no`,
+      [referenceType, ids],
+    );
+    for (const { id, ...batch } of rows) batches.set(id, [...(batches.get(id) ?? []), batch]);
+    return batches;
+  }
+
   async function productInfo(manager: EntityManager, branchId: string, productId: string) {
     const [row] = (await manager.query(
       'SELECT name, track_serials AS "trackSerials" FROM products WHERE id = $1 AND branch_id = $2',
@@ -163,7 +187,12 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     return row;
   }
 
-  function toDto(record: T, files: StockAttachment[] = [], labels: LabelRange | null = null) {
+  function toDto(
+    record: T,
+    files: StockAttachment[] = [],
+    labels: LabelRange | null = null,
+    outBatches: OutBatch[] = [],
+  ) {
     const plain = withoutInternals(record) as Record<string, unknown>;
     const party = plain[config.partyRelation] as { id: string; name: string } | null | undefined;
     const target = plain.toBranch as { id: string; name: string } | null | undefined;
@@ -175,7 +204,10 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       attachments: files.map(toAttachmentDto),
       labels,
     };
-    if (config.kind === 'stock_out') dto.toBranch = target ? { id: target.id, name: target.name } : null;
+    if (config.kind === 'stock_out') {
+      dto.toBranch = target ? { id: target.id, name: target.name } : null;
+      dto.batches = outBatches;
+    }
     return dto;
   }
 
@@ -197,7 +229,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     const record = await getRecord(branchId, id, manager);
     const files = await attachmentsFor(branchId, [id], manager);
     const labels = await labelsFor([id], manager);
-    return toDto(record, files.get(id), labels.get(id) ?? null);
+    const outBatches = await batchesFor([id], manager);
+    return toDto(record, files.get(id), labels.get(id) ?? null, outBatches.get(id));
   }
 
   async function assertParty(branchId: string, partyId: string | null | undefined, manager: EntityManager) {
@@ -330,12 +363,16 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         sortMap: { date: 'd.date', createdAt: 'd.createdAt' },
         toOneJoins: true,
       });
-      const files = await attachmentsFor(
-        branchId,
-        items.map((i) => i.id),
-      );
-      const labels = await labelsFor(items.map((i) => i.id));
-      return { items: items.map((i) => toDto(i, files.get(i.id), labels.get(i.id) ?? null)), meta };
+      const ids = items.map((i) => i.id);
+      const [files, labels, outBatches] = await Promise.all([
+        attachmentsFor(branchId, ids),
+        labelsFor(ids),
+        batchesFor(ids),
+      ]);
+      return {
+        items: items.map((i) => toDto(i, files.get(i.id), labels.get(i.id) ?? null, outBatches.get(i.id))),
+        meta,
+      };
     },
 
     get: getDto,

@@ -17,6 +17,7 @@ import {
   deliveryStatusSchema,
   saleListQuerySchema,
   salePaymentParamsSchema,
+  salePaymentProofParamsSchema,
   saleSchema,
   updateSalePaymentSchema,
   updateSaleSchema,
@@ -146,8 +147,8 @@ registry.registerPath({
   ...docs,
   method: 'post',
   path: `${item}/payments`,
-  summary: 'Add a payment (JSON, or multipart "data" + "proof"); totals are recomputed',
-  request: { ...byId, body: withData(createSalePaymentSchema, { proof: binary.optional() }) },
+  summary: 'Add a payment (JSON, or multipart "data" + up to 5 "proof" files); totals are recomputed',
+  request: { ...byId, body: withData(createSalePaymentSchema, { proof: z.array(binary).max(5).optional() }) },
   responses: { 201: one('Updated sale'), ...errorResponses },
 });
 
@@ -164,10 +165,10 @@ registry.registerPath({
   ...docs,
   method: 'post',
   path: `${item}/payments/{paymentId}/proof`,
-  summary: 'Upload or replace an online payment screenshot (multipart "proof")',
+  summary: 'Add screenshots to an online payment (multipart "proof", up to 5 per payment)',
   request: {
     ...paymentRequest,
-    body: { content: { 'multipart/form-data': { schema: z.object({ proof: binary }) } } },
+    body: { content: { 'multipart/form-data': { schema: z.object({ proof: z.array(binary).max(5) }) } } },
   },
   responses: { 200: one('Updated sale'), ...errorResponses },
 });
@@ -175,8 +176,32 @@ registry.registerPath({
 registry.registerPath({
   ...docs,
   method: 'get',
+  path: `${item}/payments/{paymentId}/proofs/{proofId}/url`,
+  summary: 'Download link for one payment screenshot',
+  request: { ...paymentRequest, params: salePaymentProofParamsSchema },
+  responses: {
+    200: {
+      description: 'Signed URL',
+      ...jsonContent(dataEnvelope(z.object({ url: z.string(), expiresIn: z.number() }))),
+    },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'delete',
+  path: `${item}/payments/{paymentId}/proofs/{proofId}`,
+  summary: 'Remove one payment screenshot',
+  request: { ...paymentRequest, params: salePaymentProofParamsSchema },
+  responses: { 200: one('Updated sale'), ...errorResponses },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
   path: `${item}/payments/{paymentId}/proof-url`,
-  summary: 'Download link for a payment screenshot',
+  summary: 'Download link for the first payment screenshot',
   request: paymentRequest,
   responses: {
     200: {

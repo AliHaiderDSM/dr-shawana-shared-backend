@@ -27,6 +27,7 @@ import { returnsService } from '../returns/returns.service';
 import { Product } from '../products/product.entity';
 import { nextSequence } from '../sequences/sequences';
 import { SaleItem } from './sale-item.entity';
+import { SalePaymentProof } from './sale-payment-proof.entity';
 import { SalePayment } from './sale-payment.entity';
 import { lineTotal, saleTotals } from './sale-totals';
 import { Sale, type DeliveryStatus } from './sale.entity';
@@ -42,6 +43,7 @@ import {
 const sales = branchScopedRepository(Sale, 'sale');
 const saleItems = branchScopedRepository(SaleItem, 'si');
 const salePayments = branchScopedRepository(SalePayment, 'sp');
+const paymentProofs = branchScopedRepository(SalePaymentProof, 'proof');
 
 const OWN_ONLY_ROLES = new Set(['front_desk', 'team_manager']);
 const REFERENCE = 'sale';
@@ -57,10 +59,21 @@ const CASH_CLEARED = {
   senderBank: null,
   senderAccountTitle: null,
   senderAccountNo: null,
-  proofFilePath: null,
-  proofOriginalName: null,
-  proofContentType: null,
 };
+
+const MAX_PROOFS = 5;
+
+function proofIndexesOf(input: SalePaymentInput) {
+  return [
+    ...new Set([
+      ...(input.proofIndexes ?? []),
+      ...(input.proofIndex === undefined ? [] : [input.proofIndex]),
+    ]),
+  ];
+}
+
+const liveProofs = (p: SalePayment) =>
+  (p.proofs ?? []).filter((f) => !f.deletedAt).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
 export function toSalePaymentDto(p: SalePayment) {
   return {
@@ -80,8 +93,13 @@ export function toSalePaymentDto(p: SalePayment) {
     senderBank: p.senderBank,
     senderAccountTitle: p.senderAccountTitle,
     senderAccountNo: p.senderAccountNo,
-    hasProof: p.proofFilePath !== null,
-    proofOriginalName: p.proofOriginalName,
+    hasProof: liveProofs(p).length > 0,
+    proofOriginalName: liveProofs(p)[0]?.originalName ?? null,
+    proofs: liveProofs(p).map((f) => ({
+      id: f.id,
+      originalName: f.originalName,
+      contentType: f.contentType,
+    })),
     createdBy: p.createdBy,
     createdAt: p.createdAt,
   };
@@ -118,7 +136,8 @@ function detailed(branchId: string, manager?: EntityManager) {
     .leftJoinAndSelect('item.product', 'product')
     .leftJoinAndSelect('item.bundle', 'bundle')
     .leftJoinAndSelect('sale.payments', 'payment', 'payment.deletedAt IS NULL')
-    .leftJoinAndSelect('payment.accountSheet', 'sheet');
+    .leftJoinAndSelect('payment.accountSheet', 'sheet')
+    .leftJoinAndSelect('payment.proofs', 'proof', 'proof.deletedAt IS NULL');
 }
 
 async function getSale(branchId: string, id: string, manager?: EntityManager) {
@@ -186,12 +205,47 @@ async function assertAccountSheet(branchId: string, id: string, manager: EntityM
 
 function assertProofIndexes(inputs: SalePaymentInput[], proofCount: number) {
   inputs.forEach((p, i) => {
-    if (p.proofIndex === undefined) return;
+    const indexes = proofIndexesOf(p);
+    if (indexes.length === 0) return;
     if (p.method !== 'online')
       throw AppError.badRequest(`Payment ${i + 1}: only online payments take a screenshot`);
-    if (p.proofIndex >= proofCount)
-      throw AppError.badRequest(`Payment ${i + 1}: screenshot ${p.proofIndex} was not uploaded`);
+    if (indexes.length > MAX_PROOFS)
+      throw AppError.badRequest(`Payment ${i + 1}: attach at most ${MAX_PROOFS} screenshots`);
+    const missing = indexes.find((index) => index >= proofCount);
+    if (missing !== undefined)
+      throw AppError.badRequest(`Payment ${i + 1}: screenshot ${missing} was not uploaded`);
   });
+}
+
+async function saveProofs(
+  manager: EntityManager,
+  actor: Actor,
+  payment: Pick<SalePayment, 'id' | 'branchId'>,
+  files: UploadedFile[],
+) {
+  for (const file of files) {
+    await paymentProofs.create(
+      payment.branchId,
+      actor.userId,
+      {
+        paymentId: payment.id,
+        filePath: file.path,
+        originalName: file.originalName,
+        contentType: file.contentType,
+        sizeBytes: file.sizeBytes,
+      },
+      manager,
+    );
+  }
+}
+
+async function dropProofs(manager: EntityManager, actor: Actor, branchId: string, paymentId: string) {
+  const proofs = await paymentProofs
+    .query(branchId, manager)
+    .andWhere('proof.paymentId = :paymentId', { paymentId })
+    .getMany();
+  for (const proof of proofs) await paymentProofs.softDelete(proof, actor.userId, manager);
+  return proofs.map((p) => p.filePath);
 }
 
 const uploadProofs = (branchId: string, files: Express.Multer.File[]) =>
@@ -201,8 +255,8 @@ async function insertPayment(
   manager: EntityManager,
   actor: Actor,
   sale: Pick<Sale, 'id' | 'branchId' | 'date'>,
-  input: Omit<SalePaymentInput, 'proofIndex'>,
-  proof: UploadedFile | undefined,
+  input: Omit<SalePaymentInput, 'proofIndex' | 'proofIndexes'>,
+  proofs: UploadedFile[],
 ) {
   await assertAccountSheet(sale.branchId, input.accountSheetId, manager);
   const details =
@@ -212,15 +266,8 @@ async function insertPayment(
           senderBank: input.senderBank ?? null,
           senderAccountTitle: input.senderAccountTitle ?? null,
           senderAccountNo: input.senderAccountNo ?? null,
-          ...(proof
-            ? {
-                proofFilePath: proof.path,
-                proofOriginalName: proof.originalName,
-                proofContentType: proof.contentType,
-              }
-            : {}),
         };
-  return salePayments.create(
+  const payment = await salePayments.create(
     sale.branchId,
     actor.userId,
     {
@@ -233,6 +280,8 @@ async function insertPayment(
     } as Partial<SalePayment>,
     manager,
   );
+  if (input.method === 'online') await saveProofs(manager, actor, payment, proofs);
+  return payment;
 }
 
 async function insertItems(manager: EntityManager, actor: Actor, sale: Sale, lines: Line[]) {
@@ -516,8 +565,8 @@ export const salesService = {
         );
         await insertItems(em, actor, sale, lines);
         for (const payment of input.payments) {
-          const proof = payment.proofIndex === undefined ? undefined : uploaded[payment.proofIndex];
-          await insertPayment(em, actor, sale, payment, proof);
+          const proofs = proofIndexesOf(payment).flatMap((index) => uploaded[index] ?? []);
+          await insertPayment(em, actor, sale, payment, proofs);
         }
         const wanted = soldByProduct(lines);
         const tracked = await inventoryItemsService.trackedProducts(em, branchId, [...wanted.keys()]);
@@ -670,18 +719,19 @@ export const salesService = {
     actor: Actor,
     branchId: string,
     id: string,
-    input: Omit<SalePaymentInput, 'proofIndex'>,
-    proof?: Express.Multer.File,
+    input: Omit<SalePaymentInput, 'proofIndex' | 'proofIndexes'>,
+    proofs: Express.Multer.File[] = [],
   ) {
-    if (proof && input.method !== 'online')
+    if (proofs.length > 0 && input.method !== 'online')
       throw AppError.badRequest('Only online payments take a screenshot');
+    if (proofs.length > MAX_PROOFS) throw AppError.badRequest(`Attach at most ${MAX_PROOFS} screenshots`);
     const existing = await getSale(branchId, id);
     assertCanChange(actor, existing);
-    const uploaded = proof ? await uploadProofs(branchId, [proof]) : [];
+    const uploaded = await uploadProofs(branchId, proofs);
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
         const sale = await getSale(branchId, id, em);
-        const payment = await insertPayment(em, actor, sale, input, uploaded[0]);
+        const payment = await insertPayment(em, actor, sale, input, uploaded);
         await recompute(em, sale, { discountPercent: sale.discountPercent });
         await audit(actor, sale, 'add_payment', em, null, { paymentId: payment.id, amount: payment.amount });
         return toSaleDto(await getSale(branchId, id, em));
@@ -696,7 +746,7 @@ export const salesService = {
     paymentId: string,
     input: UpdateSalePaymentInput,
   ) {
-    let removedProof: string | null = null;
+    let removedProofs: string[] = [];
     const dto = await withTransaction(async (em) => {
       const sale = await getSale(branchId, id, em);
       assertCanChange(actor, sale);
@@ -706,7 +756,7 @@ export const salesService = {
       const before = toSalePaymentDto(payment);
       Object.assign(payment, input, { updatedBy: actor.userId });
       if (payment.method === 'cash') {
-        removedProof = payment.proofFilePath;
+        removedProofs = await dropProofs(em, actor, branchId, payment.id);
         Object.assign(payment, CASH_CLEARED);
       }
       await salePayments.save(payment, em);
@@ -714,49 +764,57 @@ export const salesService = {
       await audit(actor, sale, 'update_payment', em, before, input);
       return toSaleDto(await getSale(branchId, id, em));
     });
-    if (removedProof) await removeQuietly(BUCKETS.paymentProofs, [removedProof]);
+    if (removedProofs.length) await removeQuietly(BUCKETS.paymentProofs, removedProofs);
     return dto;
   },
 
-  async setPaymentProof(
+  async addPaymentProofs(
     actor: Actor,
     branchId: string,
     id: string,
     paymentId: string,
-    file: Express.Multer.File,
+    files: Express.Multer.File[],
   ) {
+    if (files.length === 0) throw AppError.badRequest('Attach at least one screenshot');
     const sale = await getSale(branchId, id);
     assertCanChange(actor, sale);
-    const payment = await salePayments.findOneBy(branchId, { id: paymentId, saleId: id });
+    const payment = sale.payments?.find((p) => p.id === paymentId);
     if (!payment) throw AppError.notFound('Payment');
     if (payment.method !== 'online') throw AppError.badRequest('Only online payments take a screenshot');
-    const uploaded = await uploadProofs(branchId, [file]);
-    const previous = payment.proofFilePath;
-    const result = await withUploads(uploaded, () =>
+    if (liveProofs(payment).length + files.length > MAX_PROOFS)
+      throw AppError.badRequest(`A payment keeps at most ${MAX_PROOFS} screenshots`);
+    const uploaded = await uploadProofs(branchId, files);
+    return withUploads(uploaded, () =>
       withTransaction(async (em) => {
-        const file0 = uploaded[0] as UploadedFile;
-        await repo(SalePayment, em).update(
-          { id: paymentId },
-          {
-            proofFilePath: file0.path,
-            proofOriginalName: file0.originalName,
-            proofContentType: file0.contentType,
-            updatedBy: actor.userId,
-          },
-        );
-        await audit(actor, sale, 'replace_payment_proof', em);
+        await saveProofs(em, actor, payment, uploaded);
+        await audit(actor, sale, 'add_payment_proof', em, null, { paymentId, files: uploaded.length });
         return toSaleDto(await getSale(branchId, id, em));
       }),
     );
-    if (previous) await removeQuietly(BUCKETS.paymentProofs, [previous]);
-    return result;
   },
 
-  async paymentProofUrl(branchId: string, id: string, paymentId: string) {
-    await getSale(branchId, id);
-    const payment = await salePayments.findOneBy(branchId, { id: paymentId, saleId: id });
-    if (!payment?.proofFilePath) throw AppError.notFound('Payment screenshot');
-    return createSignedUrl(BUCKETS.paymentProofs, payment.proofFilePath);
+  async removePaymentProof(actor: Actor, branchId: string, id: string, paymentId: string, proofId: string) {
+    const sale = await getSale(branchId, id);
+    assertCanChange(actor, sale);
+    const proof = await paymentProofs.findOneBy(branchId, { id: proofId, paymentId });
+    if (!proof || !sale.payments?.some((p) => p.id === paymentId))
+      throw AppError.notFound('Payment screenshot');
+    const dto = await withTransaction(async (em) => {
+      await paymentProofs.softDelete(proof, actor.userId, em);
+      await audit(actor, sale, 'remove_payment_proof', em, { paymentId, proof: proof.originalName });
+      return toSaleDto(await getSale(branchId, id, em));
+    });
+    await removeQuietly(BUCKETS.paymentProofs, [proof.filePath]);
+    return dto;
+  },
+
+  async paymentProofUrl(branchId: string, id: string, paymentId: string, proofId?: string) {
+    const sale = await getSale(branchId, id);
+    const payment = sale.payments?.find((p) => p.id === paymentId);
+    const proofs = payment ? liveProofs(payment) : [];
+    const proof = proofId ? proofs.find((p) => p.id === proofId) : proofs[0];
+    if (!proof) throw AppError.notFound('Payment screenshot');
+    return createSignedUrl(BUCKETS.paymentProofs, proof.filePath);
   },
 
   async removePayment(actor: Actor, branchId: string, id: string, paymentId: string) {

@@ -163,6 +163,27 @@ describe('Main Warehouse transfers to branches', () => {
     expect((await asAdmin('get', `/branch/inventory/items/serial/${serials[0]}`)).status).toBe(404);
   });
 
+  it('corrects batch dates from the warehouse entry everywhere the batch went', async () => {
+    const t01 = (s: { batch: string | null }) => s.batch === 'T-01';
+    const entry = (await asAdmin('get', '/branch/stock-ins')).body.data.find(t01);
+    const res = await asAdmin('patch', `/branch/stock-ins/${entry.id}`).send({
+      batch: 'T-01',
+      manufacturingDate: '2026-06-01',
+      expiryDate: '2027-07-31',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ manufacturingDate: '2026-06-01', expiryDate: '2027-07-31' });
+
+    const batches = (await asBranch('get', `/branch/inventory/batches?productId=${lahoreToner}`)).body.data;
+    expect(batches[0]).toMatchObject({
+      batchNo: 'T-01',
+      manufacturingDate: '2026-06-01',
+      expiryDate: '2027-07-31',
+    });
+    const received = (await asBranch('get', '/branch/stock-ins')).body.data.find(t01);
+    expect(received).toMatchObject({ manufacturingDate: '2026-06-01', expiryDate: '2027-07-31' });
+  });
+
   it('lets the branch sell the transferred pieces and reuses its product on the next transfer', async () => {
     const lahoreSerum = (await asBranch('get', '/branch/products?search=Vitamin')).body.data[0].id;
     const sale = await asBranch('post', '/branch/sales', lahoreDesk).send({

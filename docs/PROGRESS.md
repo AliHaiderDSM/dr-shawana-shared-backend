@@ -22,6 +22,21 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Stock batches and sale screenshots (done 2026-10-06)
+
+- **Stock out batches:** a stock out takes its batch from each scanned DSM label. Without labels, it takes the batch that expires first (FEFO). `StockOut.batches` lists the batches an entry took: batch no, mfg date, expiry date and qty.
+- **Batch date edits:** editing a stock in with new mfg or expiry dates (`overwrite`) now copies the dates (`syncBatchDates`) to:
+  - every stock in of that batch;
+  - the copies of the batch in branches it was sent to (matched by `origin_product_id` and batch no);
+  - their stock ins.
+- **Product options** include `trackSerials`, so forms know which products are scanned.
+- **Sale payment screenshots:** an online sale payment keeps up to 5 screenshots.
+  - They are stored in the new table `sale_payment_proofs` (migration `SalePaymentProofs`). The migration copies the old single screenshot into it and drops the `proof_*` columns.
+  - `proofIndexes` on create.
+  - `POST …/proof` now adds screenshots instead of replacing.
+  - `GET …/proofs/{proofId}/url` and `DELETE …/proofs/{proofId}`.
+  - The payment DTO has `proofs[]`. `hasProof` and `proofOriginalName` are kept.
+
 ## Patient history links (done 2026-10-06)
 
 This is posSoft "Copy Link", made safe. posSoft's link carried only base64 of the patient's name and phone, so anyone could build a link for another patient.

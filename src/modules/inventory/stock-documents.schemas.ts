@@ -225,6 +225,18 @@ export const stockOutSchema = registry.register(
     destination: z.string(),
     toBranchId: z.uuid().nullable(),
     toBranch: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    batches: z
+      .array(
+        z.object({
+          batchNo: z.string(),
+          manufacturingDate: z.iso.date().nullable(),
+          expiryDate: z.iso.date().nullable(),
+          qty: quantityOutput,
+        }),
+      )
+      .openapi({
+        description: 'Batches this entry took stock from (FEFO, or the batches of the scanned labels)',
+      }),
   }),
 );
 

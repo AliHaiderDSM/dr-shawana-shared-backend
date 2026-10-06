@@ -2,7 +2,7 @@ import { Router, type Request } from 'express';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
-import { documentsUpload, documentUpload, jsonDataField, requireFile, uploadedFiles } from '../../lib/upload';
+import { documentsUpload, jsonDataField, uploadedFiles } from '../../lib/upload';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
@@ -15,6 +15,7 @@ import {
   deliveryStatusSchema,
   saleListQuerySchema,
   salePaymentParamsSchema,
+  salePaymentProofParamsSchema,
   updateSalePaymentSchema,
   updateSaleSchema,
 } from './sales.schemas';
@@ -98,14 +99,14 @@ salesRouter.post(
   `${path}/:id/payments`,
   can('update'),
   byId,
-  documentUpload('proof'),
+  documentsUpload('proof', 5),
   jsonDataField,
   validate({ body: createSalePaymentSchema }),
   async (req, res) => {
     const input = validBody(req, createSalePaymentSchema);
     sendCreated(
       res,
-      await salesService.addPayment(actorFrom(req), branchIdOf(req), idOf(req), input, req.file),
+      await salesService.addPayment(actorFrom(req), branchIdOf(req), idOf(req), input, uploadedFiles(req)),
     );
   },
 );
@@ -125,12 +126,35 @@ salesRouter.post(
   `${path}/:id/payments/:paymentId/proof`,
   can('update'),
   byPayment,
-  documentUpload('proof'),
+  documentsUpload('proof', 5),
   async (req, res) => {
     const { id, paymentId } = paymentOf(req);
     sendOk(
       res,
-      await salesService.setPaymentProof(actorFrom(req), branchIdOf(req), id, paymentId, requireFile(req)),
+      await salesService.addPaymentProofs(actorFrom(req), branchIdOf(req), id, paymentId, uploadedFiles(req)),
+    );
+  },
+);
+
+salesRouter.get(
+  `${path}/:id/payments/:paymentId/proofs/:proofId/url`,
+  can('view'),
+  validate({ params: salePaymentProofParamsSchema }),
+  async (req, res) => {
+    const { id, paymentId, proofId } = validParams(req, salePaymentProofParamsSchema);
+    sendOk(res, await salesService.paymentProofUrl(branchIdOf(req), id, paymentId, proofId));
+  },
+);
+
+salesRouter.delete(
+  `${path}/:id/payments/:paymentId/proofs/:proofId`,
+  can('update'),
+  validate({ params: salePaymentProofParamsSchema }),
+  async (req, res) => {
+    const { id, paymentId, proofId } = validParams(req, salePaymentProofParamsSchema);
+    sendOk(
+      res,
+      await salesService.removePaymentProof(actorFrom(req), branchIdOf(req), id, paymentId, proofId),
     );
   },
 );

@@ -116,6 +116,22 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     expect(conflict.status).toBe(409);
   });
 
+  it('shows the batches a stock out took, first expiry first', async () => {
+    const out = await api('post', '/branch/stock-outs').send({
+      date: '2026-09-03',
+      items: [{ productId: serum, qty: '60', destination: 'Office' }],
+    });
+    expect(out.status).toBe(201);
+    expect(out.body.data[0].batches).toEqual([
+      { batchNo: 'BATCH-002', manufacturingDate: '2026-08-01', expiryDate: '2027-03-01', qty: '50.000' },
+      { batchNo: 'BATCH-001', manufacturingDate: '2026-09-01', expiryDate: '2028-09-01', qty: '10.000' },
+    ]);
+    const listed = (await api('get', '/branch/stock-outs')).body.data[0];
+    expect(listed.batches).toHaveLength(2);
+    expect((await api('delete', `/branch/stock-outs/${out.body.data[0].id}`)).status).toBe(204);
+    expect(await batches(serum)).toEqual({ 'BATCH-001': '120.000', 'BATCH-002': '50.000' });
+  });
+
   it('sells from the batch that expires first and shows the batches on the sale', async () => {
     const sale = await sell(serum, '3');
     expect(sale.status).toBe(201);

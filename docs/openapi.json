@@ -2952,6 +2952,42 @@
               "id",
               "name"
             ]
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "batchNo": {
+                  "type": "string"
+                },
+                "manufacturingDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date"
+                },
+                "expiryDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date"
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                }
+              },
+              "required": [
+                "batchNo",
+                "manufacturingDate",
+                "expiryDate",
+                "qty"
+              ]
+            },
+            "description": "Batches this entry took stock from (FEFO, or the batches of the scanned labels)"
           }
         },
         "required": [
@@ -2971,7 +3007,8 @@
           "dispatcher",
           "destination",
           "toBranchId",
-          "toBranch"
+          "toBranch",
+          "batches"
         ]
       },
       "StockBalance": {
@@ -10478,6 +10515,16 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9
+          },
+          "proofIndexes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9
+            },
+            "maxItems": 5,
+            "description": "Positions in \"paymentProofs\" of the screenshots for this payment"
           }
         },
         "required": [
@@ -10840,6 +10887,29 @@
               "null"
             ]
           },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "originalName": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "originalName",
+                "contentType"
+              ]
+            }
+          },
           "createdBy": {
             "type": [
               "string",
@@ -10865,6 +10935,7 @@
           "senderAccountNo",
           "hasProof",
           "proofOriginalName",
+          "proofs",
           "createdBy",
           "createdAt"
         ]
@@ -15936,6 +16007,9 @@
                               "string",
                               "null"
                             ]
+                          },
+                          "trackSerials": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -15943,7 +16017,8 @@
                           "name",
                           "salePrice",
                           "batchNo",
-                          "barcode"
+                          "barcode",
+                          "trackSerials"
                         ]
                       }
                     }
@@ -37921,7 +37996,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Add a payment (JSON, or multipart \"data\" + \"proof\"); totals are recomputed",
+        "summary": "Add a payment (JSON, or multipart \"data\" + up to 5 \"proof\" files); totals are recomputed",
         "parameters": [
           {
             "schema": {
@@ -38005,8 +38080,12 @@
                     "type": "string"
                   },
                   "proof": {
-                    "type": "string",
-                    "format": "binary"
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "maxItems": 5
                   }
                 },
                 "required": [
@@ -38314,7 +38393,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Upload or replace an online payment screenshot (multipart \"proof\")",
+        "summary": "Add screenshots to an online payment (multipart \"proof\", up to 5 per payment)",
         "parameters": [
           {
             "schema": {
@@ -38351,8 +38430,12 @@
                 "type": "object",
                 "properties": {
                   "proof": {
-                    "type": "string",
-                    "format": "binary"
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "maxItems": 5
                   }
                 },
                 "required": [
@@ -38362,6 +38445,260 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Updated sale",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Sale"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/payments/{paymentId}/proofs/{proofId}/url": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Download link for one payment screenshot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "paymentId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "proofId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "expiresIn": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresIn"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/payments/{paymentId}/proofs/{proofId}": {
+      "delete": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove one payment screenshot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "paymentId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "proofId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Updated sale",
@@ -38444,7 +38781,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Download link for a payment screenshot",
+        "summary": "Download link for the first payment screenshot",
         "parameters": [
           {
             "schema": {
