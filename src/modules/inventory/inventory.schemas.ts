@@ -98,6 +98,9 @@ const reportRow = z.object({
   inBranch: quantityOutput.openapi({
     description: 'Left at the toBranchId branch (or every branch) on the last day',
   }),
+  branchReturned: quantityOutput.openapi({
+    description: 'Returned by customers back into stock at the toBranchId branch (or every branch)',
+  }),
 });
 
 const branchShare = z.object({
@@ -105,6 +108,7 @@ const branchShare = z.object({
   branchName: z.string(),
   sent: quantityOutput,
   sold: quantityOutput,
+  returned: quantityOutput,
   inBranch: quantityOutput,
 });
 

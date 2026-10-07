@@ -39,6 +39,7 @@ const REPORT_COLUMNS = [
   'closing',
   'branchSold',
   'inBranch',
+  'branchReturned',
 ] as const;
 type ReportColumn = (typeof REPORT_COLUMNS)[number];
 
@@ -105,6 +106,7 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
     branchName: string;
     sent: string;
     sold: string;
+    returned: string;
     inBranch: string;
   }[] = await AppDataSource.query(
     `SELECT p.id AS "productId", b.id AS "branchId", b.name AS "branchName",
@@ -114,6 +116,9 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
             COALESCE((SELECT -SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
                        WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id
                          AND bm.type IN ('sale', 'sale_edit_adjust') AND bm.date BETWEEN $2 AND $3), 0)::text AS sold,
+            COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
+                       WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id
+                         AND bm.type = 'sale_return' AND bm.date BETWEEN $2 AND $3), 0)::text AS returned,
             COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
                        WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id AND bm.date <= $3), 0)::text AS "inBranch"
        FROM products p
@@ -125,7 +130,7 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
   );
   const byProduct = new Map<string, typeof rows>();
   for (const row of rows) {
-    if (Number(row.sent) === 0 && Number(row.sold) === 0 && Number(row.inBranch) === 0) continue;
+    if ([row.sent, row.sold, row.returned, row.inBranch].every((v) => Number(v) === 0)) continue;
     byProduct.set(row.productId, [...(byProduct.get(row.productId) ?? []), row]);
   }
   return byProduct;
@@ -219,6 +224,10 @@ export const inventoryService = {
       ? `COALESCE((SELECT -SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
             AND bm.type IN ('sale', 'sale_edit_adjust') AND bm.date BETWEEN $2 AND $3), 0)`
       : '0';
+    const branchReturned = branchProducts
+      ? `COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
+            AND bm.type = 'sale_return' AND bm.date BETWEEN $2 AND $3), 0)`
+      : '0';
     const inBranch = branchProducts
       ? `COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
             AND bm.date <= $3), 0)`
@@ -237,6 +246,7 @@ export const inventoryService = {
                 COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['stock_out'], toWhere)}), 0)::text AS "stockOut",
                 (${branchSold})::text AS "branchSold",
                 (${inBranch})::text AS "inBranch",
+                (${branchReturned})::text AS "branchReturned",
                 COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['sale'])}), 0)::text AS sold,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_return'])}), 0)::text AS returned,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_edit_adjust', 'adjustment'])}), 0)::text AS adjusted,
@@ -259,6 +269,7 @@ export const inventoryService = {
         const list = perBranch.get(row.productId) ?? [];
         row.branchSold = list.reduce((sum, b) => sum.plus(b.sold), new Decimal(0)).toString();
         row.inBranch = list.reduce((sum, b) => sum.plus(b.inBranch), new Decimal(0)).toString();
+        row.branchReturned = list.reduce((sum, b) => sum.plus(b.returned), new Decimal(0)).toString();
       }
     }
 
@@ -281,6 +292,7 @@ export const inventoryService = {
           branchName: b.branchName,
           sent: toQuantity(b.sent),
           sold: toQuantity(b.sold),
+          returned: toQuantity(b.returned),
           inBranch: toQuantity(b.inBranch),
         })),
       })),
