@@ -71,6 +71,9 @@ describe('Sale returns and barcodes', () => {
     });
     expect(sale.status).toBe(201);
     saleId = sale.body.data.id;
+    expect(sale.body.data.paymentStatus).toBe('awaiting_approval');
+    const approved = await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({});
+    expect(approved.body.data.paymentStatus).toBe('partial');
   });
 
   it('finds products by their printed barcode and keeps barcodes unique per branch', async () => {

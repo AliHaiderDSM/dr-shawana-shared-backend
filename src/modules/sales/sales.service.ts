@@ -104,6 +104,8 @@ export function toSalePaymentDto(p: SalePayment) {
       originalName: f.originalName,
       contentType: f.contentType,
     })),
+    approvedAt: p.approvedAt,
+    approvedBy: p.approvedBy,
     createdBy: p.createdBy,
     createdAt: p.createdAt,
   };
@@ -474,7 +476,12 @@ async function recompute(
     .andWhere('sp.saleId = :id', { id: sale.id })
     .getMany();
   const received = payments.reduce((sum, p) => sum.plus(p.amount), new Decimal(0));
-  const totals = saleTotals(items, received, discount);
+  const totals = saleTotals(
+    items,
+    received,
+    discount,
+    payments.some((p) => !p.approvedAt),
+  );
   await repo(Sale, manager).update(
     { id: sale.id },
     {
@@ -497,6 +504,7 @@ function applyFilters(qb: SelectQueryBuilder<Sale>, query: SaleListQuery) {
   if (query.city) qb.andWhere('sale.city ILIKE :city', { city: escapeLike(query.city) });
   if (query.deliveryStatus) qb.andWhere('sale.deliveryStatus = :ds', { ds: query.deliveryStatus });
   if (query.paymentStatus) qb.andWhere('sale.paymentStatus = :ps', { ps: query.paymentStatus });
+  if (query.due) qb.andWhere('sale.remaining > 0');
   if (query.from) qb.andWhere('sale.date >= :from', { from: query.from });
   if (query.to) qb.andWhere('sale.date <= :to', { to: query.to });
   if (query.productId) {
@@ -566,7 +574,21 @@ export const salesService = {
         toOneJoins: true,
       },
     );
-    const [totals, rows] = await Promise.all([totalsQuery, qb.getMany()]);
+    const byBranchQuery = branchId
+      ? Promise.resolve(null)
+      : applyFilters(base().leftJoin('sale.patient', 'patient'), query)
+          .select('onlyBranches.id', 'branchId')
+          .addSelect('onlyBranches.name', 'branchName')
+          .addSelect('COUNT(*)', 'count')
+          .addSelect('COALESCE(SUM(sale.totalQty), 0)', 'qty')
+          .addSelect('COALESCE(SUM(sale.total), 0)', 'total')
+          .addSelect('COALESCE(SUM(sale.received), 0)', 'received')
+          .addSelect('COALESCE(SUM(sale.remaining), 0)', 'remaining')
+          .groupBy('onlyBranches.id')
+          .addGroupBy('onlyBranches.name')
+          .orderBy('onlyBranches.name', 'ASC')
+          .getRawMany<Record<string, string>>();
+    const [totals, rows, byBranch] = await Promise.all([totalsQuery, qb.getMany(), byBranchQuery]);
     const withPayments = rows.length
       ? await repo(SalePayment).find({ where: { saleId: In(rows.map((r) => r.id)) } })
       : [];
@@ -596,6 +618,19 @@ export const salesService = {
           received: toMoney(totals?.received ?? 0),
           remaining: toMoney(totals?.remaining ?? 0),
         },
+        ...(byBranch
+          ? {
+              byBranch: byBranch.map((b) => ({
+                branchId: b.branchId,
+                branchName: b.branchName,
+                count: Number(b.count),
+                qty: new Decimal(b.qty ?? 0).toFixed(3),
+                total: toMoney(b.total ?? 0),
+                received: toMoney(b.received ?? 0),
+                remaining: toMoney(b.remaining ?? 0),
+              })),
+            }
+          : {}),
       },
     };
   },
@@ -635,7 +670,7 @@ export const salesService = {
           : await patientsService.require(input.patientId as string, em);
         const lines = await resolveLines(branchId, input.items, em);
         const received = input.payments.reduce((sum, p) => sum.plus(p.amount), new Decimal(0));
-        const totals = saleTotals(lines, received, input);
+        const totals = saleTotals(lines, received, input, input.payments.length > 0);
         const seq = await nextSequence(em, branchId, 'sale');
         const date = input.date ?? today();
 
@@ -1009,7 +1044,11 @@ export const salesService = {
       if (!payment) throw AppError.notFound('Payment');
       if (input.accountSheetId) await assertAccountSheet(branchId, input.accountSheetId, em);
       const before = toSalePaymentDto(payment);
+      const money = (['amount', 'method', 'accountSheetId', 'date'] as const).some(
+        (key) => key in input && String(input[key]) !== String(payment[key]),
+      );
       Object.assign(payment, input, { updatedBy: actor.userId });
+      if (money) Object.assign(payment, { approvedAt: null, approvedBy: null });
       if (payment.method === 'cash') {
         removedProofs = await dropProofs(em, actor, branchId, payment.id);
         Object.assign(payment, CASH_CLEARED);
@@ -1070,6 +1109,32 @@ export const salesService = {
     const proof = proofId ? proofs.find((p) => p.id === proofId) : proofs[0];
     if (!proof) throw AppError.notFound('Payment screenshot');
     return createSignedUrl(BUCKETS.paymentProofs, proof.filePath);
+  },
+
+  async approvePayments(actor: Actor, branchId: string, id: string, paymentIds?: string[]) {
+    return withTransaction(async (em) => {
+      const sale = await getSale(branchId, id, em);
+      const pending = (sale.payments ?? []).filter(
+        (p) => !p.approvedAt && (!paymentIds?.length || paymentIds.includes(p.id)),
+      );
+      if (paymentIds?.length && pending.length !== paymentIds.length) {
+        throw AppError.conflict('Some of these payments are not on this sale or are already approved');
+      }
+      if (pending.length === 0)
+        throw AppError.conflict(`${sale.invoiceNo} has no payment waiting for approval`);
+      const approvedAt = new Date();
+      for (const payment of pending) {
+        await repo(SalePayment, em).update(
+          { id: payment.id },
+          { approvedAt, approvedBy: actor.userId, updatedBy: actor.userId },
+        );
+      }
+      await recompute(em, sale, { discountPercent: sale.discountPercent });
+      await audit(actor, sale, 'approve_payments', em, null, {
+        payments: pending.map((p) => ({ id: p.id, amount: p.amount })),
+      });
+      return toSaleDto(await getSale(branchId, id, em));
+    });
   },
 
   async removePayment(actor: Actor, branchId: string, id: string, paymentId: string) {

@@ -9,7 +9,7 @@ import { SalePayment } from './sale-payment.entity';
 export const SALE_TYPES = ['office', 'online'] as const;
 export type SaleType = (typeof SALE_TYPES)[number];
 
-export const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'] as const;
+export const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid', 'awaiting_approval'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const DELIVERY_STATUSES = ['pending', 'dispatched', 'delivered', 'returned', 'cancelled'] as const;

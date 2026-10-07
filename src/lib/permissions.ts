@@ -29,6 +29,7 @@ export const BRANCH_MODULES = [
   'consultations',
   'prescriptions',
   'sales',
+  'salePayments',
   'returns',
   'deliveryReport',
   'categories',
@@ -83,10 +84,13 @@ const frontDeskGrants: Grants = {
 const MATRIX: Record<Role, Grants> = {
   super_admin: grantAll([...PLATFORM_MODULES, ...BRANCH_MODULES], FULL),
   branch_admin: grantAll(BRANCH_MODULES, FULL),
-  accountant: grantAll(
-    BRANCH_MODULES.filter((m) => m !== 'staff'),
-    VIEW_CREATE,
-  ),
+  accountant: {
+    ...grantAll(
+      BRANCH_MODULES.filter((m) => m !== 'staff'),
+      VIEW_CREATE,
+    ),
+    salePayments: ['view', 'update'],
+  },
   doctor: {
     dashboard: VIEW,
     patients: FULL,

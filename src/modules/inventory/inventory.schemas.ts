@@ -92,10 +92,20 @@ const reportRow = z.object({
   returned: quantityOutput,
   adjusted: quantityOutput,
   closing: quantityOutput,
-  branchSold: quantityOutput.openapi({ description: 'Sold at the toBranchId branch (0 without it)' }),
-  inBranch: quantityOutput.openapi({
-    description: 'Left at the toBranchId branch on the last day (0 without it)',
+  branchSold: quantityOutput.openapi({
+    description: 'Sold at the toBranchId branch, or at every branch for the Super Admin stock',
   }),
+  inBranch: quantityOutput.openapi({
+    description: 'Left at the toBranchId branch (or every branch) on the last day',
+  }),
+});
+
+const branchShare = z.object({
+  branchId: z.uuid(),
+  branchName: z.string(),
+  sent: quantityOutput,
+  sold: quantityOutput,
+  inBranch: quantityOutput,
 });
 
 export const inventoryReportSchema = registry.register(
@@ -103,7 +113,8 @@ export const inventoryReportSchema = registry.register(
   z.object({
     from: z.iso.date(),
     to: z.iso.date(),
-    rows: z.array(reportRow),
+    perBranch: z.boolean().openapi({ description: 'Rows carry a per-branch breakdown (Super Admin stock)' }),
+    rows: z.array(reportRow.extend({ branches: z.array(branchShare) })),
     totals: reportRow.omit({ productId: true, name: true, categoryName: true }),
   }),
 );

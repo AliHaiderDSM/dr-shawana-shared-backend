@@ -136,13 +136,17 @@ describe('accounts, expenses, reports and dashboard', () => {
       items: [{ catalogItemId: progest }],
     });
 
-    await api('post', '/branch/sales', frontDesk).send({
+    const sale = await api('post', '/branch/sales', frontDesk).send({
       patientId,
       date: '2026-09-10',
       saleType: 'office',
       items: [{ productId: serum, qty: '2' }],
       payments: [{ method: 'cash', amount: '2000', date: '2026-09-10', accountSheetId: cashSheet }],
     });
+    expect(
+      (await api('post', `/branch/sales/${sale.body.data.id}/payments/approve`, frontDesk).send({})).status,
+    ).toBe(403);
+    await api('post', `/branch/sales/${sale.body.data.id}/payments/approve`, accountant).send({});
   });
 
   describe('journal', () => {

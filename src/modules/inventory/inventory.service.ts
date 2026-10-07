@@ -98,6 +98,39 @@ function movementDetail(m: {
   }
 }
 
+async function branchBreakdown(params: unknown[], filters: string[]) {
+  const rows: {
+    productId: string;
+    branchId: string;
+    branchName: string;
+    sent: string;
+    sold: string;
+    inBranch: string;
+  }[] = await AppDataSource.query(
+    `SELECT p.id AS "productId", b.id AS "branchId", b.name AS "branchName",
+            COALESCE((SELECT -SUM(m.qty) FROM stock_movements m JOIN stock_outs so ON so.id = m.reference_id
+                       WHERE m.product_id = p.id AND m.type = 'stock_out' AND so.to_branch_id = b.id
+                         AND m.date BETWEEN $2 AND $3), 0)::text AS sent,
+            COALESCE((SELECT -SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
+                       WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id
+                         AND bm.type IN ('sale', 'sale_edit_adjust') AND bm.date BETWEEN $2 AND $3), 0)::text AS sold,
+            COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
+                       WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id AND bm.date <= $3), 0)::text AS "inBranch"
+       FROM products p
+       CROSS JOIN branches b
+      WHERE p.branch_id = $1 AND p.deleted_at IS NULL AND b.kind = 'branch' AND b.deleted_at IS NULL
+        ${filters.map((f) => `AND ${f}`).join(' ')}
+      ORDER BY b.name`,
+    params.slice(0, 3 + filters.length),
+  );
+  const byProduct = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (Number(row.sent) === 0 && Number(row.sold) === 0 && Number(row.inBranch) === 0) continue;
+    byProduct.set(row.productId, [...(byProduct.get(row.productId) ?? []), row]);
+  }
+  return byProduct;
+}
+
 export const inventoryService = {
   async expiryAlerts(branchId: string | null, query: ExpiryAlertsQuery) {
     const params: unknown[] = [query.days];
@@ -217,6 +250,18 @@ export const inventoryService = {
       params,
     );
 
+    const [kind] = (await AppDataSource.query('SELECT kind FROM branches WHERE id = $1', [branchId])) as {
+      kind: string;
+    }[];
+    const perBranch = kind?.kind === 'warehouse' && !target ? await branchBreakdown(params, filters) : null;
+    if (perBranch) {
+      for (const row of rows) {
+        const list = perBranch.get(row.productId) ?? [];
+        row.branchSold = list.reduce((sum, b) => sum.plus(b.sold), new Decimal(0)).toString();
+        row.inBranch = list.reduce((sum, b) => sum.plus(b.inBranch), new Decimal(0)).toString();
+      }
+    }
+
     const totals = Object.fromEntries(
       REPORT_COLUMNS.map((col) => [
         col,
@@ -227,9 +272,17 @@ export const inventoryService = {
     return {
       from,
       to,
+      perBranch: Boolean(perBranch),
       rows: rows.map((r) => ({
         ...r,
         ...Object.fromEntries(REPORT_COLUMNS.map((col) => [col, toQuantity(r[col])])),
+        branches: (perBranch?.get(r.productId) ?? []).map((b) => ({
+          branchId: b.branchId,
+          branchName: b.branchName,
+          sent: toQuantity(b.sent),
+          sold: toQuantity(b.sold),
+          inBranch: toQuantity(b.inBranch),
+        })),
       })),
       totals,
     };

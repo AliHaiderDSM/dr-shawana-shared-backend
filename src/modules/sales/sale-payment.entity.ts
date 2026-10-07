@@ -50,6 +50,12 @@ export class SalePayment extends BranchScopedEntity {
   @Column({ name: 'sender_account_no', type: 'varchar', length: 100, nullable: true })
   senderAccountNo: string | null;
 
+  @Column({ name: 'approved_at', type: 'timestamptz', nullable: true })
+  approvedAt: Date | null;
+
+  @Column({ name: 'approved_by', type: 'uuid', nullable: true })
+  approvedBy: string | null;
+
   @OneToMany(() => SalePaymentProof, (proof) => proof.payment)
   proofs?: SalePaymentProof[];
 }

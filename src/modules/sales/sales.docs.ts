@@ -12,6 +12,7 @@ import { DELIVERY_STATUSES, PAYMENT_STATUSES } from './sale.entity';
 import { securedDocs } from '../../lib/openapi-crud';
 import { moneyOutput, quantityOutput } from '../../lib/validation';
 import {
+  approvePaymentsSchema,
   cancelOrderSchema,
   createSalePaymentSchema,
   createSaleSchema,
@@ -61,7 +62,23 @@ registry.registerPath({
       ...jsonContent(
         z.object({
           data: z.array(saleSchema.omit({ items: true, payments: true })),
-          meta: pageMetaSchema.extend({ totals: moneyTotals }),
+          meta: pageMetaSchema.extend({
+            totals: moneyTotals,
+            byBranch: z
+              .array(
+                z.object({
+                  branchId: z.uuid(),
+                  branchName: z.string(),
+                  count: z.number().int(),
+                  qty: quantityOutput,
+                  total: moneyOutput,
+                  received: moneyOutput,
+                  remaining: moneyOutput,
+                }),
+              )
+              .optional()
+              .openapi({ description: 'Super Admin across branches: the same totals split by branch' }),
+          }),
         }),
       ),
     },
@@ -134,6 +151,16 @@ registry.registerPath({
     200: { description: 'Bill', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
     ...errorResponses,
   },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'post',
+  path: `${item}/payments/approve`,
+  summary:
+    'Approve the payments of a sale (all that wait, or the given ones). Only approved payments count in the account balance and make the sale paid.',
+  request: { ...byId, body: jsonContent(approvePaymentsSchema) },
+  responses: { 200: one('Approved'), ...errorResponses },
 });
 
 registry.registerPath({

@@ -3074,6 +3074,10 @@
             "type": "string",
             "format": "date"
           },
+          "perBranch": {
+            "type": "boolean",
+            "description": "Rows carry a per-branch breakdown (Super Admin stock)"
+          },
           "rows": {
             "type": "array",
             "items": {
@@ -3131,12 +3135,46 @@
                 "branchSold": {
                   "type": "string",
                   "example": "10.000",
-                  "description": "Sold at the toBranchId branch (0 without it)"
+                  "description": "Sold at the toBranchId branch, or at every branch for the Super Admin stock"
                 },
                 "inBranch": {
                   "type": "string",
                   "example": "10.000",
-                  "description": "Left at the toBranchId branch on the last day (0 without it)"
+                  "description": "Left at the toBranchId branch (or every branch) on the last day"
+                },
+                "branches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "branchId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "branchName": {
+                        "type": "string"
+                      },
+                      "sent": {
+                        "type": "string",
+                        "example": "10.000"
+                      },
+                      "sold": {
+                        "type": "string",
+                        "example": "10.000"
+                      },
+                      "inBranch": {
+                        "type": "string",
+                        "example": "10.000"
+                      }
+                    },
+                    "required": [
+                      "branchId",
+                      "branchName",
+                      "sent",
+                      "sold",
+                      "inBranch"
+                    ]
+                  }
                 }
               },
               "required": [
@@ -3153,7 +3191,8 @@
                 "adjusted",
                 "closing",
                 "branchSold",
-                "inBranch"
+                "inBranch",
+                "branches"
               ]
             }
           },
@@ -3199,12 +3238,12 @@
               "branchSold": {
                 "type": "string",
                 "example": "10.000",
-                "description": "Sold at the toBranchId branch (0 without it)"
+                "description": "Sold at the toBranchId branch, or at every branch for the Super Admin stock"
               },
               "inBranch": {
                 "type": "string",
                 "example": "10.000",
-                "description": "Left at the toBranchId branch on the last day (0 without it)"
+                "description": "Left at the toBranchId branch (or every branch) on the last day"
               }
             },
             "required": [
@@ -3225,6 +3264,7 @@
         "required": [
           "from",
           "to",
+          "perBranch",
           "rows",
           "totals"
         ]
@@ -11209,8 +11249,8 @@
             "items": {
               "$ref": "#/components/schemas/SalePaymentInput"
             },
-            "maxItems": 10,
-            "default": []
+            "minItems": 1,
+            "maxItems": 10
           },
           "autoDiscount": {
             "type": "boolean",
@@ -11223,7 +11263,8 @@
         },
         "required": [
           "saleType",
-          "items"
+          "items",
+          "payments"
         ]
       },
       "UpdateSale": {
@@ -11400,6 +11441,20 @@
           }
         }
       },
+      "ApproveSalePayments": {
+        "type": "object",
+        "properties": {
+          "paymentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 10,
+            "description": "Leave out to approve every payment of the sale that is waiting"
+          }
+        }
+      },
       "SalePayment": {
         "type": "object",
         "properties": {
@@ -11471,6 +11526,21 @@
               "null"
             ]
           },
+          "approvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Null while the payment waits for approval"
+          },
+          "approvedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "hasProof": {
             "type": "boolean"
           },
@@ -11526,6 +11596,8 @@
           "senderBank",
           "senderAccountTitle",
           "senderAccountNo",
+          "approvedAt",
+          "approvedBy",
           "hasProof",
           "proofOriginalName",
           "proofs",
@@ -11630,7 +11702,8 @@
             "enum": [
               "unpaid",
               "partial",
-              "paid"
+              "paid",
+              "awaiting_approval"
             ]
           },
           "deliveryStatus": {
@@ -12038,7 +12111,8 @@
             "enum": [
               "unpaid",
               "partial",
-              "paid"
+              "paid",
+              "awaiting_approval"
             ]
           },
           "city": {
@@ -37113,11 +37187,25 @@
               "enum": [
                 "unpaid",
                 "partial",
-                "paid"
+                "paid",
+                "awaiting_approval"
               ]
             },
             "required": false,
             "name": "paymentStatus",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ],
+              "description": "Only sales with money still to receive (unpaid or partly paid)"
+            },
+            "required": false,
+            "description": "Only sales with money still to receive (unpaid or partly paid)",
+            "name": "due",
             "in": "query"
           },
           {
@@ -37278,7 +37366,8 @@
                             "enum": [
                               "unpaid",
                               "partial",
-                              "paid"
+                              "paid",
+                              "awaiting_approval"
                             ]
                           },
                           "deliveryStatus": {
@@ -37481,6 +37570,50 @@
                                 "received",
                                 "remaining"
                               ]
+                            },
+                            "byBranch": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "branchId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "branchName": {
+                                    "type": "string"
+                                  },
+                                  "count": {
+                                    "type": "integer"
+                                  },
+                                  "qty": {
+                                    "type": "string",
+                                    "example": "10.000"
+                                  },
+                                  "total": {
+                                    "type": "string",
+                                    "example": "1250.50"
+                                  },
+                                  "received": {
+                                    "type": "string",
+                                    "example": "1250.50"
+                                  },
+                                  "remaining": {
+                                    "type": "string",
+                                    "example": "1250.50"
+                                  }
+                                },
+                                "required": [
+                                  "branchId",
+                                  "branchName",
+                                  "count",
+                                  "qty",
+                                  "total",
+                                  "received",
+                                  "remaining"
+                                ]
+                              },
+                              "description": "Super Admin across branches: the same totals split by branch"
                             }
                           },
                           "required": [
@@ -38135,6 +38268,118 @@
                     "data": {
                       "type": "object",
                       "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/payments/approve": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Approve the payments of a sale (all that wait, or the given ones). Only approved payments count in the account balance and make the sale paid.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveSalePayments"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Sale"
                     }
                   },
                   "required": [

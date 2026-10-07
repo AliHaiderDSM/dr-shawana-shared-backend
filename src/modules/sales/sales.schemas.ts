@@ -83,7 +83,10 @@ export const createSaleSchema = registry.register(
       note: optionalText(2000),
       items: z.array(saleItemInputSchema).min(1).max(100),
       serials: serialsInput.optional(),
-      payments: z.array(salePaymentInputSchema).max(10).default([]),
+      payments: z
+        .array(salePaymentInputSchema)
+        .min(1, 'Add the payment. A sale is saved only with its payment.')
+        .max(10),
       ...discountFields,
     })
     .refine((v) => (v.patientId ? 1 : 0) + (v.patient ? 1 : 0) === 1, {
@@ -176,6 +179,10 @@ export const saleListQuerySchema = listQuerySchema(['date', 'createdAt', 'invoic
     city: z.string().trim().max(100).optional(),
     deliveryStatus: z.enum(DELIVERY_STATUSES).optional(),
     paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
+    due: z
+      .enum(['true'])
+      .optional()
+      .openapi({ description: 'Only sales with money still to receive (unpaid or partly paid)' }),
     method: z.enum(PAYMENT_METHODS).optional(),
     accountSheetId: z.uuid().optional(),
     from: dateInput.optional(),
@@ -196,6 +203,17 @@ export const deliverySlipsQuerySchema = z.object({
 
 export const salePaymentParamsSchema = z.object({ id: z.uuid(), paymentId: z.uuid() });
 export const salePaymentProofParamsSchema = salePaymentParamsSchema.extend({ proofId: z.uuid() });
+
+export const approvePaymentsSchema = registry.register(
+  'ApproveSalePayments',
+  z.object({
+    paymentIds: z
+      .array(z.uuid())
+      .max(10)
+      .optional()
+      .openapi({ description: 'Leave out to approve every payment of the sale that is waiting' }),
+  }),
+);
 
 export type SaleItemInput = z.output<typeof saleItemInputSchema>;
 export type SalePaymentInput = z.output<typeof salePaymentInputSchema>;
@@ -220,6 +238,11 @@ export const salePaymentSchema = registry.register(
     senderBank: z.string().nullable(),
     senderAccountTitle: z.string().nullable(),
     senderAccountNo: z.string().nullable(),
+    approvedAt: z.iso
+      .datetime()
+      .nullable()
+      .openapi({ description: 'Null while the payment waits for approval' }),
+    approvedBy: z.uuid().nullable(),
     hasProof: z.boolean(),
     proofOriginalName: z.string().nullable(),
     proofs: z.array(z.object({ id: z.uuid(), originalName: z.string(), contentType: z.string() })),

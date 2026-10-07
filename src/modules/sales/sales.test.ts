@@ -29,6 +29,8 @@ describe('POS sales', () => {
   const api = (method: 'get' | 'post' | 'patch' | 'delete', path: string, who: { id: string }) =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
 
+  const pay = (amount = '1') => [{ method: 'cash', amount, accountSheetId: cashSheet }];
+
   async function stock(productId: string) {
     const res = await api('get', '/branch/inventory/stock?pageSize=100', admin);
     return res.body.data.find((r: { productId: string }) => r.productId === productId)?.quantity as string;
@@ -132,9 +134,21 @@ describe('POS sales', () => {
       total: '3330.00',
       received: '2500.00',
       remaining: '830.00',
-      paymentStatus: 'partial',
+      paymentStatus: 'awaiting_approval',
       paymentMethods: ['cash', 'online'],
     });
+    expect(res.body.data.payments.every((p: { approvedAt: string | null }) => p.approvedAt === null)).toBe(
+      true,
+    );
+    expect((await api('post', `/branch/sales/${saleId}/payments/approve`, frontDesk).send({})).status).toBe(
+      403,
+    );
+    const approved = await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({});
+    expect(approved.body.data.paymentStatus).toBe('partial');
+    expect(
+      approved.body.data.payments.every((p: { approvedAt: string | null }) => p.approvedAt !== null),
+    ).toBe(true);
+    expect((await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({})).status).toBe(409);
     expect(
       res.body.data.items.map((i: { unitPrice: string; bundleId: string | null }) => [
         i.unitPrice,
@@ -154,6 +168,7 @@ describe('POS sales', () => {
       patientId,
       saleType: 'office',
       items: [{ productId: toner, qty: '4', unitPrice: '1' }],
+      payments: pay(),
     });
     expect(short.status).toBe(422);
     expect(short.body.error.details.shortages[0]).toMatchObject({
@@ -168,6 +183,14 @@ describe('POS sales', () => {
       items: [],
     });
     expect(noItems.status).toBe(400);
+    const unpaid = await api('post', '/branch/sales', frontDesk).send({
+      patientId,
+      saleType: 'office',
+      items: [{ productId: toner, qty: '1' }],
+      payments: [],
+    });
+    expect(unpaid.status).toBe(400);
+    expect(JSON.stringify(unpaid.body.error)).toContain('payment');
   });
 
   it('turns an underpayment into the discount with posSoft "Auto"', async () => {
@@ -188,8 +211,12 @@ describe('POS sales', () => {
       discountPercent: '10.00',
       total: '900.00',
       remaining: '0.00',
-      paymentStatus: 'paid',
+      paymentStatus: 'awaiting_approval',
     });
+    expect(
+      (await api('post', `/branch/sales/${onlineSaleId}/payments/approve`, admin).send({})).body.data
+        .paymentStatus,
+    ).toBe('paid');
     expect(await stock(serum)).toBe(before);
     const dispatched = await api('post', `/branch/sales/${onlineSaleId}/dispatch`, admin).send({});
     expect(dispatched.status).toBe(200);
@@ -238,7 +265,14 @@ describe('POS sales', () => {
       amount: '500',
       accountSheetId: cashSheet,
     });
-    expect(added.body.data).toMatchObject({ received: '1000.00', remaining: '0.00', paymentStatus: 'paid' });
+    expect(added.body.data).toMatchObject({
+      received: '1000.00',
+      remaining: '0.00',
+      paymentStatus: 'awaiting_approval',
+    });
+    expect(
+      (await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({})).body.data.paymentStatus,
+    ).toBe('paid');
   });
 
   it('keeps several screenshots on an online payment', async () => {
@@ -408,6 +442,7 @@ describe('POS sales', () => {
       patientId,
       saleType: 'office',
       items: [{ productId: toner, qty: '1' }],
+      payments: pay(),
     });
     expect(next.body.data.invoiceNo).toBe('LHR-000003');
   });
@@ -421,7 +456,7 @@ describe('POS sales', () => {
         { productId: serum, qty: '2', discountPercent: '25' },
         { productId: serum, qty: '1' },
       ],
-      payments: [],
+      payments: pay(),
     });
     expect(res.status).toBe(201);
     expect(res.body.data.items.map((i: { discountAmount: string; lineTotal: string }) => i)).toEqual([
@@ -439,7 +474,7 @@ describe('POS sales', () => {
       patientId,
       saleType: 'office',
       items: [{ productId: serum, qty: '1', discountPercent: '120' }],
-      payments: [],
+      payments: pay(),
     });
     expect(tooMuch.status).toBe(400);
   });
@@ -470,7 +505,7 @@ describe('POS sales', () => {
         patientId,
         saleType: 'office',
         items: [{ productId: toner, qty: String(free + 1) }],
-        payments: [],
+        payments: pay(),
       });
       expect(office.status).toBe(422);
       expect(office.body.error.details.shortages[0]).toMatchObject({ reserved: '2.000' });
@@ -478,7 +513,7 @@ describe('POS sales', () => {
         patientId,
         saleType: 'online',
         items: [{ productId: toner, qty: String(free + 1) }],
-        payments: [],
+        payments: pay(),
       });
       expect(tooMuch.status).toBe(422);
 
@@ -507,6 +542,11 @@ describe('POS sales', () => {
         awaiting: 1,
       });
       expect(calendar.body.data.awaiting).toEqual({ orders: 1, oldest: '2026-10-03' });
+      const waiting = (await api('get', '/branch/sales?deliveryStatus=pending', admin)).body.data;
+      expect(waiting.map((d: { invoiceNo: string }) => d.invoiceNo)).toEqual([order.body.data.invoiceNo]);
+      const due = (await api('get', '/branch/sales?due=true', admin)).body.data;
+      expect(due.every((d: { remaining: string }) => Number(d.remaining) > 0)).toBe(true);
+      expect(due.map((d: { invoiceNo: string }) => d.invoiceNo)).not.toContain(order.body.data.invoiceNo);
       const day = await api('get', '/branch/sales/deliveries?date=2026-10-03', admin);
       expect(day.body.data).toEqual([
         expect.objectContaining({

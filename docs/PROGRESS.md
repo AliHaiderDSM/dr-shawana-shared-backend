@@ -22,6 +22,26 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Sale payment approval, payment required, branch sales split (done 2026-10-07)
+
+- **A sale needs a payment:** `CreateSale.payments` must have at least one payment.
+- **Payment approval:**
+  - `sale_payments` has `approved_at` and `approved_by` (migration `SalePaymentApproval`). Payments that existed before the migration count as approved.
+  - A sale with any unapproved payment has `paymentStatus = awaiting_approval`, a new value in the enum. When every payment is approved it becomes unpaid, partial or paid as before.
+  - Editing a payment's amount, method, account or date sends it back for approval.
+- **`account_movements`:** only approved sale payments count toward the account balance.
+- **`POST /branch/sales/{id}/payments/approve {paymentIds?}`:** needs the new permission `salePayments.update`. Branch admin and super admin have full access; the accountant gets view and update. Front desk and team manager cannot approve.
+- **`GET /branch/sales`:** without a branch (Super Admin), `meta.byBranch` returns count, qty, total, received and remaining per branch.
+
+## Inventory report per branch, sales due filter (done 2026-10-07)
+
+- **Inventory report for the Super Admin stock (warehouse), without `toBranchId`:**
+  - `perBranch` is `true`.
+  - `branchSold` and `inBranch` add up every branch.
+  - Each row has `branches[]`: what was sent to each branch, what that branch sold and what is left there. Branch products are matched by `origin_product_id`.
+  - Before this change, Sold showed 0 here because the warehouse itself never sells.
+- **`GET /branch/sales?due=true`:** returns only sales with money still to receive (`remaining > 0`).
+
 ## Online orders: book now, dispatch later (done 2026-10-07)
 
 - **Problem:** an online order paid on Saturday leaves the store on Monday. Payments must be reported on Saturday and stock out on Monday.

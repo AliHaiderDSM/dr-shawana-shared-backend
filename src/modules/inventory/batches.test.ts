@@ -18,6 +18,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
   let serum: string;
   let cream: string;
   let patientId: string;
+  let cashSheet: string;
   let saleId: string;
 
   const api = (method: 'get' | 'post' | 'patch' | 'delete', path: string, who: { id: string } = admin) =>
@@ -32,7 +33,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
       date,
       saleType: 'office',
       items: [{ productId, qty }],
-      payments: [],
+      payments: [{ method: 'cash', amount: '1', accountSheetId: cashSheet }],
     });
 
   async function batches(productId: string) {
@@ -49,6 +50,12 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
+    cashSheet = (
+      await request(app)
+        .post('/api/v1/branch/account-sheets')
+        .set(bearer(admin))
+        .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
+    ).body.data.id;
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
     const categoryId = (await api('post', '/branch/categories').send({ name: 'Skin' })).body.data.id;
     serum = (await api('post', '/branch/products').send({ name: 'Vitamin C Serum', categoryId })).body.data

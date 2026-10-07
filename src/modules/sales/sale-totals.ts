@@ -21,7 +21,12 @@ export function lineTotal(line: PricedLine) {
   return toMoney(new Decimal(line.qty).times(line.unitPrice).minus(lineDiscount(line)));
 }
 
-export function saleTotals(lines: PricedLine[], received: DecimalInput, discount: DiscountChoice) {
+export function saleTotals(
+  lines: PricedLine[],
+  received: DecimalInput,
+  discount: DiscountChoice,
+  awaitingApproval = false,
+) {
   const subtotal = toMoney(lines.reduce((sum, l) => sum.plus(lineTotal(l)), new Decimal(0)));
   const paid = toMoney(received);
   let discountPercent: Decimal;
@@ -38,8 +43,13 @@ export function saleTotals(lines: PricedLine[], received: DecimalInput, discount
   const total = toMoney(subtotal.minus(discountAmount));
   const remaining = toMoney(total.minus(paid));
   const totalQty = lines.reduce((sum, l) => sum.plus(l.qty), new Decimal(0));
-  const paymentStatus: PaymentStatus =
-    paid.lte(0) && total.gt(0) ? 'unpaid' : remaining.gt(0) ? 'partial' : 'paid';
+  const paymentStatus: PaymentStatus = awaitingApproval
+    ? 'awaiting_approval'
+    : paid.lte(0) && total.gt(0)
+      ? 'unpaid'
+      : remaining.gt(0)
+        ? 'partial'
+        : 'paid';
   return {
     totalQty: totalQty.toFixed(3),
     subtotal,

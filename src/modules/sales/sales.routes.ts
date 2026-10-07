@@ -11,6 +11,7 @@ import { saleDocumentsService } from './sale-documents.service';
 import {
   createSalePaymentSchema,
   createSaleSchema,
+  approvePaymentsSchema,
   cancelOrderSchema,
   deliveriesQuerySchema,
   deliveryCalendarQuerySchema,
@@ -110,6 +111,16 @@ salesRouter.post(
   async (req, res) => {
     const { status } = validBody(req, deliveryStatusSchema);
     sendOk(res, await salesService.setDelivery(actorFrom(req), branchIdOf(req), idOf(req), status));
+  },
+);
+
+salesRouter.post(
+  `${path}/:id/payments/approve`,
+  requirePermission('salePayments.update'),
+  validate({ params: idParamsSchema, body: approvePaymentsSchema }),
+  async (req, res) => {
+    const { paymentIds } = validBody(req, approvePaymentsSchema);
+    sendOk(res, await salesService.approvePayments(actorFrom(req), branchIdOf(req), idOf(req), paymentIds));
   },
 );
 

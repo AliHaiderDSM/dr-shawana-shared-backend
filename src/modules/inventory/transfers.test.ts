@@ -15,6 +15,7 @@ describe('Main Warehouse transfers to branches', () => {
   let serum: string;
   let toner: string;
   let lahoreToner: string;
+  let cashSheet: string;
   let serials: string[];
   let patientId: string;
 
@@ -38,6 +39,12 @@ describe('Main Warehouse transfers to branches', () => {
     superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
     lahoreAdmin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
     lahoreDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
+    cashSheet = (
+      await request(app)
+        .post('/api/v1/branch/account-sheets')
+        .set(bearer(lahoreAdmin))
+        .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
+    ).body.data.id;
 
     const categoryId = (await asAdmin('post', '/branch/categories').send({ name: 'Skin' })).body.data.id;
     serum = (
@@ -85,7 +92,7 @@ describe('Main Warehouse transfers to branches', () => {
       patientId,
       saleType: 'office',
       items: [{ productId: toner, qty: '1' }],
-      payments: [],
+      payments: [{ method: 'cash', amount: '1', accountSheetId: cashSheet }],
     });
     expect(sale.status).toBe(409);
     const staff = await asAdmin('post', '/branch/staff').send({
@@ -200,7 +207,7 @@ describe('Main Warehouse transfers to branches', () => {
       saleType: 'office',
       items: [{ productId: lahoreSerum, qty: '1' }],
       serials: [serials[0]],
-      payments: [],
+      payments: [{ method: 'cash', amount: '1', accountSheetId: cashSheet }],
     });
     expect(sale.status).toBe(201);
     expect(sale.body.data.invoiceNo).toMatch(/^LHR-/);
@@ -319,6 +326,23 @@ describe('Main Warehouse transfers to branches', () => {
     ]);
   });
 
+  it('shows the Super Admin where each product went and what each branch sold, without a filter', async () => {
+    const report = await asAdmin(
+      'get',
+      `/branch/inventory/report?from=2026-10-01&to=2026-12-31&productId=${serum}`,
+    );
+    expect(report.status).toBe(200);
+    expect(report.body.data.perBranch).toBe(true);
+    expect(report.body.data.rows[0]).toMatchObject({
+      stockOut: '4.000',
+      branchSold: '1.000',
+      inBranch: '3.000',
+      branches: [{ branchName: 'Lahore', sent: '4.000', sold: '1.000', inBranch: '3.000' }],
+    });
+    const branch = await asBranch('get', '/branch/inventory/report?from=2026-10-01&to=2026-12-31');
+    expect(branch.body.data.perBranch).toBe(false);
+  });
+
   it('filters the inventory report by stock to, and lists every branch sale for the Super Admin', async () => {
     const report = await asAdmin(
       'get',
@@ -341,6 +365,15 @@ describe('Main Warehouse transfers to branches', () => {
     expect(sales.status).toBe(200);
     expect(sales.body.data).toHaveLength(1);
     expect(sales.body.data[0].branch).toMatchObject({ code: 'LHR', name: 'Lahore' });
+    expect(sales.body.meta.byBranch).toEqual([
+      expect.objectContaining({
+        branchName: 'Lahore',
+        count: 1,
+        received: '1.00',
+        remaining: sales.body.data[0].remaining,
+      }),
+    ]);
+    expect((await asBranch('get', '/branch/sales')).body.meta.byBranch).toBeUndefined();
     const byProduct = await request(app)
       .get(`/api/v1/branch/sales?productId=${serum}`)
       .set(bearer(superAdmin));

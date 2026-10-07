@@ -15,6 +15,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
   let cream: string;
   let toner: string;
   let patientId: string;
+  let cashSheet: string;
   let firstStockIn: { id: string; batchId: string };
   let serials: string[];
   let saleId: string;
@@ -45,7 +46,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
       patientId,
       date: '2026-10-01',
       saleType: 'office',
-      payments: [],
+      payments: [{ method: 'cash', amount: '1', accountSheetId: cashSheet }],
       ...body,
     });
 
@@ -54,6 +55,12 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
     const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
+    cashSheet = (
+      await request(app)
+        .post('/api/v1/branch/account-sheets')
+        .set(bearer(admin))
+        .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
+    ).body.data.id;
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
     const categoryId = (await api('post', '/branch/categories').send({ name: 'Skin' })).body.data.id;
     const product = async (name: string, extra: Record<string, unknown> = {}) =>
