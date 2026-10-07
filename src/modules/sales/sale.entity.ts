@@ -12,7 +12,7 @@ export type SaleType = (typeof SALE_TYPES)[number];
 export const PAYMENT_STATUSES = ['unpaid', 'partial', 'paid'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const DELIVERY_STATUSES = ['pending', 'delivered', 'returned'] as const;
+export const DELIVERY_STATUSES = ['pending', 'dispatched', 'delivered', 'returned', 'cancelled'] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 @Entity('sales')
@@ -90,6 +90,16 @@ export class Sale extends BranchScopedEntity {
     nullable: true,
   })
   deliveryStatus: DeliveryStatus | null;
+
+  @Index()
+  @Column({ name: 'dispatched_on', type: 'date', nullable: true })
+  dispatchedOn: string | null;
+
+  @Column({ name: 'dispatched_by', type: 'uuid', nullable: true })
+  dispatchedBy: string | null;
+
+  @Column({ name: 'delivered_on', type: 'date', nullable: true })
+  deliveredOn: string | null;
 
   @Column({ type: 'text', nullable: true })
   note: string | null;

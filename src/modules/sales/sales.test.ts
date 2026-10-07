@@ -171,6 +171,7 @@ describe('POS sales', () => {
   });
 
   it('turns an underpayment into the discount with posSoft "Auto"', async () => {
+    const before = await stock(serum);
     const res = await api('post', '/branch/sales', admin).send({
       patient: { name: 'Walk In', phone: '923331112222', city: 'Lahore' },
       saleType: 'online',
@@ -189,6 +190,11 @@ describe('POS sales', () => {
       remaining: '0.00',
       paymentStatus: 'paid',
     });
+    expect(await stock(serum)).toBe(before);
+    const dispatched = await api('post', `/branch/sales/${onlineSaleId}/dispatch`, admin).send({});
+    expect(dispatched.status).toBe(200);
+    expect(dispatched.body.data.deliveryStatus).toBe('dispatched');
+    expect(Number(await stock(serum))).toBe(Number(before) - 1);
   });
 
   it('adjusts stock by the difference on edit and lets front desk edit only their own sales', async () => {
@@ -436,5 +442,142 @@ describe('POS sales', () => {
       payments: [],
     });
     expect(tooMuch.status).toBe(400);
+  });
+
+  describe('online orders booked now and dispatched later', () => {
+    const balance = async (productId: string) =>
+      (await api('get', '/branch/inventory/stock?pageSize=100', admin)).body.data.find(
+        (r: { productId: string }) => r.productId === productId,
+      ) as { quantity: string; reservedQuantity: string };
+
+    it('books stock on Saturday, takes it out on Monday and keeps the dates apart', async () => {
+      const start = await balance(toner);
+      const order = await api('post', '/branch/sales', admin).send({
+        patientId,
+        saleType: 'online',
+        date: '2026-10-03',
+        items: [{ productId: toner, qty: '2' }],
+        payments: [{ method: 'online', amount: '1000', accountSheetId: bankSheet, date: '2026-10-03' }],
+      });
+      expect(order.status).toBe(201);
+      expect(order.body.data).toMatchObject({ deliveryStatus: 'pending', dispatchedOn: null });
+      const booked = await balance(toner);
+      expect(booked.quantity).toBe(start.quantity);
+      expect(booked.reservedQuantity).toBe('2.000');
+
+      const free = Number(start.quantity) - 2;
+      const office = await api('post', '/branch/sales', admin).send({
+        patientId,
+        saleType: 'office',
+        items: [{ productId: toner, qty: String(free + 1) }],
+        payments: [],
+      });
+      expect(office.status).toBe(422);
+      expect(office.body.error.details.shortages[0]).toMatchObject({ reserved: '2.000' });
+      const tooMuch = await api('post', '/branch/sales', admin).send({
+        patientId,
+        saleType: 'online',
+        items: [{ productId: toner, qty: String(free + 1) }],
+        payments: [],
+      });
+      expect(tooMuch.status).toBe(422);
+
+      expect(
+        (
+          await api('post', `/branch/sales/${order.body.data.id}/delivery`, admin).send({
+            status: 'delivered',
+          })
+        ).status,
+      ).toBe(409);
+      expect(
+        (
+          await api('post', '/branch/returns', admin).send({
+            saleId: order.body.data.id,
+            date: '2026-10-04',
+            reason: 'other',
+            items: [{ productId: toner, qty: '1' }],
+          })
+        ).status,
+      ).toBe(409);
+
+      const calendar = await api('get', '/branch/sales/delivery-calendar?month=2026-10', admin);
+      expect(calendar.status).toBe(200);
+      expect(calendar.body.data.days.find((d: { date: string }) => d.date === '2026-10-03')).toMatchObject({
+        orders: 1,
+        awaiting: 1,
+      });
+      expect(calendar.body.data.awaiting).toEqual({ orders: 1, oldest: '2026-10-03' });
+      const day = await api('get', '/branch/sales/deliveries?date=2026-10-03', admin);
+      expect(day.body.data).toEqual([
+        expect.objectContaining({
+          invoiceNo: order.body.data.invoiceNo,
+          items: [expect.objectContaining({ name: 'Toner', qty: '2.000', tracked: false })],
+        }),
+      ]);
+
+      expect(
+        (
+          await api('post', `/branch/sales/${order.body.data.id}/dispatch`, admin).send({
+            date: '2026-10-01',
+          })
+        ).status,
+      ).toBe(400);
+      const sent = await api('post', `/branch/sales/${order.body.data.id}/dispatch`, admin).send({
+        date: '2026-10-05',
+      });
+      expect(sent.status).toBe(200);
+      expect(sent.body.data).toMatchObject({ deliveryStatus: 'dispatched', dispatchedOn: '2026-10-05' });
+      const after = await balance(toner);
+      expect(after.reservedQuantity).toBe('0.000');
+      expect(Number(after.quantity)).toBe(Number(start.quantity) - 2);
+      const moves = await AppDataSource.getRepository(StockMovement).find({
+        where: { referenceId: order.body.data.id },
+      });
+      expect(moves.map((m) => m.date)).toEqual(['2026-10-05']);
+      const monday = await api('get', '/branch/sales/delivery-calendar?month=2026-10', admin);
+      expect(monday.body.data.days.find((d: { date: string }) => d.date === '2026-10-05')).toMatchObject({
+        dispatchedOn: 1,
+      });
+      expect((await api('post', `/branch/sales/${order.body.data.id}/dispatch`, admin).send({})).status).toBe(
+        409,
+      );
+
+      const delivered = await api('post', `/branch/sales/${order.body.data.id}/delivery`, admin).send({
+        status: 'delivered',
+      });
+      expect(delivered.body.data.deliveryStatus).toBe('delivered');
+      expect(delivered.body.data.deliveredOn).toEqual(expect.any(String));
+    });
+
+    it('cancels a booked order with a refund and frees its stock', async () => {
+      const order = await api('post', '/branch/sales', admin).send({
+        patientId,
+        saleType: 'online',
+        date: '2026-10-04',
+        items: [{ productId: toner, qty: '1' }],
+        payments: [{ method: 'online', amount: '500', accountSheetId: bankSheet, date: '2026-10-04' }],
+      });
+      expect((await balance(toner)).reservedQuantity).toBe('1.000');
+      const tooBig = await api('post', `/branch/sales/${order.body.data.id}/cancel`, admin).send({
+        refund: { amount: '600', method: 'online', accountSheetId: bankSheet },
+      });
+      expect(tooBig.status).toBe(422);
+      const cancelled = await api('post', `/branch/sales/${order.body.data.id}/cancel`, admin).send({
+        refund: { amount: '500', method: 'online', accountSheetId: bankSheet, date: '2026-10-05' },
+      });
+      expect(cancelled.status).toBe(200);
+      expect(cancelled.body.data.deliveryStatus).toBe('cancelled');
+      expect((await balance(toner)).reservedQuantity).toBe('0.000');
+      const refunds = (await api('get', `/branch/returns?saleId=${order.body.data.id}`, admin)).body.data;
+      expect(refunds).toEqual([
+        expect.objectContaining({ status: 'completed', refundAmount: '500.00', totalQty: '0.000' }),
+      ]);
+      expect((await api('post', `/branch/sales/${order.body.data.id}/cancel`, admin).send({})).status).toBe(
+        409,
+      );
+      expect((await api('post', `/branch/sales/${order.body.data.id}/dispatch`, admin).send({})).status).toBe(
+        409,
+      );
+    });
   });
 });

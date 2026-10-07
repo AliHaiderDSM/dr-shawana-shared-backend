@@ -11,7 +11,11 @@ import { saleDocumentsService } from './sale-documents.service';
 import {
   createSalePaymentSchema,
   createSaleSchema,
+  cancelOrderSchema,
+  deliveriesQuerySchema,
+  deliveryCalendarQuerySchema,
   deliverySlipsQuerySchema,
+  dispatchSchema,
   deliveryStatusSchema,
   saleListQuerySchema,
   salePaymentParamsSchema,
@@ -37,6 +41,25 @@ salesRouter.get(path, can('view'), validate({ query: saleListQuerySchema }), asy
   const { items, meta } = await salesService.list(req.branchId ?? null, validQuery(req, saleListQuerySchema));
   sendOk(res, items, meta);
 });
+
+salesRouter.get(
+  `${path}/delivery-calendar`,
+  can('view'),
+  validate({ query: deliveryCalendarQuerySchema }),
+  async (req, res) => {
+    const { month } = validQuery(req, deliveryCalendarQuerySchema);
+    sendOk(res, await salesService.deliveryCalendar(branchIdOf(req), month));
+  },
+);
+
+salesRouter.get(
+  `${path}/deliveries`,
+  can('view'),
+  validate({ query: deliveriesQuerySchema }),
+  async (req, res) => {
+    sendOk(res, await salesService.deliveries(branchIdOf(req), validQuery(req, deliveriesQuerySchema)));
+  },
+);
 
 salesRouter.get(
   `${path}/delivery-slips`,
@@ -87,6 +110,35 @@ salesRouter.post(
   async (req, res) => {
     const { status } = validBody(req, deliveryStatusSchema);
     sendOk(res, await salesService.setDelivery(actorFrom(req), branchIdOf(req), idOf(req), status));
+  },
+);
+
+salesRouter.post(
+  `${path}/:id/dispatch`,
+  can('update'),
+  validate({ params: idParamsSchema, body: dispatchSchema }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await salesService.dispatch(actorFrom(req), branchIdOf(req), idOf(req), validBody(req, dispatchSchema)),
+    );
+  },
+);
+
+salesRouter.post(
+  `${path}/:id/cancel`,
+  can('update'),
+  validate({ params: idParamsSchema, body: cancelOrderSchema }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await salesService.cancelOrder(
+        actorFrom(req),
+        branchIdOf(req),
+        idOf(req),
+        validBody(req, cancelOrderSchema),
+      ),
+    );
   },
 );
 

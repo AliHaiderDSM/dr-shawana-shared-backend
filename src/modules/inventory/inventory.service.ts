@@ -22,6 +22,7 @@ interface BalanceRow {
   unit: string;
   quantity: string;
   expiredQuantity: string;
+  reservedQuantity: string;
   lowStockThreshold: string;
   isLowStock: boolean;
 }
@@ -131,6 +132,9 @@ export const inventoryService = {
       `SELECT b.product_id AS "productId", b.name, b.batch_no AS "batchNo", b.category_id AS "categoryId",
               c.name AS "categoryName", b.unit, b.quantity::text AS quantity,
               b.expired_quantity::text AS "expiredQuantity",
+              COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
+                         WHERE si.product_id = b.product_id AND si.deleted_at IS NULL AND s.deleted_at IS NULL
+                           AND s.sale_type = 'online' AND s.delivery_status = 'pending'), 0)::numeric(12,3)::text AS "reservedQuantity",
               b.low_stock_threshold::text AS "lowStockThreshold", b.is_low_stock AS "isLowStock"
          FROM product_stock_balances b
          LEFT JOIN categories c ON c.id = b.category_id

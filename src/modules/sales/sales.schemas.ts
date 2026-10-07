@@ -15,6 +15,7 @@ import { patientFields } from '../patients/patients.schemas';
 import { ITEM_STATUSES } from '../inventory/inventory-item.entity';
 import { serialsInput } from '../inventory/inventory-items.schemas';
 import { allocatedBatchSchema } from '../inventory/product-batches.schemas';
+import { refundInputSchema } from '../returns/returns.schemas';
 import { DELIVERY_STATUSES, PAYMENT_STATUSES, SALE_TYPES } from './sale.entity';
 
 const positiveMoney = moneyInput.refine((v) => Number(v) > 0, 'Must be greater than zero');
@@ -115,8 +116,40 @@ export const updateSaleSchema = registry.register(
 
 export const deliveryStatusSchema = registry.register(
   'SaleDeliveryStatus',
-  z.object({ status: z.enum(DELIVERY_STATUSES) }),
+  z.object({ status: z.enum(['delivered', 'returned']) }),
 );
+
+export const dispatchSchema = registry.register(
+  'DispatchOrder',
+  z.object({
+    date: dateInput
+      .optional()
+      .openapi({ description: 'Dispatch date; stock leaves on this date. Defaults to today.' }),
+    serials: serialsInput
+      .optional()
+      .openapi({ description: 'DSM labels of every labelled piece in the parcel' }),
+  }),
+);
+
+export const cancelOrderSchema = registry.register(
+  'CancelOrder',
+  z.object({ refund: z.union([refundInputSchema, z.null()]).optional() }),
+);
+
+export const deliveryCalendarQuerySchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM')
+    .openapi({ example: '2026-10' }),
+  branchId: z.uuid().optional(),
+});
+
+export const deliveriesQuerySchema = z.object({
+  date: dateInput.optional(),
+  by: z.enum(['order', 'dispatch']).default('order'),
+  status: z.enum(DELIVERY_STATUSES).optional(),
+  branchId: z.uuid().optional(),
+});
 
 export const createSalePaymentSchema = salePaymentInputSchema.omit({ proofIndex: true, proofIndexes: true });
 export const updateSalePaymentSchema = registry.register(
@@ -217,6 +250,8 @@ export const saleSchema = registry.register(
     remaining: moneyOutput,
     paymentStatus: z.enum(PAYMENT_STATUSES),
     deliveryStatus: z.enum(DELIVERY_STATUSES).nullable(),
+    dispatchedOn: z.iso.date().nullable(),
+    deliveredOn: z.iso.date().nullable(),
     paymentMethods: z.array(z.enum(PAYMENT_METHODS)),
     note: z.string().nullable(),
     items: z.array(
@@ -251,3 +286,7 @@ export const saleSchema = registry.register(
     }),
   }),
 );
+
+export type DispatchInput = z.output<typeof dispatchSchema>;
+export type CancelOrderInput = z.output<typeof cancelOrderSchema>;
+export type DeliveriesQuery = z.output<typeof deliveriesQuerySchema>;

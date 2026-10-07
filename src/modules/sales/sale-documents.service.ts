@@ -86,7 +86,8 @@ export const saleDocumentsService = {
       .leftJoinAndSelect('sale.patient', 'patient')
       .leftJoinAndSelect('sale.items', 'item', 'item.deletedAt IS NULL')
       .leftJoinAndSelect('item.product', 'product')
-      .where('sale.branchId = :branchId', { branchId });
+      .where('sale.branchId = :branchId', { branchId })
+      .andWhere("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
     if (from) qb.andWhere('sale.date >= :from', { from });

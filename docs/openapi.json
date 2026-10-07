@@ -3036,6 +3036,11 @@
             "example": "10.000",
             "description": "Part of quantity in batches past their expiry date"
           },
+          "reservedQuantity": {
+            "type": "string",
+            "example": "10.000",
+            "description": "Booked by online orders that are still waiting for dispatch; still on the shelf"
+          },
           "lowStockThreshold": {
             "type": "string",
             "example": "10.000"
@@ -3053,6 +3058,7 @@
           "unit",
           "quantity",
           "expiredQuantity",
+          "reservedQuantity",
           "lowStockThreshold",
           "isLowStock"
         ]
@@ -10478,826 +10484,6 @@
           "qty"
         ]
       },
-      "SalePaymentInput": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "online"
-            ]
-          },
-          "amount": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "accountSheetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "senderBank": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 150
-          },
-          "senderAccountTitle": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 150
-          },
-          "senderAccountNo": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 100
-          },
-          "proofIndex": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 9
-          },
-          "proofIndexes": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9
-            },
-            "maxItems": 5,
-            "description": "Positions in \"paymentProofs\" of the screenshots for this payment"
-          }
-        },
-        "required": [
-          "method",
-          "amount",
-          "accountSheetId"
-        ]
-      },
-      "CreateSale": {
-        "type": "object",
-        "properties": {
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "patient": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 150
-              },
-              "phone": {
-                "type": "string",
-                "maxLength": 30,
-                "example": "923001234567"
-              },
-              "city": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 100
-              },
-              "age": {
-                "type": "integer",
-                "example": 42
-              },
-              "dateOfBirth": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date",
-                "example": "2026-09-30"
-              },
-              "country": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "maxLength": 100
-              },
-              "address": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "maxLength": 2000
-              }
-            },
-            "required": [
-              "name",
-              "phone",
-              "city"
-            ]
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "saleType": {
-            "type": "string",
-            "enum": [
-              "office",
-              "online"
-            ]
-          },
-          "city": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100,
-            "description": "Defaults to the branch city"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 2000
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "productId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "bundleId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "qty": {
-                  "type": "string",
-                  "example": "10.000"
-                },
-                "discountPercent": {
-                  "type": "string",
-                  "example": "10",
-                  "description": "Discount on this line only, before the sale discount"
-                }
-              },
-              "required": [
-                "qty"
-              ]
-            },
-            "minItems": 1,
-            "maxItems": 100
-          },
-          "serials": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^DSM-\\d{1,12}$",
-              "example": "DSM-000001"
-            },
-            "maxItems": 5000,
-            "description": "Scanned piece labels. Required for products tracked by label."
-          },
-          "payments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SalePaymentInput"
-            },
-            "maxItems": 10,
-            "default": []
-          },
-          "autoDiscount": {
-            "type": "boolean",
-            "description": "posSoft \"Auto\": any unpaid part becomes the discount (the percent is then fixed)"
-          },
-          "discountPercent": {
-            "type": "string",
-            "example": "10"
-          }
-        },
-        "required": [
-          "saleType",
-          "items"
-        ]
-      },
-      "UpdateSale": {
-        "type": "object",
-        "properties": {
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "saleType": {
-            "type": "string",
-            "enum": [
-              "office",
-              "online"
-            ]
-          },
-          "city": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 2000
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "productId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "bundleId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "qty": {
-                  "type": "string",
-                  "example": "10.000"
-                },
-                "discountPercent": {
-                  "type": "string",
-                  "example": "10",
-                  "description": "Discount on this line only, before the sale discount"
-                }
-              },
-              "required": [
-                "qty"
-              ]
-            },
-            "minItems": 1,
-            "maxItems": 100
-          },
-          "serials": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^DSM-\\d{1,12}$",
-              "example": "DSM-000001"
-            },
-            "maxItems": 5000,
-            "description": "Every label on the sale after the edit. Leave out to keep the labels already sold."
-          },
-          "discountPercent": {
-            "type": "string",
-            "example": "10"
-          }
-        }
-      },
-      "SaleDeliveryStatus": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "delivered",
-              "returned"
-            ]
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "UpdateSalePayment": {
-        "type": "object",
-        "properties": {
-          "method": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "online"
-            ]
-          },
-          "amount": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "accountSheetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "senderBank": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 150
-          },
-          "senderAccountTitle": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 150
-          },
-          "senderAccountNo": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 100
-          }
-        }
-      },
-      "SalePayment": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "saleId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "method": {
-            "type": "string",
-            "enum": [
-              "cash",
-              "online"
-            ]
-          },
-          "amount": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "accountSheetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "accountSheet": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "accountName": {
-                "type": "string"
-              },
-              "accountCode": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "accountName",
-              "accountCode"
-            ]
-          },
-          "senderBank": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "senderAccountTitle": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "senderAccountNo": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "hasProof": {
-            "type": "boolean"
-          },
-          "proofOriginalName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "proofs": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "originalName": {
-                  "type": "string"
-                },
-                "contentType": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "originalName",
-                "contentType"
-              ]
-            }
-          },
-          "createdBy": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "saleId",
-          "method",
-          "amount",
-          "date",
-          "accountSheetId",
-          "accountSheet",
-          "senderBank",
-          "senderAccountTitle",
-          "senderAccountNo",
-          "hasProof",
-          "proofOriginalName",
-          "proofs",
-          "createdBy",
-          "createdAt"
-        ]
-      },
-      "Sale": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "branchId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "invoiceNo": {
-            "type": "string",
-            "example": "LHR-000123"
-          },
-          "invoiceSeq": {
-            "type": "integer"
-          },
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "patient": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              },
-              "phone": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "phone"
-            ]
-          },
-          "patientCity": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "saleType": {
-            "type": "string",
-            "enum": [
-              "office",
-              "online"
-            ]
-          },
-          "city": {
-            "type": "string"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "totalQty": {
-            "type": "string",
-            "example": "10.000"
-          },
-          "subtotal": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "discountPercent": {
-            "type": "string"
-          },
-          "discountAmount": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "total": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "received": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "remaining": {
-            "type": "string",
-            "example": "1250.50"
-          },
-          "paymentStatus": {
-            "type": "string",
-            "enum": [
-              "unpaid",
-              "partial",
-              "paid"
-            ]
-          },
-          "deliveryStatus": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "pending",
-              "delivered",
-              "returned",
-              null
-            ]
-          },
-          "paymentMethods": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "cash",
-                "online"
-              ]
-            }
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "productId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "product": {
-                  "type": [
-                    "object",
-                    "null"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name"
-                  ]
-                },
-                "bundleId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "uuid"
-                },
-                "bundle": {
-                  "type": [
-                    "object",
-                    "null"
-                  ],
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name"
-                  ]
-                },
-                "qty": {
-                  "type": "string",
-                  "example": "10.000"
-                },
-                "unitPrice": {
-                  "type": "string",
-                  "example": "1250.50"
-                },
-                "discountPercent": {
-                  "type": "string"
-                },
-                "discountAmount": {
-                  "type": "string",
-                  "example": "1250.50"
-                },
-                "lineTotal": {
-                  "type": "string",
-                  "example": "1250.50"
-                }
-              },
-              "required": [
-                "id",
-                "productId",
-                "product",
-                "bundleId",
-                "bundle",
-                "qty",
-                "unitPrice",
-                "discountPercent",
-                "discountAmount",
-                "lineTotal"
-              ]
-            }
-          },
-          "payments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SalePayment"
-            }
-          },
-          "createdBy": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "branch": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "code": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "code",
-              "name"
-            ],
-            "description": "The selling branch (list only)"
-          },
-          "serials": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "serial": {
-                  "type": "string"
-                },
-                "productId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "in_stock",
-                    "sold",
-                    "returned",
-                    "quarantined",
-                    "damaged",
-                    "expired",
-                    "supplier_returned",
-                    "dispatched",
-                    "written_off"
-                  ]
-                }
-              },
-              "required": [
-                "serial",
-                "productId",
-                "status"
-              ]
-            },
-            "description": "Labelled pieces sold on this sale (detail only)"
-          },
-          "batches": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AllocatedBatch"
-            },
-            "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
-          }
-        },
-        "required": [
-          "id",
-          "branchId",
-          "invoiceNo",
-          "invoiceSeq",
-          "patientId",
-          "patient",
-          "patientCity",
-          "saleType",
-          "city",
-          "date",
-          "totalQty",
-          "subtotal",
-          "discountPercent",
-          "discountAmount",
-          "total",
-          "received",
-          "remaining",
-          "paymentStatus",
-          "deliveryStatus",
-          "paymentMethods",
-          "note",
-          "items",
-          "payments",
-          "createdBy",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
       "ReturnRefundInput": {
         "type": "object",
         "properties": {
@@ -11826,6 +11012,1124 @@
           "invoiceNo",
           "received",
           "refunded",
+          "items"
+        ]
+      },
+      "SalePaymentInput": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "online"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "accountSheetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderBank": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 150
+          },
+          "senderAccountTitle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 150
+          },
+          "senderAccountNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "proofIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9
+          },
+          "proofIndexes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9
+            },
+            "maxItems": 5,
+            "description": "Positions in \"paymentProofs\" of the screenshots for this payment"
+          }
+        },
+        "required": [
+          "method",
+          "amount",
+          "accountSheetId"
+        ]
+      },
+      "CreateSale": {
+        "type": "object",
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 150
+              },
+              "phone": {
+                "type": "string",
+                "maxLength": 30,
+                "example": "923001234567"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "age": {
+                "type": "integer",
+                "example": 42
+              },
+              "dateOfBirth": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date",
+                "example": "2026-09-30"
+              },
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 100
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "name",
+              "phone",
+              "city"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "office",
+              "online"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Defaults to the branch city"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bundleId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "discountPercent": {
+                  "type": "string",
+                  "example": "10",
+                  "description": "Discount on this line only, before the sale discount"
+                }
+              },
+              "required": [
+                "qty"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "maxItems": 5000,
+            "description": "Scanned piece labels. Required for products tracked by label."
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalePaymentInput"
+            },
+            "maxItems": 10,
+            "default": []
+          },
+          "autoDiscount": {
+            "type": "boolean",
+            "description": "posSoft \"Auto\": any unpaid part becomes the discount (the percent is then fixed)"
+          },
+          "discountPercent": {
+            "type": "string",
+            "example": "10"
+          }
+        },
+        "required": [
+          "saleType",
+          "items"
+        ]
+      },
+      "UpdateSale": {
+        "type": "object",
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "office",
+              "online"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "bundleId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "discountPercent": {
+                  "type": "string",
+                  "example": "10",
+                  "description": "Discount on this line only, before the sale discount"
+                }
+              },
+              "required": [
+                "qty"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "maxItems": 5000,
+            "description": "Every label on the sale after the edit. Leave out to keep the labels already sold."
+          },
+          "discountPercent": {
+            "type": "string",
+            "example": "10"
+          }
+        }
+      },
+      "SaleDeliveryStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "delivered",
+              "returned"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "DispatchOrder": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30",
+            "description": "Dispatch date; stock leaves on this date. Defaults to today."
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^DSM-\\d{1,12}$",
+              "example": "DSM-000001"
+            },
+            "maxItems": 5000,
+            "description": "DSM labels of every labelled piece in the parcel"
+          }
+        }
+      },
+      "CancelOrder": {
+        "type": "object",
+        "properties": {
+          "refund": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReturnRefundInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateSalePayment": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "online"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "accountSheetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderBank": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 150
+          },
+          "senderAccountTitle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 150
+          },
+          "senderAccountNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          }
+        }
+      },
+      "SalePayment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "online"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "accountSheetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountSheet": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "accountName": {
+                "type": "string"
+              },
+              "accountCode": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "accountName",
+              "accountCode"
+            ]
+          },
+          "senderBank": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "senderAccountTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "senderAccountNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hasProof": {
+            "type": "boolean"
+          },
+          "proofOriginalName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proofs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "originalName": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "originalName",
+                "contentType"
+              ]
+            }
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "saleId",
+          "method",
+          "amount",
+          "date",
+          "accountSheetId",
+          "accountSheet",
+          "senderBank",
+          "senderAccountTitle",
+          "senderAccountNo",
+          "hasProof",
+          "proofOriginalName",
+          "proofs",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "Sale": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": "string",
+            "example": "LHR-000123"
+          },
+          "invoiceSeq": {
+            "type": "integer"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "phone"
+            ]
+          },
+          "patientCity": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "saleType": {
+            "type": "string",
+            "enum": [
+              "office",
+              "online"
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "totalQty": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "subtotal": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "discountPercent": {
+            "type": "string"
+          },
+          "discountAmount": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "total": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "received": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "remaining": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "unpaid",
+              "partial",
+              "paid"
+            ]
+          },
+          "deliveryStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pending",
+              "dispatched",
+              "delivered",
+              "returned",
+              "cancelled",
+              null
+            ]
+          },
+          "dispatchedOn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "deliveredOn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "paymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cash",
+                "online"
+              ]
+            }
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "product": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "bundleId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "bundle": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ]
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "unitPrice": {
+                  "type": "string",
+                  "example": "1250.50"
+                },
+                "discountPercent": {
+                  "type": "string"
+                },
+                "discountAmount": {
+                  "type": "string",
+                  "example": "1250.50"
+                },
+                "lineTotal": {
+                  "type": "string",
+                  "example": "1250.50"
+                }
+              },
+              "required": [
+                "id",
+                "productId",
+                "product",
+                "bundleId",
+                "bundle",
+                "qty",
+                "unitPrice",
+                "discountPercent",
+                "discountAmount",
+                "lineTotal"
+              ]
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalePayment"
+            }
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "branch": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "The selling branch (list only)"
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serial": {
+                  "type": "string"
+                },
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "in_stock",
+                    "sold",
+                    "returned",
+                    "quarantined",
+                    "damaged",
+                    "expired",
+                    "supplier_returned",
+                    "dispatched",
+                    "written_off"
+                  ]
+                }
+              },
+              "required": [
+                "serial",
+                "productId",
+                "status"
+              ]
+            },
+            "description": "Labelled pieces sold on this sale (detail only)"
+          },
+          "batches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllocatedBatch"
+            },
+            "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "invoiceNo",
+          "invoiceSeq",
+          "patientId",
+          "patient",
+          "patientCity",
+          "saleType",
+          "city",
+          "date",
+          "totalQty",
+          "subtotal",
+          "discountPercent",
+          "discountAmount",
+          "total",
+          "received",
+          "remaining",
+          "paymentStatus",
+          "deliveryStatus",
+          "dispatchedOn",
+          "deliveredOn",
+          "paymentMethods",
+          "note",
+          "items",
+          "payments",
+          "createdBy",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DeliveryCalendar": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "orders": {
+                  "type": "integer"
+                },
+                "awaiting": {
+                  "type": "integer"
+                },
+                "dispatched": {
+                  "type": "integer"
+                },
+                "delivered": {
+                  "type": "integer"
+                },
+                "returned": {
+                  "type": "integer"
+                },
+                "cancelled": {
+                  "type": "integer"
+                },
+                "amount": {
+                  "type": "string",
+                  "example": "1250.50"
+                },
+                "dispatchedOn": {
+                  "type": "integer",
+                  "description": "Orders dispatched on this date, whatever their order date"
+                }
+              },
+              "required": [
+                "date",
+                "orders",
+                "awaiting",
+                "dispatched",
+                "delivered",
+                "returned",
+                "cancelled",
+                "amount",
+                "dispatchedOn"
+              ]
+            }
+          },
+          "awaiting": {
+            "type": "object",
+            "properties": {
+              "orders": {
+                "type": "integer"
+              },
+              "oldest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              }
+            },
+            "required": [
+              "orders",
+              "oldest"
+            ]
+          }
+        },
+        "required": [
+          "month",
+          "from",
+          "to",
+          "days",
+          "awaiting"
+        ]
+      },
+      "DeliveryOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "deliveryStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "pending",
+              "dispatched",
+              "delivered",
+              "returned",
+              "cancelled",
+              null
+            ]
+          },
+          "dispatchedOn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "deliveredOn": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "total": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "received": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "remaining": {
+            "type": "string",
+            "example": "1250.50"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "unpaid",
+              "partial",
+              "paid"
+            ]
+          },
+          "city": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "customer": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "phone",
+              "address"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "bundle": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "tracked": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "productId",
+                "name",
+                "bundle",
+                "qty",
+                "tracked"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "invoiceNo",
+          "date",
+          "deliveryStatus",
+          "dispatchedOn",
+          "deliveredOn",
+          "total",
+          "received",
+          "remaining",
+          "paymentStatus",
+          "city",
+          "note",
+          "customer",
           "items"
         ]
       },
@@ -36793,8 +37097,10 @@
               "type": "string",
               "enum": [
                 "pending",
+                "dispatched",
                 "delivered",
-                "returned"
+                "returned",
+                "cancelled"
               ]
             },
             "required": false,
@@ -36982,10 +37288,26 @@
                             ],
                             "enum": [
                               "pending",
+                              "dispatched",
                               "delivered",
                               "returned",
+                              "cancelled",
                               null
                             ]
+                          },
+                          "dispatchedOn": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date"
+                          },
+                          "deliveredOn": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "date"
                           },
                           "paymentMethods": {
                             "type": "array",
@@ -37105,6 +37427,8 @@
                           "remaining",
                           "paymentStatus",
                           "deliveryStatus",
+                          "dispatchedOn",
+                          "deliveredOn",
                           "paymentMethods",
                           "note",
                           "createdBy",
@@ -37667,7 +37991,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Online sales: mark pending, delivered or returned. Returning puts the stock back (sale_return).",
+        "summary": "Online orders after dispatch: mark delivered (sets deliveredOn) or returned (creates a return in the returns section).",
         "parameters": [
           {
             "schema": {
@@ -37811,6 +38135,469 @@
                     "data": {
                       "type": "object",
                       "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/dispatch": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dispatch a booked online order: scan the labels, stock leaves on the dispatch date and the order becomes dispatched",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dispatched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Sale"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancel an online order that was not dispatched yet; its booked stock is released. An optional refund is recorded as a return with no items.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelOrder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Sale"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/delivery-calendar": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Online orders per day of a month: booked, awaiting dispatch, dispatched, delivered, plus dispatches per day",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            },
+            "required": true,
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Calendar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DeliveryCalendar"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/deliveries": {
+      "get": {
+        "tags": [
+          "Sales"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Online orders of one day (by order date or dispatch date) or by status, with their items",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": false,
+            "name": "date",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "order",
+                "dispatch"
+              ],
+              "default": "order"
+            },
+            "required": false,
+            "name": "by",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "dispatched",
+                "delivered",
+                "returned",
+                "cancelled"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orders",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DeliveryOrder"
+                      }
                     }
                   },
                   "required": [

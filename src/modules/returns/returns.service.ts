@@ -267,6 +267,17 @@ async function insertReturn(
   return saved;
 }
 
+function assertDispatched(sale: Sale) {
+  if (
+    sale.saleType === 'online' &&
+    (sale.deliveryStatus === 'pending' || sale.deliveryStatus === 'cancelled')
+  ) {
+    throw AppError.conflict(
+      'This online order was never dispatched, so nothing can be returned. Cancel the order instead.',
+    );
+  }
+}
+
 function applyFilters(qb: SelectQueryBuilder<SaleReturn>, query: ReturnListQuery) {
   if (query.status) qb.andWhere('sr.status = :status', { status: query.status });
   if (query.reason) qb.andWhere('sr.reason = :reason', { reason: query.reason });
@@ -328,6 +339,7 @@ export const returnsService = {
     const manager = repo(Sale).manager;
     const sale = await repo(Sale).findOneBy({ id: saleId, branchId });
     if (!sale) throw AppError.notFound('Sale');
+    assertDispatched(sale);
     const lines = await saleLines(manager, saleId);
     const sold = (await inventoryItemsService.itemsOf(manager, { saleId })).filter(
       (i) => i.status === 'sold',
@@ -353,6 +365,7 @@ export const returnsService = {
   async create(actor: Actor, branchId: string, input: CreateReturnInput) {
     return withTransaction(async (em) => {
       const sale = await lockSale(em, branchId, input.saleId);
+      assertDispatched(sale);
       const lines = await saleLines(em, sale.id);
       const problems = input.items.flatMap((item) => {
         const line = lines.get(item.productId);
@@ -432,6 +445,23 @@ export const returnsService = {
       remaining,
       await refundFields(manager, sale.branchId, sale, null),
     );
+  },
+
+  async refundCancelledOrder(manager: EntityManager, actor: Actor, sale: Sale, refund: RefundInput) {
+    const created = await insertReturn(
+      manager,
+      actor,
+      sale,
+      {
+        date: refund.date ?? today(),
+        reason: 'customer_refused',
+        note: `Order ${sale.invoiceNo} cancelled before dispatch`,
+      },
+      [],
+      await refundFields(manager, sale.branchId, sale, refund),
+    );
+    await repo(SaleReturn, manager).update({ id: created.id }, { status: 'completed' });
+    return created;
   },
 
   async hasReturns(manager: EntityManager, saleId: string) {

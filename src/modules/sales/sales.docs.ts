@@ -8,12 +8,17 @@ import {
   pageMetaSchema,
 } from '../../lib/http';
 import { registry } from '../../lib/openapi';
+import { DELIVERY_STATUSES, PAYMENT_STATUSES } from './sale.entity';
 import { securedDocs } from '../../lib/openapi-crud';
 import { moneyOutput, quantityOutput } from '../../lib/validation';
 import {
+  cancelOrderSchema,
   createSalePaymentSchema,
   createSaleSchema,
+  deliveriesQuerySchema,
+  deliveryCalendarQuerySchema,
   deliverySlipsQuerySchema,
+  dispatchSchema,
   deliveryStatusSchema,
   saleListQuerySchema,
   salePaymentParamsSchema,
@@ -104,7 +109,8 @@ registry.registerPath({
   ...docs,
   method: 'post',
   path: `${item}/delivery`,
-  summary: 'Online sales: mark pending, delivered or returned. Returning puts the stock back (sale_return).',
+  summary:
+    'Online orders after dispatch: mark delivered (sets deliveredOn) or returned (creates a return in the returns section).',
   request: { ...byId, body: jsonContent(deliveryStatusSchema) },
   responses: { 200: one('Updated'), ...errorResponses },
 });
@@ -126,6 +132,107 @@ registry.registerPath({
   request: byId,
   responses: {
     200: { description: 'Bill', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'post',
+  path: `${item}/dispatch`,
+  summary:
+    'Dispatch a booked online order: scan the labels, stock leaves on the dispatch date and the order becomes dispatched',
+  request: { ...byId, body: jsonContent(dispatchSchema) },
+  responses: { 200: one('Dispatched'), ...errorResponses },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'post',
+  path: `${item}/cancel`,
+  summary:
+    'Cancel an online order that was not dispatched yet; its booked stock is released. An optional refund is recorded as a return with no items.',
+  request: { ...byId, body: jsonContent(cancelOrderSchema) },
+  responses: { 200: one('Cancelled'), ...errorResponses },
+});
+
+const deliveryDaySchema = z.object({
+  date: z.iso.date(),
+  orders: z.number().int(),
+  awaiting: z.number().int(),
+  dispatched: z.number().int(),
+  delivered: z.number().int(),
+  returned: z.number().int(),
+  cancelled: z.number().int(),
+  amount: moneyOutput,
+  dispatchedOn: z
+    .number()
+    .int()
+    .openapi({ description: 'Orders dispatched on this date, whatever their order date' }),
+});
+
+export const deliveryCalendarSchema = registry.register(
+  'DeliveryCalendar',
+  z.object({
+    month: z.string(),
+    from: z.iso.date(),
+    to: z.iso.date(),
+    days: z.array(deliveryDaySchema),
+    awaiting: z.object({ orders: z.number().int(), oldest: z.iso.date().nullable() }),
+  }),
+);
+
+export const deliveryOrderSchema = registry.register(
+  'DeliveryOrder',
+  z.object({
+    id: z.uuid(),
+    invoiceNo: z.string(),
+    date: z.iso.date(),
+    deliveryStatus: z.enum(DELIVERY_STATUSES).nullable(),
+    dispatchedOn: z.iso.date().nullable(),
+    deliveredOn: z.iso.date().nullable(),
+    total: moneyOutput,
+    received: moneyOutput,
+    remaining: moneyOutput,
+    paymentStatus: z.enum(PAYMENT_STATUSES),
+    city: z.string(),
+    note: z.string().nullable(),
+    customer: z
+      .object({ id: z.uuid(), name: z.string(), phone: z.string(), address: z.string().nullable() })
+      .nullable(),
+    items: z.array(
+      z.object({
+        productId: z.uuid(),
+        name: z.string(),
+        bundle: z.string().nullable(),
+        qty: quantityOutput,
+        tracked: z.boolean(),
+      }),
+    ),
+  }),
+);
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/branch/sales/delivery-calendar',
+  summary:
+    'Online orders per day of a month: booked, awaiting dispatch, dispatched, delivered, plus dispatches per day',
+  request: { query: deliveryCalendarQuerySchema },
+  responses: {
+    200: { description: 'Calendar', ...jsonContent(dataEnvelope(deliveryCalendarSchema)) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/branch/sales/deliveries',
+  summary: 'Online orders of one day (by order date or dispatch date) or by status, with their items',
+  request: { query: deliveriesQuerySchema },
+  responses: {
+    200: { description: 'Orders', ...jsonContent(dataEnvelope(z.array(deliveryOrderSchema))) },
     ...errorResponses,
   },
 });

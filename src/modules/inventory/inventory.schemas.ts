@@ -71,6 +71,9 @@ export const stockBalanceSchema = registry.register(
     expiredQuantity: quantityOutput.openapi({
       description: 'Part of quantity in batches past their expiry date',
     }),
+    reservedQuantity: quantityOutput.openapi({
+      description: 'Booked by online orders that are still waiting for dispatch; still on the shelf',
+    }),
     lowStockThreshold: quantityOutput,
     isLowStock: z.boolean(),
   }),

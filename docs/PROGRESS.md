@@ -22,6 +22,33 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Online orders: book now, dispatch later (done 2026-10-07)
+
+- **Problem:** an online order paid on Saturday leaves the store on Monday. Payments must be reported on Saturday and stock out on Monday.
+- **Delivery statuses:** `pending` (awaiting dispatch), `dispatched`, `delivered`, `returned` and `cancelled`.
+  - Sales get `dispatched_on`, `dispatched_by` and `delivered_on`.
+  - Migration `OnlineDispatch` rebuilds the enum so it can run in one transaction. It moves online sales that were already posted to `dispatched`, with `dispatched_on` set to the sale date.
+- **Booking (online create):**
+  - No stock movement and no labels. The stock is booked, not taken.
+  - `assertAvailable` checks sellable stock (not expired) minus what other awaiting online orders have booked. It locks the products with `FOR NO KEY UPDATE`.
+  - Office sales and sale edits run the same check, so they cannot sell stock that is booked.
+- **`POST /branch/sales/{id}/dispatch {date?, serials?}`:**
+  - Scans the labels (`assertScanned`) and posts the stock movements on the dispatch date. Unlabelled stock goes FEFO.
+  - The status becomes `dispatched`. The date cannot be before the order date.
+- **`POST /branch/sales/{id}/delivery`:** now only takes `delivered` (sets `delivered_on`) or `returned`, and only after dispatch.
+- **`POST /branch/sales/{id}/cancel {refund?}`:**
+  - Only works while the order is pending. The booking is released.
+  - An optional refund is saved as a completed return with no items (`returnsService.refundCancelledOrder`), so it lowers the account balance like any refund.
+- **Returns:** blocked for online orders that were never dispatched.
+- **Other changes:**
+  - The sale type cannot change after saving.
+  - Delivery slips skip cancelled orders.
+- **New read endpoints:**
+  - `GET /branch/sales/delivery-calendar?month=`: per order date, the counts by status and the amount, plus the orders dispatched on each day and all awaiting orders.
+  - `GET /branch/sales/deliveries?date=&by=order|dispatch&status=`: the orders with their items, address and whether each item is labelled.
+- **Stock balances:** include `reservedQuantity`.
+- **Reports:** sales and payments use the order date. Stock reports use the movement date, which is the dispatch date.
+
 ## Account opening balance removed (done 2026-10-06)
 
 - `account_sheets.opening_balance` was dropped (migration `DropAccountOpeningBalance`). posSoft has no such field.

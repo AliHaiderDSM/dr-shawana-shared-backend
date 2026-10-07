@@ -30,9 +30,12 @@ import { SaleItem } from './sale-item.entity';
 import { SalePaymentProof } from './sale-payment-proof.entity';
 import { SalePayment } from './sale-payment.entity';
 import { lineDiscount, lineTotal, saleTotals } from './sale-totals';
-import { Sale, type DeliveryStatus } from './sale.entity';
+import { Sale } from './sale.entity';
 import {
+  type CancelOrderInput,
   type CreateSaleInput,
+  type DeliveriesQuery,
+  type DispatchInput,
   type SaleItemInput,
   type SaleListQuery,
   type SalePaymentInput,
@@ -379,6 +382,77 @@ async function assertScanned(
   );
 }
 
+const RESERVING = `s.sale_type = 'online' AND s.delivery_status = 'pending' AND s.deleted_at IS NULL`;
+
+async function assertAvailable(
+  manager: EntityManager,
+  branchId: string,
+  wanted: Map<string, Decimal>,
+  options: { excludeSaleId?: string; onlyWhenReserved?: boolean; already?: Map<string, Decimal> } = {},
+) {
+  const ids = [...wanted.keys()];
+  if (ids.length === 0) return;
+  await manager.query('SELECT id FROM products WHERE id = ANY($1) FOR NO KEY UPDATE', [ids]);
+  const rows: { productId: string; name: string; sellable: string; reserved: string }[] = await manager.query(
+    `SELECT p.id AS "productId", p.name,
+            COALESCE((SELECT SUM(m.qty) FROM stock_movements m LEFT JOIN product_batches b ON b.id = m.batch_id
+                       WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $3::date)), 0)::text AS sellable,
+            COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
+                       WHERE si.product_id = p.id AND si.deleted_at IS NULL AND ${RESERVING}
+                         AND ($4::uuid IS NULL OR s.id <> $4::uuid)), 0)::text AS reserved
+       FROM products p WHERE p.branch_id = $1 AND p.id = ANY($2)`,
+    [branchId, ids, today(), options.excludeSaleId ?? null],
+  );
+  const shortages = rows.flatMap((r) => {
+    const reserved = new Decimal(r.reserved);
+    if (options.onlyWhenReserved && reserved.isZero()) return [];
+    const available = Decimal.max(0, new Decimal(r.sellable).minus(reserved));
+    const need = (wanted.get(r.productId) ?? new Decimal(0)).minus(options.already?.get(r.productId) ?? 0);
+    if (!need.greaterThan(available)) return [];
+    return [
+      {
+        productId: r.productId,
+        productName: r.name,
+        available: available.toFixed(3),
+        required: need.toFixed(3),
+        reserved: reserved.toFixed(3),
+      },
+    ];
+  });
+  if (shortages.length) {
+    throw AppError.unprocessable('Not enough stock for this change: part of it is booked by online orders', {
+      shortages,
+    });
+  }
+}
+
+async function postSaleStock(
+  manager: EntityManager,
+  actor: Actor,
+  sale: Sale,
+  wanted: Map<string, Decimal>,
+  serials: string[],
+  date: string,
+) {
+  const tracked = await inventoryItemsService.trackedProducts(manager, sale.branchId, [...wanted.keys()]);
+  const taken = await takeForSale(manager, actor, sale, serials, tracked, date);
+  await assertScanned(manager, wanted, tracked, taken);
+  await stockLedger.apply(manager, ledgerRef(actor, sale), [
+    ...[...wanted]
+      .filter(([productId]) => !tracked.has(productId))
+      .map(([productId, qty]) => ({
+        productId,
+        type: 'sale' as const,
+        qty: qty.negated(),
+        date,
+        note: sale.invoiceNo,
+      })),
+    ...inventoryItemsService.movements(taken, -1, { type: 'sale', date, note: sale.invoiceNo }),
+  ]);
+}
+
+const awaitingDispatch = (sale: Sale) => sale.saleType === 'online' && sale.deliveryStatus === 'pending';
+
 const ledgerRef = (actor: Actor, sale: Sale) => ({
   branchId: sale.branchId,
   referenceType: REFERENCE,
@@ -541,6 +615,12 @@ export const salesService = {
 
   async create(actor: Actor, branchId: string, input: CreateSaleInput, proofs: Express.Multer.File[] = []) {
     assertProofIndexes(input.payments, proofs.length);
+    const online = input.saleType === 'online';
+    if (online && input.serials?.length) {
+      throw AppError.badRequest(
+        'Online orders are scanned when they are dispatched, not when they are booked',
+      );
+    }
     const uploaded = await uploadProofs(branchId, proofs);
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
@@ -582,21 +662,12 @@ export const salesService = {
           await insertPayment(em, actor, sale, payment, proofs);
         }
         const wanted = soldByProduct(lines);
-        const tracked = await inventoryItemsService.trackedProducts(em, branchId, [...wanted.keys()]);
-        const taken = await takeForSale(em, actor, sale, input.serials ?? [], tracked);
-        await assertScanned(em, wanted, tracked, taken);
-        await stockLedger.apply(em, ledgerRef(actor, sale), [
-          ...[...wanted]
-            .filter(([productId]) => !tracked.has(productId))
-            .map(([productId, qty]) => ({
-              productId,
-              type: 'sale' as const,
-              qty: qty.negated(),
-              date,
-              note: sale.invoiceNo,
-            })),
-          ...inventoryItemsService.movements(taken, -1, { type: 'sale', date, note: sale.invoiceNo }),
-        ]);
+        if (online) {
+          await assertAvailable(em, branchId, wanted, { excludeSaleId: sale.id });
+        } else {
+          await assertAvailable(em, branchId, wanted, { onlyWhenReserved: true });
+          await postSaleStock(em, actor, sale, wanted, input.serials ?? [], date);
+        }
         const dto = toSaleDto(await getSale(branchId, sale.id, em));
         await audit(actor, sale, 'create', em, null, dto);
         return dto;
@@ -615,13 +686,33 @@ export const salesService = {
       ) {
         throw AppError.conflict('A sale with returns cannot change its items or type');
       }
+      if (input.saleType && input.saleType !== sale.saleType) {
+        throw AppError.conflict(
+          'The sale type cannot change after the sale is saved. Delete it and add it again.',
+        );
+      }
+      if (input.items && sale.deliveryStatus === 'cancelled') {
+        throw AppError.conflict('This order was cancelled');
+      }
 
-      if (input.items) {
+      if (input.items && awaitingDispatch(sale)) {
+        if (input.serials?.length) {
+          throw AppError.badRequest('Online orders are scanned when they are dispatched');
+        }
+        const lines = await resolveLines(branchId, input.items, em);
+        for (const old of sale.items ?? []) await saleItems.softDelete(old, actor.userId, em);
+        await insertItems(em, actor, sale, lines);
+        await assertAvailable(em, branchId, soldByProduct(lines), { excludeSaleId: sale.id });
+      } else if (input.items) {
         const lines = await resolveLines(branchId, input.items, em);
         for (const old of sale.items ?? []) await saleItems.softDelete(old, actor.userId, em);
         await insertItems(em, actor, sale, lines);
         const wanted = soldByProduct(lines);
         const net = await netStock(em, sale);
+        await assertAvailable(em, branchId, wanted, {
+          onlyWhenReserved: true,
+          already: new Map([...net].map(([productId, qty]) => [productId, qty.negated()])),
+        });
         const editDate = input.date ?? sale.date;
         const note = `${sale.invoiceNo} edited`;
         const old = (await inventoryItemsService.itemsOf(em, { saleId: sale.id })).filter(
@@ -672,9 +763,6 @@ export const salesService = {
         const patient = await patientsService.require(input.patientId, em);
         sale.patientCity = patient.city;
       }
-      if (input.saleType && input.saleType !== sale.saleType) {
-        sale.deliveryStatus = input.saleType === 'online' ? 'pending' : null;
-      }
       const { items: _items, discountPercent, ...fields } = input;
       Object.assign(sale, fields, { updatedBy: actor.userId });
       delete sale.items;
@@ -688,19 +776,173 @@ export const salesService = {
     });
   },
 
-  async setDelivery(actor: Actor, branchId: string, id: string, status: DeliveryStatus) {
+  async setDelivery(actor: Actor, branchId: string, id: string, status: 'delivered' | 'returned') {
     return withTransaction(async (em) => {
       const sale = await getSale(branchId, id, em);
-      assertCanChange(actor, sale);
       if (sale.saleType !== 'online')
         throw AppError.unprocessable('Only online sales have a delivery status');
       if (sale.deliveryStatus === status) return toSaleDto(sale);
+      if (sale.deliveryStatus === 'pending') throw AppError.conflict(`Dispatch ${sale.invoiceNo} first`);
+      if (sale.deliveryStatus === 'cancelled') throw AppError.conflict('This order was cancelled');
       if (sale.deliveryStatus === 'returned') throw AppError.conflict('This sale was already returned');
       if (status === 'returned') await returnsService.createForReturnedDelivery(em, actor, sale);
-      const before = { deliveryStatus: sale.deliveryStatus };
-      await repo(Sale, em).update({ id }, { deliveryStatus: status, updatedBy: actor.userId });
-      await audit(actor, sale, `delivery:${status}`, em, before, { deliveryStatus: status });
+      const before = { deliveryStatus: sale.deliveryStatus, deliveredOn: sale.deliveredOn };
+      const deliveredOn = status === 'delivered' ? today() : sale.deliveredOn;
+      await repo(Sale, em).update({ id }, { deliveryStatus: status, deliveredOn, updatedBy: actor.userId });
+      await audit(actor, sale, `delivery:${status}`, em, before, { deliveryStatus: status, deliveredOn });
       return toSaleDto(await getSale(branchId, id, em));
+    });
+  },
+
+  async dispatch(actor: Actor, branchId: string, id: string, input: DispatchInput) {
+    return withTransaction(async (em) => {
+      const sale = await getSale(branchId, id, em);
+      if (sale.saleType !== 'online') throw AppError.unprocessable('Only online orders are dispatched');
+      if (!awaitingDispatch(sale)) {
+        throw AppError.conflict(`${sale.invoiceNo} is ${sale.deliveryStatus}, not waiting for dispatch`);
+      }
+      const date = input.date ?? today();
+      if (date < sale.date) throw AppError.badRequest('The dispatch date cannot be before the order date');
+      await postSaleStock(
+        em,
+        actor,
+        sale,
+        soldByProduct(sale.items ?? []),
+        normalizeSerials(input.serials ?? []),
+        date,
+      );
+      await repo(Sale, em).update(
+        { id },
+        {
+          deliveryStatus: 'dispatched',
+          dispatchedOn: date,
+          dispatchedBy: actor.userId,
+          updatedBy: actor.userId,
+        },
+      );
+      await audit(
+        actor,
+        sale,
+        'dispatch',
+        em,
+        { deliveryStatus: 'pending' },
+        { deliveryStatus: 'dispatched', dispatchedOn: date },
+      );
+      return toSaleDto(await getSale(branchId, id, em));
+    });
+  },
+
+  async cancelOrder(actor: Actor, branchId: string, id: string, input: CancelOrderInput) {
+    return withTransaction(async (em) => {
+      const sale = await getSale(branchId, id, em);
+      assertCanChange(actor, sale);
+      if (!awaitingDispatch(sale)) {
+        throw AppError.conflict('Only an online order that is still waiting for dispatch can be cancelled');
+      }
+      if (input.refund) await returnsService.refundCancelledOrder(em, actor, sale, input.refund);
+      await repo(Sale, em).update({ id }, { deliveryStatus: 'cancelled', updatedBy: actor.userId });
+      await audit(
+        actor,
+        sale,
+        'cancel',
+        em,
+        { deliveryStatus: 'pending' },
+        { deliveryStatus: 'cancelled', refund: input.refund ?? null },
+      );
+      return toSaleDto(await getSale(branchId, id, em));
+    });
+  },
+
+  async deliveryCalendar(branchId: string, month: string) {
+    const from = `${month}-01`;
+    const [y, m] = month.split('-').map(Number) as [number, number];
+    const to = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+    const [placed, dispatched, waiting] = await Promise.all([
+      AppDataSource.query(
+        `SELECT to_char(s.date, 'YYYY-MM-DD') AS date, COUNT(*)::int AS orders,
+                COUNT(*) FILTER (WHERE s.delivery_status = 'pending')::int AS awaiting,
+                COUNT(*) FILTER (WHERE s.delivery_status = 'dispatched')::int AS dispatched,
+                COUNT(*) FILTER (WHERE s.delivery_status = 'delivered')::int AS delivered,
+                COUNT(*) FILTER (WHERE s.delivery_status = 'returned')::int AS returned,
+                COUNT(*) FILTER (WHERE s.delivery_status = 'cancelled')::int AS cancelled,
+                COALESCE(SUM(s.total) FILTER (WHERE s.delivery_status <> 'cancelled'), 0)::numeric(12,2)::text AS amount
+           FROM sales s
+          WHERE s.branch_id = $1 AND s.sale_type = 'online' AND s.deleted_at IS NULL AND s.date BETWEEN $2 AND $3
+          GROUP BY s.date`,
+        [branchId, from, to],
+      ) as Promise<Record<string, unknown>[]>,
+      AppDataSource.query(
+        `SELECT to_char(s.dispatched_on, 'YYYY-MM-DD') AS date, COUNT(*)::int AS orders
+           FROM sales s
+          WHERE s.branch_id = $1 AND s.sale_type = 'online' AND s.deleted_at IS NULL
+            AND s.dispatched_on BETWEEN $2 AND $3
+          GROUP BY s.dispatched_on`,
+        [branchId, from, to],
+      ) as Promise<{ date: string; orders: number }[]>,
+      AppDataSource.query(
+        `SELECT COUNT(*)::int AS orders, to_char(MIN(s.date), 'YYYY-MM-DD') AS oldest
+           FROM sales s WHERE s.branch_id = $1 AND ${RESERVING}`,
+        [branchId],
+      ) as Promise<{ orders: number; oldest: string | null }[]>,
+    ]);
+    const sent = new Map(dispatched.map((d) => [d.date, d.orders]));
+    const dates = new Set([...placed.map((p) => String(p.date)), ...sent.keys()]);
+    const empty = {
+      orders: 0,
+      awaiting: 0,
+      dispatched: 0,
+      delivered: 0,
+      returned: 0,
+      cancelled: 0,
+      amount: '0.00',
+    };
+    const days = [...dates].sort().map((date) => ({
+      ...empty,
+      ...(placed.find((p) => p.date === date) ?? {}),
+      date,
+      dispatchedOn: sent.get(date) ?? 0,
+    }));
+    return { month, from, to, days, awaiting: waiting[0] ?? { orders: 0, oldest: null } };
+  },
+
+  async deliveries(branchId: string, query: DeliveriesQuery) {
+    const qb = detailed(branchId).andWhere("sale.saleType = 'online'");
+    if (query.date && query.by === 'dispatch') qb.andWhere('sale.dispatchedOn = :date', { date: query.date });
+    else if (query.date) qb.andWhere('sale.date = :date', { date: query.date });
+    if (query.status) qb.andWhere('sale.deliveryStatus = :status', { status: query.status });
+    const rows = await qb
+      .orderBy('sale.date', 'ASC')
+      .addOrderBy('sale.invoiceSeq', 'ASC')
+      .take(500)
+      .getMany();
+    const productIds = [...new Set(rows.flatMap((r) => (r.items ?? []).map((i) => i.productId)))];
+    const tracked = await inventoryItemsService.trackedProducts(AppDataSource.manager, branchId, productIds);
+    return rows.map((r) => {
+      const dto = toSaleDto(r);
+      return {
+        id: dto.id,
+        invoiceNo: dto.invoiceNo,
+        date: dto.date,
+        deliveryStatus: dto.deliveryStatus,
+        dispatchedOn: r.dispatchedOn,
+        deliveredOn: r.deliveredOn,
+        total: dto.total,
+        received: dto.received,
+        remaining: dto.remaining,
+        paymentStatus: dto.paymentStatus,
+        city: dto.city,
+        note: dto.note,
+        customer: r.patient
+          ? { id: r.patient.id, name: r.patient.name, phone: r.patient.phone, address: r.patient.address }
+          : null,
+        items: dto.items.map((i) => ({
+          productId: i.productId,
+          name: i.product?.name ?? '',
+          bundle: i.bundle?.name ?? null,
+          qty: i.qty,
+          tracked: tracked.has(i.productId),
+        })),
+      };
     });
   },
 
