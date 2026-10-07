@@ -37511,6 +37511,29 @@
                               "$ref": "#/components/schemas/AllocatedBatch"
                             },
                             "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
+                          },
+                          "products": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "qty": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "example": "10.000"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "qty"
+                              ]
+                            },
+                            "description": "Products on the sale; a bundle shows once by its name without a qty"
                           }
                         },
                         "required": [
@@ -37539,7 +37562,8 @@
                           "note",
                           "createdBy",
                           "createdAt",
-                          "updatedAt"
+                          "updatedAt",
+                          "products"
                         ]
                       }
                     },

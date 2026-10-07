@@ -386,6 +386,7 @@ describe('POS sales', () => {
     const list = await api('get', '/branch/sales?saleType=office', frontDesk);
     expect(list.body.data.map((s: { id: string }) => s.id)).toEqual([saleId]);
     expect(list.body.meta.totals).toMatchObject({ total: '1000.00', received: '1000.00' });
+    expect(list.body.data[0].products).toEqual([{ name: 'Serum', qty: '1.000' }]);
     const byProduct = await api('get', `/branch/sales?productId=${toner}`, frontDesk);
     expect(byProduct.body.data).toEqual([]);
     const search = await api('get', '/branch/sales?search=LHR-000002', frontDesk);

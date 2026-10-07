@@ -589,9 +589,31 @@ export const salesService = {
           .orderBy('onlyBranches.name', 'ASC')
           .getRawMany<Record<string, string>>();
     const [totals, rows, byBranch] = await Promise.all([totalsQuery, qb.getMany(), byBranchQuery]);
-    const withPayments = rows.length
-      ? await repo(SalePayment).find({ where: { saleId: In(rows.map((r) => r.id)) } })
-      : [];
+    const ids = rows.map((r) => r.id);
+    const [withPayments, lines] = ids.length
+      ? await Promise.all([
+          repo(SalePayment).find({ where: { saleId: In(ids) } }),
+          repo(SaleItem)
+            .createQueryBuilder('si')
+            .leftJoinAndSelect('si.product', 'product')
+            .leftJoinAndSelect('si.bundle', 'bundle')
+            .where('si.saleId IN (:...ids)', { ids })
+            .andWhere('si.deletedAt IS NULL')
+            .orderBy('si.createdAt', 'ASC')
+            .getMany(),
+        ])
+      : [[], []];
+    const productsOf = (saleId: string) => {
+      const summary = new Map<string, { name: string; qty: Decimal | null }>();
+      for (const line of lines.filter((l) => l.saleId === saleId)) {
+        const key = line.bundleId ? `b:${line.bundleId}` : `p:${line.productId}`;
+        const name = line.bundleId ? (line.bundle?.name ?? 'Bundle') : (line.product?.name ?? 'Product');
+        const entry = summary.get(key) ?? { name, qty: line.bundleId ? null : new Decimal(0) };
+        if (entry.qty) entry.qty = entry.qty.plus(line.qty);
+        summary.set(key, entry);
+      }
+      return [...summary.values()].map((p) => ({ name: p.name, qty: p.qty ? p.qty.toFixed(3) : null }));
+    };
     return {
       items: rows.map((r) => {
         const {
@@ -606,6 +628,7 @@ export const salesService = {
         return {
           ...rest,
           branch: r.branch ? { id: r.branch.id, code: r.branch.code, name: r.branch.name } : null,
+          products: productsOf(r.id),
         };
       }),
       meta: {
