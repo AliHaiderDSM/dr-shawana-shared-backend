@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Delivery slips for every branch (done 2026-10-08)
+
+- A Super Admin without `branchId` gets slips from every branch, newest date first, then by branch code.
+- Each slip has `branch` {code, name} and `dispatchedOn`, and its sender is its own branch.
+
 ## Stock report batches (done 2026-10-08)
 
 - The stock report shows the movement batch (`product_batches.batch_no`) per row and drops the Manufactured column.

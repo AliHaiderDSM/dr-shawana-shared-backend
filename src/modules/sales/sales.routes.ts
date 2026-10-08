@@ -35,7 +35,9 @@ const can = (action: 'view' | 'create' | 'update' | 'delete') => requirePermissi
 const paymentOf = (req: Request) => validParams(req, salePaymentParamsSchema);
 
 salesRouter.use(path, authenticate, (req, res, next) =>
-  branchScope({ allowAllForSuperAdmin: req.method === 'GET' && req.path === '/' })(req, res, next),
+  branchScope({
+    allowAllForSuperAdmin: req.method === 'GET' && (req.path === '/' || req.path === '/delivery-slips'),
+  })(req, res, next),
 );
 
 salesRouter.get(path, can('view'), validate({ query: saleListQuerySchema }), async (req, res) => {
@@ -69,7 +71,10 @@ salesRouter.get(
   async (req, res) => {
     sendOk(
       res,
-      await saleDocumentsService.deliverySlips(branchIdOf(req), validQuery(req, deliverySlipsQuerySchema)),
+      await saleDocumentsService.deliverySlips(
+        req.branchId ?? null,
+        validQuery(req, deliverySlipsQuerySchema),
+      ),
     );
   },
 );

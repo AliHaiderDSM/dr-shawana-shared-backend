@@ -78,16 +78,17 @@ export const saleDocumentsService = {
     };
   },
 
-  async deliverySlips(branchId: string, query: DeliverySlipsQuery) {
+  async deliverySlips(branchId: string | null, query: DeliverySlipsQuery) {
     const from = query.from ?? (query.invoiceFrom || query.invoiceTo ? undefined : today());
     const to = query.to ?? from;
     const qb = repo(Sale)
       .createQueryBuilder('sale')
       .leftJoinAndSelect('sale.patient', 'patient')
+      .leftJoinAndSelect('sale.branch', 'branch')
       .leftJoinAndSelect('sale.items', 'item', 'item.deletedAt IS NULL')
       .leftJoinAndSelect('item.product', 'product')
-      .where('sale.branchId = :branchId', { branchId })
-      .andWhere("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
+      .where("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
+    if (branchId) qb.andWhere('sale.branchId = :branchId', { branchId });
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
     const dateColumn = query.dateBy === 'dispatched' ? 'sale.dispatchedOn' : 'sale.date';
@@ -95,14 +96,18 @@ export const saleDocumentsService = {
     if (to) qb.andWhere(`${dateColumn} <= :to`, { to });
     if (query.invoiceFrom) qb.andWhere('sale.invoiceSeq >= :invoiceFrom', { invoiceFrom: query.invoiceFrom });
     if (query.invoiceTo) qb.andWhere('sale.invoiceSeq <= :invoiceTo', { invoiceTo: query.invoiceTo });
-    const rows = await qb.orderBy('sale.invoiceSeq', 'DESC').getMany();
-    const { company, branch } = await header(branchId);
-    const sender = {
-      name: company?.name ?? branch.name,
-      phone: branch.phone ?? company?.phone ?? null,
-      city: branch.city,
-      address: branch.address ?? company?.address ?? null,
-    };
+    const rows = await qb
+      .orderBy(dateColumn, 'DESC')
+      .addOrderBy('branch.code', 'ASC')
+      .addOrderBy('sale.invoiceSeq', 'DESC')
+      .getMany();
+    const company = await companyService.get().catch(() => null);
+    const senderOf = (branch: Branch | undefined) => ({
+      name: company?.name ?? branch?.name ?? '',
+      phone: branch?.phone ?? company?.phone ?? null,
+      city: branch?.city ?? '',
+      address: branch?.address ?? company?.address ?? null,
+    });
     return {
       logoPath: company?.logoPath ?? null,
       slipsPerPage: 2,
@@ -110,7 +115,9 @@ export const saleDocumentsService = {
         saleId: sale.id,
         invoiceNo: sale.invoiceNo,
         date: sale.date,
+        dispatchedOn: sale.dispatchedOn,
         saleType: sale.saleType,
+        branch: sale.branch ? { code: sale.branch.code, name: sale.branch.name } : null,
         to: {
           name: sale.patient?.name ?? '',
           phone: sale.patient?.phone ?? '',
@@ -122,7 +129,7 @@ export const saleDocumentsService = {
           name: i.product?.name ?? '',
           qty: i.qty,
         })),
-        from: sender,
+        from: senderOf(sale.branch),
       })),
     };
   },

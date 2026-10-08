@@ -419,6 +419,15 @@ describe('POS sales', () => {
     });
     expect((await api('get', '/branch/sales', deliveryPrint)).status).toBe(403);
     expect((await api('get', '/branch/sales/delivery-slips', frontDesk)).status).toBe(403);
+    const superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
+    const everywhere = await api(
+      'get',
+      '/branch/sales/delivery-slips?from=2026-01-01&to=2030-12-31',
+      superAdmin,
+    );
+    expect(everywhere.status).toBe(200);
+    expect(everywhere.body.data.slips.length).toBeGreaterThan(0);
+    expect(everywhere.body.data.slips[0]).toMatchObject({ branch: { code: expect.any(String) } });
   });
 
   it('keeps roles and branches apart', async () => {
