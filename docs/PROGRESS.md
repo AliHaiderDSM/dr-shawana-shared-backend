@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Stock report batches (done 2026-10-08)
+
+- The stock report shows the movement batch (`product_batches.batch_no`) per row and drops the Manufactured column.
+
 ## Product size unit, warehouse label counts, balance without opening (done 2026-10-08)
 
 - **Products:**

@@ -194,11 +194,10 @@ export const reportsService = {
         q.productId,
       );
     const rows = await query(
-      `SELECT b.code AS branch, pr.batch_no AS batch, pr.name AS product, c.name AS category,
+      `SELECT b.code AS branch, pb.batch_no AS batch, pr.name AS product, c.name AS category,
               to_char(m.date, 'YYYY-MM-DD') AS date,
               COALESCE(SUM(m.qty) FILTER (WHERE m.type = 'purchase_in'), 0)::numeric(12,3)::text AS bought,
               COALESCE(SUM(m.qty) FILTER (WHERE m.type = 'stock_in'), 0)::numeric(12,3)::text AS "stockIn",
-              COALESCE(SUM(m.qty) FILTER (WHERE m.type = 'manufacturing_in'), 0)::numeric(12,3)::text AS manufactured,
               COALESCE(-SUM(m.qty) FILTER (WHERE m.type = 'stock_out'), 0)::numeric(12,3)::text AS "stockOut",
               COALESCE(-SUM(m.qty) FILTER (WHERE m.type IN ('sale', 'sale_edit_adjust')), 0)::numeric(12,3)::text AS sold,
               COALESCE(SUM(m.qty) FILTER (WHERE m.type = 'sale_return'), 0)::numeric(12,3)::text AS returned
@@ -206,9 +205,10 @@ export const reportsService = {
          JOIN products pr ON pr.id = m.product_id
          JOIN categories c ON c.id = pr.category_id
          JOIN branches b ON b.id = m.branch_id
+         LEFT JOIN product_batches pb ON pb.id = m.batch_id
         ${f.where}
-        GROUP BY b.code, pr.id, c.name, m.date
-        ORDER BY m.date DESC, pr.name`,
+        GROUP BY b.code, pr.id, c.name, m.date, pb.batch_no
+        ORDER BY m.date DESC, pr.name, pb.batch_no`,
       f.params,
     );
     return build(
@@ -221,13 +221,12 @@ export const reportsService = {
         { key: 'date', label: 'Date' },
         { key: 'bought', label: 'Buy Qty' },
         { key: 'stockIn', label: 'Stock In' },
-        { key: 'manufactured', label: 'Manufactured' },
         { key: 'stockOut', label: 'Stock Out' },
         { key: 'sold', label: 'Sale Qty' },
         { key: 'returned', label: 'Returned' },
       ],
       rows,
-      ['bought', 'stockIn', 'manufactured', 'stockOut', 'sold', 'returned'],
+      ['bought', 'stockIn', 'stockOut', 'sold', 'returned'],
       3,
     );
   },
