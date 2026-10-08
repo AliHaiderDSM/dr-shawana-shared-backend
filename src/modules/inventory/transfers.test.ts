@@ -162,6 +162,24 @@ describe('Main Warehouse transfers to branches', () => {
       409,
     );
 
+    const warehouseLabels = await asAdmin('get', `/branch/inventory/items/batches?productId=${serum}`);
+    expect(warehouseLabels.body.data[0]).toMatchObject({
+      total: 10,
+      inStock: 6,
+      inBranches: 4,
+      sold: 0,
+      other: 0,
+    });
+    const withSent = await asAdmin(
+      'get',
+      `/branch/inventory/items?productId=${serum}&batchId=${warehouseLabels.body.data[0].batchId}&includeSent=true`,
+    );
+    expect(withSent.body.data).toHaveLength(10);
+    expect(
+      withSent.body.data.filter((i: { atBranch: string | null }) => i.atBranch === 'Lahore'),
+    ).toHaveLength(4);
+    expect((await asAdmin('get', `/branch/inventory/items?productId=${serum}`)).body.data).toHaveLength(6);
+
     const piece = await asBranch('get', `/branch/inventory/items/serial/${serials[0]}`);
     expect(piece.body.data).toMatchObject({ status: 'in_stock', branchName: 'Lahore', batchNo: 'B-001' });
     expect(

@@ -22,6 +22,18 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Product size unit, warehouse label counts, balance without opening (done 2026-10-08)
+
+- **Products:**
+  - New `sizeUnit` field: g, kg, mg, ml, l, pcs, tablets, capsules, sachets. The default is g. Migration `1791400000000-ProductSizeUnit` adds the column.
+  - Transfers copy the unit to the branch product.
+  - The production loss report converts kg and mg to grams, and skips non-weight units.
+- **Label batches (`items/batches`):**
+  - Pieces the branch sent to other branches still count under its own product and batch.
+  - New `inBranches` count. `sold` includes sales at the branches.
+  - `items?includeSent=true` lists those pieces too, with `atBranch`.
+- **Accounts balance report:** the summary table has no Opening column. The single-account ledger keeps its opening in the summary.
+
 ## Banks folded into account sheets, sale report by completed sale, slips by dispatch date (done 2026-10-08)
 
 - **Banks:** the `/branch/banks` routes and the `banks` permission module are removed.

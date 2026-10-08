@@ -98,11 +98,13 @@ export const manufacturingReportsService = {
                   SELECT SUM(si.qty) FROM stock_ins si
                    WHERE si.branch_id = b.branch_id AND si.batch = b.batch_no AND si.deleted_at IS NULL), 0))::text
                 AS "finishedQty",
-              COALESCE(p.size_grams, sp.size_grams)::text AS "sizeGrams"
+              (CASE COALESCE(p.size_unit, sp.size_unit)
+                 WHEN 'g' THEN 1 WHEN 'kg' THEN 1000 WHEN 'mg' THEN 0.001 END
+                 * COALESCE(p.size_grams, sp.size_grams))::text AS "sizeGrams"
          FROM material_batches b
          LEFT JOIN products p ON p.id = b.product_id
          LEFT JOIN LATERAL (
-              SELECT pr.name, pr.size_grams FROM stock_ins si
+              SELECT pr.name, pr.size_grams, pr.size_unit FROM stock_ins si
                 JOIN products pr ON pr.id = si.product_id
                WHERE si.branch_id = b.branch_id AND si.batch = b.batch_no AND si.deleted_at IS NULL
                ORDER BY si.created_at ASC LIMIT 1) sp ON true

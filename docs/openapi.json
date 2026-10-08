@@ -1015,7 +1015,22 @@
           "sizeGrams": {
             "type": "string",
             "example": "10.000",
-            "description": "Pack size in grams, used for production loss"
+            "description": "Pack size, in sizeUnit. In grams it also gives the production loss"
+          },
+          "sizeUnit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "kg",
+              "mg",
+              "ml",
+              "l",
+              "pcs",
+              "tablets",
+              "capsules",
+              "sachets"
+            ],
+            "description": "Unit of the pack size, g by default"
           },
           "unit": {
             "type": "string",
@@ -1121,7 +1136,22 @@
           "sizeGrams": {
             "type": "string",
             "example": "10.000",
-            "description": "Pack size in grams, used for production loss"
+            "description": "Pack size, in sizeUnit. In grams it also gives the production loss"
+          },
+          "sizeUnit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "kg",
+              "mg",
+              "ml",
+              "l",
+              "pcs",
+              "tablets",
+              "capsules",
+              "sachets"
+            ],
+            "description": "Unit of the pack size, g by default"
           },
           "unit": {
             "type": "string",
@@ -1279,6 +1309,20 @@
             ],
             "example": "10.000"
           },
+          "sizeUnit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "kg",
+              "mg",
+              "ml",
+              "l",
+              "pcs",
+              "tablets",
+              "capsules",
+              "sachets"
+            ]
+          },
           "unit": {
             "type": "string"
           },
@@ -1332,6 +1376,7 @@
           "barcode",
           "batchNo",
           "sizeGrams",
+          "sizeUnit",
           "unit",
           "lowStockThreshold",
           "salePrice",
@@ -1806,8 +1851,13 @@
           "inStock": {
             "type": "integer"
           },
+          "inBranches": {
+            "type": "integer",
+            "description": "Sent to other branches and still in stock there"
+          },
           "sold": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Sold here or at the branches they were sent to"
           },
           "other": {
             "type": "integer"
@@ -1828,6 +1878,7 @@
           "expiryDate",
           "total",
           "inStock",
+          "inBranches",
           "sold",
           "other",
           "firstSerial",
@@ -1958,6 +2009,13 @@
               "null"
             ],
             "format": "date"
+          },
+          "atBranch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Branch the piece was sent to, when it is not here"
           }
         },
         "required": [
@@ -1973,7 +2031,8 @@
           "receivedOn",
           "saleId",
           "invoiceNo",
-          "soldOn"
+          "soldOn",
+          "atBranch"
         ]
       },
       "InventoryItemDetail": {
@@ -2057,6 +2116,13 @@
               "null"
             ],
             "format": "date"
+          },
+          "atBranch": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Branch the piece was sent to, when it is not here"
           },
           "branchId": {
             "type": "string",
@@ -2178,6 +2244,7 @@
           "saleId",
           "invoiceNo",
           "soldOn",
+          "atBranch",
           "branchId",
           "branchName",
           "salePrice",
@@ -19756,6 +19823,20 @@
             "required": false,
             "description": "Last label of a range",
             "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "Also list pieces this branch sent to other branches; productId and batchId then match this branch product and batch"
+            },
+            "required": false,
+            "description": "Also list pieces this branch sent to other branches; productId and batchId then match this branch product and batch",
+            "name": "includeSent",
             "in": "query"
           },
           {

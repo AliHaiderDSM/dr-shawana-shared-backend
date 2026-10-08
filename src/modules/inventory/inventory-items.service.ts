@@ -140,6 +140,15 @@ const STATUS_TEXT: Record<ItemStatus, string> = {
   written_off: 'was written off',
 };
 
+const LINEAGE_JOINS = `JOIN products p ON p.id = i.product_id
+      LEFT JOIN product_batches b ON b.id = i.batch_id
+      LEFT JOIN stock_outs so ON so.id = i.stock_out_id AND i.branch_id <> $1
+      LEFT JOIN product_batches ob ON ob.product_id = so.product_id AND b.batch_no IS NOT NULL AND ob.batch_no = b.batch_no`;
+const LINEAGE_SCOPE =
+  '(i.branch_id = $1 OR i.stock_out_id IN (SELECT x.id FROM stock_outs x WHERE x.branch_id = $1))';
+const LINEAGE_PRODUCT = 'COALESCE(so.product_id, i.product_id)';
+const LINEAGE_BATCH = 'CASE WHEN so.id IS NULL THEN i.batch_id ELSE ob.id END';
+
 export const inventoryItemsService = {
   async trackedProducts(manager: EntityManager, branchId: string, productIds: string[]) {
     if (productIds.length === 0) return new Set<string>();
@@ -477,14 +486,17 @@ export const inventoryItemsService = {
 
   async list(branchId: string, query: InventoryItemListQuery) {
     const params: unknown[] = [branchId];
-    const where = ['i.branch_id = $1', 'i.deleted_at IS NULL'];
+    const sent = Boolean(query.includeSent);
+    const productColumn = sent ? LINEAGE_PRODUCT : 'i.product_id';
+    const batchColumn = sent ? `(${LINEAGE_BATCH})` : 'i.batch_id';
+    const where = [sent ? LINEAGE_SCOPE : 'i.branch_id = $1', 'i.deleted_at IS NULL'];
     const add = (sql: string, value: unknown) => {
       params.push(value);
       where.push(sql.replace('?', `$${params.length}`));
     };
-    if (query.productId) add('i.product_id = ?', query.productId);
-    if (query.batchId) add('i.batch_id = ?', query.batchId);
-    if (query.withoutBatch) where.push('i.batch_id IS NULL');
+    if (query.productId) add(`${productColumn} = ?`, query.productId);
+    if (query.batchId) add(`${batchColumn} = ?`, query.batchId);
+    if (query.withoutBatch) where.push(`${batchColumn} IS NULL`);
     if (query.status) add('i.status = ?', query.status);
     if (query.saleId) add('i.sale_id = ?', query.saleId);
     if (query.source && query.sourceId) {
@@ -498,8 +510,8 @@ export const inventoryItemsService = {
       where.push(`(i.serial ILIKE $${params.length} OR p.name ILIKE $${params.length})`);
     }
     const from = `FROM inventory_items i
-      JOIN products p ON p.id = i.product_id
-      LEFT JOIN product_batches b ON b.id = i.batch_id
+      ${LINEAGE_JOINS}
+      LEFT JOIN branches br ON br.id = i.branch_id AND i.branch_id <> $1
       LEFT JOIN sales s ON s.id = i.sale_id
      WHERE ${where.join(' AND ')}`;
     const [{ total }] = (await AppDataSource.query(`SELECT COUNT(*)::int AS total ${from}`, params)) as [
@@ -511,7 +523,8 @@ export const inventoryItemsService = {
               to_char(b.manufacturing_date, 'YYYY-MM-DD') AS "manufacturingDate",
               to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate",
               to_char(i.received_on, 'YYYY-MM-DD') AS "receivedOn",
-              i.sale_id AS "saleId", s.invoice_no AS "invoiceNo", to_char(i.sold_on, 'YYYY-MM-DD') AS "soldOn"
+              i.sale_id AS "saleId", s.invoice_no AS "invoiceNo", to_char(i.sold_on, 'YYYY-MM-DD') AS "soldOn",
+              br.name AS "atBranch"
          ${from}
         ORDER BY i.serial_no ${query.sort === '-serial' ? 'DESC' : 'ASC'}
         LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
@@ -522,14 +535,15 @@ export const inventoryItemsService = {
 
   async batches(branchId: string, query: LabelBatchListQuery) {
     const params: unknown[] = [branchId];
-    const where = ['i.branch_id = $1', 'i.deleted_at IS NULL'];
+    const where = [LINEAGE_SCOPE, 'i.deleted_at IS NULL'];
+    const groupWhere: string[] = [];
     if (query.productId) {
       params.push(query.productId);
-      where.push(`i.product_id = $${params.length}`);
+      groupWhere.push(`pc.product_id = $${params.length}`);
     }
     if (query.batchId) {
       params.push(query.batchId);
-      where.push(`i.batch_id = $${params.length}`);
+      groupWhere.push(`pc.batch_id = $${params.length}`);
     }
     if (query.search) {
       params.push(`%${escapeLike(query.search)}%`);
@@ -540,18 +554,25 @@ export const inventoryItemsService = {
     const having: string[] = [];
     if (query.status) {
       params.push(query.status);
-      having.push(`COUNT(*) FILTER (WHERE i.status = $${params.length}) > 0`);
+      having.push(`COUNT(*) FILTER (WHERE pc.status = $${params.length}) > 0`);
     }
-    const grouped = `SELECT i.product_id, i.batch_id, p.name, b.batch_no, b.expiry_date AS expiry,
+    const grouped = `WITH pc AS (
+        SELECT ${LINEAGE_PRODUCT} AS product_id, ${LINEAGE_BATCH} AS batch_id, i.status, i.serial_no,
+               so.id IS NULL AS here
+          FROM inventory_items i
+          ${LINEAGE_JOINS}
+         WHERE ${where.join(' AND ')})
+      SELECT pc.product_id, pc.batch_id, gp.name, gb.batch_no, gb.expiry_date AS expiry,
            COUNT(*)::int AS total,
-           COUNT(*) FILTER (WHERE i.status = 'in_stock')::int AS in_stock,
-           COUNT(*) FILTER (WHERE i.status = 'sold')::int AS sold,
-           MIN(i.serial_no) AS first_no, MAX(i.serial_no) AS last_no
-      FROM inventory_items i
-      JOIN products p ON p.id = i.product_id
-      LEFT JOIN product_batches b ON b.id = i.batch_id
-     WHERE ${where.join(' AND ')}
-     GROUP BY i.product_id, i.batch_id, p.name, b.batch_no, b.expiry_date
+           COUNT(*) FILTER (WHERE pc.here AND pc.status = 'in_stock')::int AS in_stock,
+           COUNT(*) FILTER (WHERE NOT pc.here AND pc.status = 'in_stock')::int AS in_branches,
+           COUNT(*) FILTER (WHERE pc.status = 'sold')::int AS sold,
+           MIN(pc.serial_no) AS first_no, MAX(pc.serial_no) AS last_no
+      FROM pc
+      JOIN products gp ON gp.id = pc.product_id
+      LEFT JOIN product_batches gb ON gb.id = pc.batch_id
+     ${groupWhere.length ? `WHERE ${groupWhere.join(' AND ')}` : ''}
+     GROUP BY pc.product_id, pc.batch_id, gp.name, gb.batch_no, gb.expiry_date
      ${having.length ? `HAVING ${having.join(' AND ')}` : ''}`;
     const [{ total }] = (await AppDataSource.query(
       `SELECT COUNT(*)::int AS total FROM (${grouped}) g`,
@@ -565,6 +586,7 @@ export const inventoryItemsService = {
       expiry_date: string | null;
       total: number;
       in_stock: number;
+      in_branches: number;
       sold: number;
       first_no: string;
       last_no: string;
@@ -584,8 +606,9 @@ export const inventoryItemsService = {
         expiryDate: r.expiry_date,
         total: r.total,
         inStock: r.in_stock,
+        inBranches: r.in_branches,
         sold: r.sold,
-        other: r.total - r.in_stock - r.sold,
+        other: r.total - r.in_stock - r.in_branches - r.sold,
         firstSerial: formatSerial(r.first_no),
         lastSerial: formatSerial(r.last_no),
       })),

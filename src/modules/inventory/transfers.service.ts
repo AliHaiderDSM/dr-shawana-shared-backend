@@ -77,8 +77,8 @@ async function productIn(manager: EntityManager, actor: Actor, branchId: string,
   };
   const [created] = (await manager.query(
     `INSERT INTO products (branch_id, name, category_id, sku, barcode, batch_no, size_grams, image_path, unit,
-                           low_stock_threshold, sale_price, status, origin_product_id, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12, $13) RETURNING id`,
+                           low_stock_threshold, sale_price, status, origin_product_id, created_by, size_unit)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'active', $12, $13, $14) RETURNING id`,
     [
       branchId,
       source.name,
@@ -93,6 +93,7 @@ async function productIn(manager: EntityManager, actor: Actor, branchId: string,
       source.sale_price,
       sourceProductId,
       actor.userId,
+      source.size_unit,
     ],
   )) as { id: string }[];
   return created!.id;

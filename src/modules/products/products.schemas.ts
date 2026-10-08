@@ -22,7 +22,7 @@ import {
   quantityOutput,
   requiredText,
 } from '../../lib/validation';
-import { PRODUCT_STATUSES } from './product.entity';
+import { PRODUCT_STATUSES, SIZE_UNITS } from './product.entity';
 
 const purchaseFields = z.object({
   supplierId: optionalUuid,
@@ -51,7 +51,8 @@ const productFields = z.object({
   sizeGrams: quantityInput
     .nullable()
     .optional()
-    .openapi({ description: 'Pack size in grams, used for production loss' }),
+    .openapi({ description: 'Pack size, in sizeUnit. In grams it also gives the production loss' }),
+  sizeUnit: z.enum(SIZE_UNITS).optional().openapi({ description: 'Unit of the pack size, g by default' }),
   unit: z.string().trim().min(1).max(30).optional(),
   lowStockThreshold: quantityInput.optional(),
   salePrice: moneyInput.optional(),
@@ -103,6 +104,7 @@ export const productSchema = registry.register(
     barcode: z.string().nullable(),
     batchNo: z.string().nullable(),
     sizeGrams: quantityOutput.nullable(),
+    sizeUnit: z.enum(SIZE_UNITS),
     unit: z.string(),
     lowStockThreshold: quantityOutput,
     salePrice: moneyOutput,

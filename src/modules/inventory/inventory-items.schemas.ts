@@ -37,6 +37,14 @@ export const inventoryItemListQuerySchema = z.object({
   sourceId: z.uuid().optional(),
   from: serialInput.optional().openapi({ description: 'First label of a range' }),
   to: serialInput.optional().openapi({ description: 'Last label of a range' }),
+  includeSent: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional()
+    .openapi({
+      description:
+        'Also list pieces this branch sent to other branches; productId and batchId then match this branch product and batch',
+    }),
   branchId: z.uuid().optional(),
 });
 
@@ -64,7 +72,8 @@ export const labelBatchSchema = registry.register(
     expiryDate: z.iso.date().nullable(),
     total: z.number().int(),
     inStock: z.number().int(),
-    sold: z.number().int(),
+    inBranches: z.number().int().openapi({ description: 'Sent to other branches and still in stock there' }),
+    sold: z.number().int().openapi({ description: 'Sold here or at the branches they were sent to' }),
     other: z.number().int(),
     firstSerial: z.string(),
     lastSerial: z.string(),
@@ -103,6 +112,10 @@ const itemSchema = z.object({
   saleId: z.uuid().nullable(),
   invoiceNo: z.string().nullable(),
   soldOn: z.iso.date().nullable(),
+  atBranch: z
+    .string()
+    .nullable()
+    .openapi({ description: 'Branch the piece was sent to, when it is not here' }),
 });
 
 export const inventoryItemSchema = registry.register('InventoryItem', itemSchema);

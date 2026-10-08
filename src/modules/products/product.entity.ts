@@ -5,6 +5,8 @@ import { moneyColumn, quantityColumn } from '../../database/transformers';
 import { Category } from '../categories/category.entity';
 
 export const PRODUCT_STATUSES = ['active', 'inactive'] as const;
+export const SIZE_UNITS = ['g', 'kg', 'mg', 'ml', 'l', 'pcs', 'tablets', 'capsules', 'sachets'] as const;
+export type SizeUnit = (typeof SIZE_UNITS)[number];
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
 @Entity('products')
@@ -39,6 +41,9 @@ export class Product extends BranchScopedEntity {
 
   @Column({ name: 'size_grams', ...quantityColumn({ nullable: true }) })
   sizeGrams: Decimal | null;
+
+  @Column({ name: 'size_unit', type: 'varchar', length: 20, default: 'g' })
+  sizeUnit: SizeUnit;
 
   @Column({ name: 'image_path', type: 'text', nullable: true })
   imagePath: string | null;

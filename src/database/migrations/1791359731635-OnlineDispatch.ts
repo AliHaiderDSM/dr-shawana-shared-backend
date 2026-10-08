@@ -24,7 +24,9 @@ export class OnlineDispatch1791359731635 implements MigrationInterface {
       `UPDATE "sales" SET "delivery_status" = 'dispatched' WHERE "sale_type" = 'online' AND "delivery_status" = 'pending'`,
     );
     await queryRunner.query(`UPDATE "sales" SET "dispatched_on" = "date" WHERE "sale_type" = 'online'`);
-    await queryRunner.query(`UPDATE "sales" SET "delivered_on" = "date" WHERE "delivery_status" = 'delivered'`);
+    await queryRunner.query(
+      `UPDATE "sales" SET "delivered_on" = "date" WHERE "delivery_status" = 'delivered'`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

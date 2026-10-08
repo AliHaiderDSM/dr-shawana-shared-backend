@@ -263,8 +263,8 @@ describe('accounts, expenses, reports and dashboard', () => {
       const res = await report('accounts-balance', accountant, 'month=2026-09');
       expect(res.status).toBe(200);
       const cash = res.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1');
+      expect(cash).not.toHaveProperty('opening');
       expect(cash).toMatchObject({
-        opening: '0.00',
         debit: '5000.00',
         credit: '1350.00',
         closing: '3650.00',
@@ -276,7 +276,6 @@ describe('accounts, expenses, reports and dashboard', () => {
       expect(
         october.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1'),
       ).toMatchObject({
-        opening: '3650.00',
         debit: '0.00',
         closing: '3650.00',
       });

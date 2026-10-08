@@ -59,12 +59,15 @@ describe('products and purchase entries', () => {
       categoryId,
       batchNo: '100',
       sizeGrams: '100',
+      sizeUnit: 'ml',
       initialPurchase: { supplierId, date: '2026-09-01', quantity: '20', unitPrice: '1500' },
     });
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({
       name: 'Hair Oil',
       salePrice: '1500.00',
+      sizeGrams: '100.000',
+      sizeUnit: 'ml',
       category: { name: 'Oils' },
     });
     expect(await stockOf(res.body.data.id)).toBe('20.000');

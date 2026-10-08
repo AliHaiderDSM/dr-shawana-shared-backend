@@ -681,7 +681,6 @@ export const reportsService = {
 
     const rows = await query(
       `SELECT b.code AS branch, sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.type,
-              (COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${startParam}::date IS NOT NULL AND m.date < $${startParam}::date), 0))::numeric(12,2)::text AS opening,
               COALESCE(SUM(m.debit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS debit,
               COALESCE(SUM(m.credit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS credit,
               (COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${endParam}::date IS NULL OR m.date <= $${endParam}::date), 0))::numeric(12,2)::text AS closing
@@ -700,13 +699,12 @@ export const reportsService = {
         { key: 'accountName', label: 'Account' },
         { key: 'accountCode', label: 'Code' },
         { key: 'type', label: 'Type' },
-        { key: 'opening', label: 'Opening' },
         { key: 'debit', label: 'Debit' },
         { key: 'credit', label: 'Credit' },
         { key: 'closing', label: 'Balance' },
       ],
       rows,
-      ['opening', 'debit', 'credit', 'closing'],
+      ['debit', 'credit', 'closing'],
     );
   },
 
