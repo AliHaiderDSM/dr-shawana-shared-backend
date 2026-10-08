@@ -236,7 +236,17 @@ const appointmentBase = {
   updatedAt: z.iso.datetime(),
 };
 
-export const appointmentSchema = registry.register('Appointment', z.object(appointmentBase));
+export const appointmentSchema = registry.register(
+  'Appointment',
+  z.object({
+    ...appointmentBase,
+    createdByName: z
+      .string()
+      .nullable()
+      .optional()
+      .openapi({ description: 'Staff member who entered the appointment (list only)' }),
+  }),
+);
 
 export const appointmentDetailSchema = registry.register(
   'AppointmentDetail',

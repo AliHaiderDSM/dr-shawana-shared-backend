@@ -257,6 +257,7 @@ describe('appointments and payments', () => {
   it('filters the list and the calendar', async () => {
     const online = await api('get', '/branch/appointments?mode=online', admin);
     expect(online.body.data.map((a: { id: string }) => a.id)).toEqual([appointmentId]);
+    expect(typeof online.body.data[0].createdByName).toBe('string');
     const search = await api('get', '/branch/appointments?search=ayesha', admin);
     expect(search.body.meta.total).toBeGreaterThan(0);
     const byNo = await api(

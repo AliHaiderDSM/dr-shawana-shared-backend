@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Appointment list: entered by (done 2026-10-08)
+
+- `GET /branch/appointments` items carry `createdByName`, the staff member who entered the appointment.
+
 ## Delivery slips: office sales count as handed over (done 2026-10-08)
 
 - With `dateBy=dispatched`, an office sale matches on its sale date, and its `dispatchedOn` is the sale date.

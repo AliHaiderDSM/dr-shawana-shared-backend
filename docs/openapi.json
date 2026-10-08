@@ -5712,6 +5712,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "createdByName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Staff member who entered the appointment (list only)"
           }
         },
         "required": [

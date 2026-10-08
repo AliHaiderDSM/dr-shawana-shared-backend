@@ -1,3 +1,4 @@
+import { AppDataSource } from '../../database/data-source';
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { withTransaction } from '../../database/transaction';
@@ -185,7 +186,21 @@ export const appointmentsService = {
       viewer.branchId,
       items.map((i) => i.id),
     );
-    return { items: items.map((i) => toAppointmentDto(i, paid.get(i.id))), meta };
+    const creatorIds = [...new Set(items.flatMap((i) => (i.createdBy ? [i.createdBy] : [])))];
+    const creators: { id: string; name: string }[] = creatorIds.length
+      ? await AppDataSource.query(
+          `SELECT id, trim(first_name || ' ' || last_name) AS name FROM staff_profiles WHERE id = ANY($1)`,
+          [creatorIds],
+        )
+      : [];
+    const creatorName = new Map(creators.map((c) => [c.id, c.name]));
+    return {
+      items: items.map((i) => ({
+        ...toAppointmentDto(i, paid.get(i.id)),
+        createdByName: i.createdBy ? (creatorName.get(i.createdBy) ?? null) : null,
+      })),
+      meta,
+    };
   },
 
   async calendar(viewer: Viewer, query: CalendarQuery) {
