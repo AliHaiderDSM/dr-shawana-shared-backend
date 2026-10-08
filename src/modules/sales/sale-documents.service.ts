@@ -80,7 +80,7 @@ export const saleDocumentsService = {
 
   async deliverySlips(branchId: string, query: DeliverySlipsQuery) {
     const from =
-      query.from ?? (query.invoiceFrom || query.invoiceTo || query.awaitingDispatch ? undefined : today());
+      query.from ?? (query.invoiceFrom || query.invoiceTo || query.dispatchedOn ? undefined : today());
     const to = query.to ?? from;
     const qb = repo(Sale)
       .createQueryBuilder('sale')
@@ -91,7 +91,8 @@ export const saleDocumentsService = {
       .andWhere("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
-    if (query.awaitingDispatch) qb.andWhere("sale.deliveryStatus = 'pending'");
+    if (query.dispatchedOn)
+      qb.andWhere('sale.dispatchedOn = :dispatchedOn', { dispatchedOn: query.dispatchedOn });
     if (from) qb.andWhere('sale.date >= :from', { from });
     if (to) qb.andWhere('sale.date <= :to', { to });
     if (query.invoiceFrom) qb.andWhere('sale.invoiceSeq >= :invoiceFrom', { invoiceFrom: query.invoiceFrom });
@@ -118,7 +119,11 @@ export const saleDocumentsService = {
           city: sale.patient?.city ?? sale.patientCity,
           address: sale.patient?.address ?? null,
         },
-        items: (sale.items ?? []).map((i) => ({ name: i.product?.name ?? '', qty: i.qty })),
+        items: (sale.items ?? []).map((i) => ({
+          productId: i.productId,
+          name: i.product?.name ?? '',
+          qty: i.qty,
+        })),
         from: sender,
       })),
     };

@@ -39022,14 +39022,13 @@
           {
             "schema": {
               "type": "string",
-              "enum": [
-                "true"
-              ],
-              "description": "Only online orders still waiting for dispatch, from any day unless from/to is given"
+              "format": "date",
+              "example": "2026-09-30",
+              "description": "Only online orders dispatched on this day, whatever day they were booked"
             },
             "required": false,
-            "description": "Only online orders still waiting for dispatch, from any day unless from/to is given",
-            "name": "awaitingDispatch",
+            "description": "Only online orders dispatched on this day, whatever day they were booked",
+            "name": "dispatchedOn",
             "in": "query"
           },
           {

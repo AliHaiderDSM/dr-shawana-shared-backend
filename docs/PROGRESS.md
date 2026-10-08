@@ -22,9 +22,9 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
-## Delivery slips: awaiting dispatch filter (done 2026-10-08)
+## Delivery slips: dispatched-on filter (done 2026-10-08)
 
-- `GET /branch/sales/delivery-slips?awaitingDispatch=true` returns slips for the online orders still waiting for dispatch, from any day unless from/to is given.
+- `GET /branch/sales/delivery-slips?dispatchedOn=YYYY-MM-DD` returns slips for the online orders dispatched that day, whatever day they were booked. Each slip item now carries `productId`.
 - Test added in sales.test.ts.
 
 ## Sale payment approval, payment required, branch sales split (done 2026-10-07)
