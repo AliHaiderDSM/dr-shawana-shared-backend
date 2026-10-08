@@ -91,13 +91,16 @@ export const saleDocumentsService = {
     if (branchId) qb.andWhere('sale.branchId = :branchId', { branchId });
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
-    const dateColumn = query.dateBy === 'dispatched' ? 'sale.dispatchedOn' : 'sale.date';
+    const dateColumn =
+      query.dateBy === 'dispatched'
+        ? "COALESCE(sale.dispatchedOn, CASE WHEN sale.saleType = 'office' THEN sale.date END)"
+        : 'sale.date';
     if (from) qb.andWhere(`${dateColumn} >= :from`, { from });
     if (to) qb.andWhere(`${dateColumn} <= :to`, { to });
     if (query.invoiceFrom) qb.andWhere('sale.invoiceSeq >= :invoiceFrom', { invoiceFrom: query.invoiceFrom });
     if (query.invoiceTo) qb.andWhere('sale.invoiceSeq <= :invoiceTo', { invoiceTo: query.invoiceTo });
     const rows = await qb
-      .orderBy(dateColumn, 'DESC')
+      .orderBy('sale.date', 'DESC')
       .addOrderBy('branch.code', 'ASC')
       .addOrderBy('sale.invoiceSeq', 'DESC')
       .getMany();
@@ -115,7 +118,7 @@ export const saleDocumentsService = {
         saleId: sale.id,
         invoiceNo: sale.invoiceNo,
         date: sale.date,
-        dispatchedOn: sale.dispatchedOn,
+        dispatchedOn: sale.dispatchedOn ?? (sale.saleType === 'office' ? sale.date : null),
         saleType: sale.saleType,
         branch: sale.branch ? { code: sale.branch.code, name: sale.branch.name } : null,
         to: {

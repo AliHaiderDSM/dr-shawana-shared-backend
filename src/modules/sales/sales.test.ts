@@ -417,6 +417,13 @@ describe('POS sales', () => {
       items: [{ name: 'Serum', qty: '1.000' }],
       from: { city: 'Lahore' },
     });
+    const handedOver = await api(
+      'get',
+      '/branch/sales/delivery-slips?dateBy=dispatched&from=2026-01-01&to=2030-12-31&invoiceFrom=1&invoiceTo=1',
+      deliveryPrint,
+    );
+    expect(handedOver.body.data.slips).toHaveLength(1);
+    expect(handedOver.body.data.slips[0].dispatchedOn).toBe(handedOver.body.data.slips[0].date);
     expect((await api('get', '/branch/sales', deliveryPrint)).status).toBe(403);
     expect((await api('get', '/branch/sales/delivery-slips', frontDesk)).status).toBe(403);
     const superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });

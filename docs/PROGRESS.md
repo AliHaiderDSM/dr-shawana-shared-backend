@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Delivery slips: office sales count as handed over (done 2026-10-08)
+
+- With `dateBy=dispatched`, an office sale matches on its sale date, and its `dispatchedOn` is the sale date.
+
 ## Delivery slips for every branch (done 2026-10-08)
 
 - A Super Admin without `branchId` gets slips from every branch, newest date first, then by branch code.
