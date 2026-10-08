@@ -198,6 +198,12 @@ export const deliverySlipsQuerySchema = z.object({
   to: dateInput.optional(),
   invoiceFrom: z.coerce.number().int().positive().optional(),
   invoiceTo: z.coerce.number().int().positive().optional(),
+  awaitingDispatch: z
+    .enum(['true'])
+    .optional()
+    .openapi({
+      description: 'Only online orders still waiting for dispatch, from any day unless from/to is given',
+    }),
   branchId: z.uuid().optional(),
 });
 

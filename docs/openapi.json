@@ -39022,6 +39022,19 @@
           {
             "schema": {
               "type": "string",
+              "enum": [
+                "true"
+              ],
+              "description": "Only online orders still waiting for dispatch, from any day unless from/to is given"
+            },
+            "required": false,
+            "description": "Only online orders still waiting for dispatch, from any day unless from/to is given",
+            "name": "awaitingDispatch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "format": "uuid"
             },
             "required": false,

@@ -63,11 +63,9 @@ registry.registerPath({
         z.object({
           data: z.array(
             saleSchema.omit({ items: true, payments: true }).extend({
-              products: z
-                .array(z.object({ name: z.string(), qty: quantityOutput.nullable() }))
-                .openapi({
-                  description: 'Products on the sale; a bundle shows once by its name without a qty',
-                }),
+              products: z.array(z.object({ name: z.string(), qty: quantityOutput.nullable() })).openapi({
+                description: 'Products on the sale; a bundle shows once by its name without a qty',
+              }),
             }),
           ),
           meta: pageMetaSchema.extend({

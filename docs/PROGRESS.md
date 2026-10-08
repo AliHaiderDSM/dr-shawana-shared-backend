@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Delivery slips: awaiting dispatch filter (done 2026-10-08)
+
+- `GET /branch/sales/delivery-slips?awaitingDispatch=true` returns slips for the online orders still waiting for dispatch, from any day unless from/to is given.
+- Test added in sales.test.ts.
+
 ## Sale payment approval, payment required, branch sales split (done 2026-10-07)
 
 - **A sale needs a payment:** `CreateSale.payments` must have at least one payment.

@@ -548,6 +548,10 @@ describe('POS sales', () => {
       const due = (await api('get', '/branch/sales?due=true', admin)).body.data;
       expect(due.every((d: { remaining: string }) => Number(d.remaining) > 0)).toBe(true);
       expect(due.map((d: { invoiceNo: string }) => d.invoiceNo)).not.toContain(order.body.data.invoiceNo);
+      const waitingSlips = await api('get', '/branch/sales/delivery-slips?awaitingDispatch=true', admin);
+      expect(waitingSlips.body.data.slips.map((s: { invoiceNo: string }) => s.invoiceNo)).toEqual([
+        order.body.data.invoiceNo,
+      ]);
       const day = await api('get', '/branch/sales/deliveries?date=2026-10-03', admin);
       expect(day.body.data).toEqual([
         expect.objectContaining({

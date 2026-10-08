@@ -79,7 +79,8 @@ export const saleDocumentsService = {
   },
 
   async deliverySlips(branchId: string, query: DeliverySlipsQuery) {
-    const from = query.from ?? (query.invoiceFrom || query.invoiceTo ? undefined : today());
+    const from =
+      query.from ?? (query.invoiceFrom || query.invoiceTo || query.awaitingDispatch ? undefined : today());
     const to = query.to ?? from;
     const qb = repo(Sale)
       .createQueryBuilder('sale')
@@ -90,6 +91,7 @@ export const saleDocumentsService = {
       .andWhere("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
+    if (query.awaitingDispatch) qb.andWhere("sale.deliveryStatus = 'pending'");
     if (from) qb.andWhere('sale.date >= :from', { from });
     if (to) qb.andWhere('sale.date <= :to', { to });
     if (query.invoiceFrom) qb.andWhere('sale.invoiceSeq >= :invoiceFrom', { invoiceFrom: query.invoiceFrom });
