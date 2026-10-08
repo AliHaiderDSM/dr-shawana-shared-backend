@@ -44,7 +44,11 @@ function phoneFields(phone: string) {
 async function assertPhoneAvailable(last9: string, excludeId: string | undefined, manager?: EntityManager) {
   const existing = await patientsRepository.findByLast9(last9, manager);
   if (existing && existing.id !== excludeId) {
-    throw AppError.conflict('This phone number is already added', { patient: toPatientOption(existing) });
+    const branch = existing.createdInBranch?.name;
+    throw AppError.conflict(`This phone number is already added${branch ? ` in ${branch}` : ''}`, {
+      patient: toPatientOption(existing),
+      branch: branch ?? null,
+    });
   }
 }
 
@@ -77,7 +81,11 @@ export const patientsService = {
     const last9 = last9Of(phone);
     const existing = last9 ? await patientsRepository.findByLast9(last9) : null;
     const match = existing && existing.id !== excludeId ? existing : null;
-    return { exists: match !== null, patient: match ? toPatientOption(match) : null };
+    return {
+      exists: match !== null,
+      patient: match ? toPatientOption(match) : null,
+      branch: match?.createdInBranch?.name ?? null,
+    };
   },
 
   cities: (search: string) => patientsRepository.cities(search),

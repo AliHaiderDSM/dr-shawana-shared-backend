@@ -179,6 +179,13 @@ export const saleListQuerySchema = listQuerySchema(['date', 'createdAt', 'invoic
     city: z.string().trim().max(100).optional(),
     deliveryStatus: z.enum(DELIVERY_STATUSES).optional(),
     paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
+    completed: z
+      .enum(['true'])
+      .optional()
+      .openapi({
+        description:
+          'Only fully paid and approved sales that are handed over: office sales, or online orders dispatched or delivered',
+      }),
     due: z
       .enum(['true'])
       .optional()

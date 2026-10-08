@@ -505,6 +505,11 @@ function applyFilters(qb: SelectQueryBuilder<Sale>, query: SaleListQuery) {
   if (query.deliveryStatus) qb.andWhere('sale.deliveryStatus = :ds', { ds: query.deliveryStatus });
   if (query.paymentStatus) qb.andWhere('sale.paymentStatus = :ps', { ps: query.paymentStatus });
   if (query.due) qb.andWhere('sale.remaining > 0');
+  if (query.completed) {
+    qb.andWhere("sale.paymentStatus = 'paid'").andWhere(
+      "(sale.saleType = 'office' OR sale.deliveryStatus IN ('dispatched', 'delivered'))",
+    );
+  }
   if (query.from) qb.andWhere('sale.date >= :from', { from: query.from });
   if (query.to) qb.andWhere('sale.date <= :to', { to: query.to });
   if (query.productId) {

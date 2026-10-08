@@ -570,6 +570,20 @@ describe('POS sales', () => {
       });
       expect(sent.status).toBe(200);
       expect(sent.body.data).toMatchObject({ deliveryStatus: 'dispatched', dispatchedOn: '2026-10-05' });
+      const completed = (await api('get', '/branch/sales?completed=true', admin)).body.data as {
+        id: string;
+        paymentStatus: string;
+        saleType: string;
+        deliveryStatus: string | null;
+      }[];
+      expect(completed.map((s) => s.id)).not.toContain(order.body.data.id);
+      expect(
+        completed.every(
+          (s) =>
+            s.paymentStatus === 'paid' &&
+            (s.saleType === 'office' || ['dispatched', 'delivered'].includes(s.deliveryStatus ?? '')),
+        ),
+      ).toBe(true);
       const after = await balance(toner);
       expect(after.reservedQuantity).toBe('0.000');
       expect(Number(after.quantity)).toBe(Number(start.quantity) - 2);

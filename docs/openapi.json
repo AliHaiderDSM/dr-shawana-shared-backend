@@ -28018,11 +28018,19 @@
                             "phone",
                             "city"
                           ]
+                        },
+                        "branch": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Branch where the patient was first added"
                         }
                       },
                       "required": [
                         "exists",
-                        "patient"
+                        "patient",
+                        "branch"
                       ]
                     }
                   },
@@ -37210,6 +37218,19 @@
             },
             "required": false,
             "name": "paymentStatus",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ],
+              "description": "Only fully paid and approved sales that are handed over: office sales, or online orders dispatched or delivered"
+            },
+            "required": false,
+            "description": "Only fully paid and approved sales that are handed over: office sales, or online orders dispatched or delivered",
+            "name": "completed",
             "in": "query"
           },
           {

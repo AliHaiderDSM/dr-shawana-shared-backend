@@ -73,12 +73,19 @@ describe('patients and doctors', () => {
 
       const check = await api('get', '/branch/patients/check-phone?phone=03001234567', frontDesk);
       expect(check.body.data).toMatchObject({ exists: true, patient: { id: patientId } });
+      expect(typeof check.body.data.branch).toBe('string');
+      const international = await api(
+        'get',
+        '/branch/patients/check-phone?phone=%2B92%20300%201234567',
+        frontDesk,
+      );
+      expect(international.body.data).toMatchObject({ exists: true, patient: { id: patientId } });
       const self = await api(
         'get',
         `/branch/patients/check-phone?phone=03001234567&excludeId=${patientId}`,
         frontDesk,
       );
-      expect(self.body.data).toEqual({ exists: false, patient: null });
+      expect(self.body.data).toEqual({ exists: false, patient: null, branch: null });
     });
 
     it('validates the input', async () => {

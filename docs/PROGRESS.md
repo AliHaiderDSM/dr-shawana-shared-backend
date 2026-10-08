@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Phone check branch, completed sales filter (done 2026-10-08)
+
+- `GET /branch/patients/check-phone` returns `branch`, the name of the branch where the patient was first added. The 409 on create names the branch too.
+- `GET /branch/sales?completed=true` returns paid sales that are handed over: office sales, or online orders that are dispatched or delivered.
+
 ## Delivery slips: dispatched-on filter (done 2026-10-08)
 
 - `GET /branch/sales/delivery-slips?dispatchedOn=YYYY-MM-DD` returns slips for the online orders dispatched that day, whatever day they were booked. Each slip item now carries `productId`.

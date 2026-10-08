@@ -39,7 +39,7 @@ export const patientsRepository = {
   },
 
   findByLast9(last9: string, manager?: EntityManager) {
-    return patients(manager).findOne({ where: { phoneLast9: last9 } });
+    return patients(manager).findOne({ where: { phoneLast9: last9 }, relations: { createdInBranch: true } });
   },
 
   create(data: Partial<Patient>, manager?: EntityManager) {

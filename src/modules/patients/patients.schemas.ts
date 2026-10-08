@@ -98,6 +98,7 @@ export const patientOptionSchema = z.object({
 const phoneCheckSchema = z.object({
   exists: z.boolean(),
   patient: patientOptionSchema.nullable(),
+  branch: z.string().nullable().openapi({ description: 'Branch where the patient was first added' }),
 });
 
 const summaryAppointmentSchema = z.object({
