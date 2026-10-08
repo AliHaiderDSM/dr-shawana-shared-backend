@@ -45,7 +45,6 @@ export const BRANCH_MODULES = [
   'production',
   'finishedGoods',
   'materialReport',
-  'banks',
   'accounts',
   'journal',
   'expenses',

@@ -215,7 +215,7 @@ Finished Goods / Material Report
 
 ### 4.8 Accounts / Finance
 
-- **Banks** and **Account Sheets**, which form the chart of accounts for each branch.
+- **Account Sheets** (bank and cash accounts) form the chart of accounts for each branch. A bank account is added with its bank name in the same form, and a new name adds the bank to the branch. There is no separate Banks screen.
 - **General Entries**, the double-entry journal with debit and credit lines.
 - Revenue comes from **sale payments** and **appointment payments**, each linked to an account sheet.
 - **Accounts Balance** and **Finance Report** are available for each branch. Super Admin also sees a combined report for all branches.

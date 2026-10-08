@@ -15,6 +15,7 @@ const base = { ...reportFormat, ...periodFilters };
 export const saleProductsQuerySchema = z.object({
   ...base,
   patientId: z.uuid().optional(),
+  customer: z.string().trim().max(100).optional().openapi({ description: 'Customer name or phone' }),
   productId: z.uuid().optional(),
   saleType: z.enum(SALE_TYPES).optional(),
   city: z.string().trim().max(100).optional().openapi({ description: 'Sale city' }),
@@ -137,7 +138,7 @@ const reportSchema = registry.register(
 const reports: [string, string, z.ZodObject][] = [
   [
     'sale-products',
-    'Sale products (posSoft Monthly Sale Products): one row per sold item',
+    'Sale products (posSoft Monthly Sale Products): one row per completed sale (paid and approved, handed over) with its products, discount, received and remaining',
     saleProductsQuerySchema,
   ],
   ['purchases', 'Buy products: purchase entries with supplier and amount', purchasesQuerySchema],

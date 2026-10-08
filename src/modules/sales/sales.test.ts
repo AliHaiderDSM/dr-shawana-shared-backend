@@ -72,13 +72,12 @@ describe('POS sales', () => {
         type: 'cash',
       })
     ).body.data.id;
-    const bankId = (await api('post', '/branch/banks', admin).send({ name: 'Meezan' })).body.data.id;
     bankSheet = (
       await api('post', '/branch/account-sheets', admin).send({
         accountName: 'Meezan',
         accountCode: 'M1',
         type: 'bank',
-        bankId,
+        bankName: 'Meezan',
       })
     ).body.data.id;
     patientId = (
@@ -548,7 +547,11 @@ describe('POS sales', () => {
       const due = (await api('get', '/branch/sales?due=true', admin)).body.data;
       expect(due.every((d: { remaining: string }) => Number(d.remaining) > 0)).toBe(true);
       expect(due.map((d: { invoiceNo: string }) => d.invoiceNo)).not.toContain(order.body.data.invoiceNo);
-      const notSent = await api('get', '/branch/sales/delivery-slips?dispatchedOn=2026-10-05', admin);
+      const notSent = await api(
+        'get',
+        '/branch/sales/delivery-slips?dateBy=dispatched&from=2026-10-03&to=2026-10-03',
+        admin,
+      );
       expect(notSent.body.data.slips).toEqual([]);
       const day = await api('get', '/branch/sales/deliveries?date=2026-10-03', admin);
       expect(day.body.data).toEqual([
@@ -570,6 +573,14 @@ describe('POS sales', () => {
       });
       expect(sent.status).toBe(200);
       expect(sent.body.data).toMatchObject({ deliveryStatus: 'dispatched', dispatchedOn: '2026-10-05' });
+      const sentSlips = await api(
+        'get',
+        '/branch/sales/delivery-slips?dateBy=dispatched&from=2026-10-05&to=2026-10-05',
+        admin,
+      );
+      expect(sentSlips.body.data.slips.map((x: { invoiceNo: string }) => x.invoiceNo)).toEqual([
+        order.body.data.invoiceNo,
+      ]);
       const completed = (await api('get', '/branch/sales?completed=true', admin)).body.data as {
         id: string;
         paymentStatus: string;

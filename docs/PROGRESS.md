@@ -22,6 +22,17 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Banks folded into account sheets, sale report by completed sale, slips by dispatch date (done 2026-10-08)
+
+- **Banks:** the `/branch/banks` routes and the `banks` permission module are removed.
+  - Account sheet create and update take `bankName`. An unknown name adds a bank to the branch, matched case-insensitively.
+  - Update can also change `type` and `date`. Changing an account to cash clears its bank.
+- **Sale products report (`/branch/reports/sale-products`):**
+  - One row per completed sale, meaning paid with approved payments and handed over (office, or online dispatched or delivered).
+  - Columns: Invoice, Date, Entry Date, Customer, Phone, City, Sale Type, Sale City, Products, Total Qty, Total Amount, Discount, After Discount, Received, Remaining, Payment, Account.
+  - New filter: `customer` (name or phone). `patientCity` falls back to the patient's city.
+- **Delivery slips:** `dateBy=dispatched` makes from/to the dispatch date. This replaces `dispatchedOn`.
+
 ## Phone check branch, completed sales filter (done 2026-10-08)
 
 - `GET /branch/patients/check-phone` returns `branch`, the name of the branch where the patient was first added. The 409 on create names the branch too.

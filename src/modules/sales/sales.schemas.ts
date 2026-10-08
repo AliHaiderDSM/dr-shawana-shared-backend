@@ -179,13 +179,10 @@ export const saleListQuerySchema = listQuerySchema(['date', 'createdAt', 'invoic
     city: z.string().trim().max(100).optional(),
     deliveryStatus: z.enum(DELIVERY_STATUSES).optional(),
     paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
-    completed: z
-      .enum(['true'])
-      .optional()
-      .openapi({
-        description:
-          'Only fully paid and approved sales that are handed over: office sales, or online orders dispatched or delivered',
-      }),
+    completed: z.enum(['true']).optional().openapi({
+      description:
+        'Only fully paid and approved sales that are handed over: office sales, or online orders dispatched or delivered',
+    }),
     due: z
       .enum(['true'])
       .optional()
@@ -205,9 +202,13 @@ export const deliverySlipsQuerySchema = z.object({
   to: dateInput.optional(),
   invoiceFrom: z.coerce.number().int().positive().optional(),
   invoiceTo: z.coerce.number().int().positive().optional(),
-  dispatchedOn: dateInput
+  dateBy: z
+    .enum(['booked', 'dispatched'])
     .optional()
-    .openapi({ description: 'Only online orders dispatched on this day, whatever day they were booked' }),
+    .openapi({
+      description:
+        'booked (default): from/to is the sale date. dispatched: from/to is the dispatch date of online orders',
+    }),
   branchId: z.uuid().optional(),
 });
 

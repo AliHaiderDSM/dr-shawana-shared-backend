@@ -1,6 +1,6 @@
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
-import { paginate, type ListQuery } from '../../lib/pagination';
+import { paginate } from '../../lib/pagination';
 import { AccountSheet } from './account-sheet.entity';
 import { type AccountSheetListQuery } from './accounts.schemas';
 import { Bank } from './bank.entity';
@@ -10,21 +10,6 @@ const sheetsBase = branchScopedRepository(AccountSheet, 'a');
 
 export const banksRepository = {
   ...banksBase,
-
-  list(branchId: string, query: ListQuery, manager?: EntityManager) {
-    return paginate(banksBase.query(branchId, manager), query, {
-      searchColumns: ['bk.name'],
-      sortMap: { name: 'bk.name', createdAt: 'bk.createdAt' },
-    });
-  },
-
-  options(branchId: string, manager?: EntityManager) {
-    return banksBase
-      .query(branchId, manager)
-      .select(['bk.id', 'bk.name'])
-      .orderBy('bk.name', 'ASC')
-      .getMany();
-  },
 
   findByName(branchId: string, name: string, manager?: EntityManager) {
     return banksBase.query(branchId, manager).andWhere('lower(bk.name) = lower(:name)', { name }).getOne();

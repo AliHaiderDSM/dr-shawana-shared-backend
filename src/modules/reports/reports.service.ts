@@ -60,18 +60,21 @@ export const reportsService = {
   async saleProducts(scope: ReportScope, q: SaleProductsQuery) {
     const f = scoped(scope, 's.branch_id')
       .add('s.deleted_at IS NULL')
-      .add('si.deleted_at IS NULL')
+      .add("s.payment_status = 'paid'")
+      .add("(s.sale_type = 'office' OR s.delivery_status IN ('dispatched', 'delivered'))")
       .period('s.date', q)
       .when(q.patientId, 's.patient_id = ?', q.patientId)
+      .when(q.customer, '(p.name ILIKE ? OR p.phone ILIKE ?)', `%${q.customer}%`, `%${q.customer}%`)
       .when(
         q.productId,
-        'si.product_id IN (SELECT id FROM products WHERE id = ? OR origin_product_id = ?)',
+        `EXISTS (SELECT 1 FROM sale_items x WHERE x.sale_id = s.id AND x.deleted_at IS NULL
+           AND x.product_id IN (SELECT id FROM products WHERE id = ? OR origin_product_id = ?))`,
         q.productId,
         q.productId,
       )
       .when(q.saleType, 's.sale_type = ?', q.saleType)
       .when(q.city, 's.city ILIKE ?', q.city)
-      .when(q.patientCity, 's.patient_city ILIKE ?', q.patientCity)
+      .when(q.patientCity, 'COALESCE(s.patient_city, p.city) ILIKE ?', q.patientCity)
       .when(q.createdBy, 's.created_by = ?', q.createdBy)
       .when(q.createdFrom, 's.created_at::date >= ?', q.createdFrom)
       .when(q.createdTo, 's.created_at::date <= ?', q.createdTo)
@@ -87,17 +90,24 @@ export const reportsService = {
       );
     const rows = await query(
       `SELECT b.code AS branch, s.invoice_no AS "invoiceNo", to_char(s.date, 'YYYY-MM-DD') AS date,
-              p.name AS patient, p.phone, s.sale_type AS "saleType", s.city, pr.name AS product, bu.name AS bundle,
-              si.qty::text AS qty, si.unit_price::text AS "unitPrice", si.line_total::text AS "lineTotal",
-              s.discount_percent::text AS "discountPercent", s.total::text AS "saleTotal", s.payment_status AS "paymentStatus"
-         FROM sale_items si
-         JOIN sales s ON s.id = si.sale_id
+              to_char(s.created_at, 'YYYY-MM-DD') AS "entryDate",
+              p.name AS customer, p.phone, COALESCE(s.patient_city, p.city) AS "customerCity",
+              s.sale_type AS "saleType", s.city,
+              (SELECT string_agg(x.name || ' x ' || trim_scale(x.qty)::text, ', ' ORDER BY x.name)
+                 FROM (SELECT pr.name, SUM(si.qty) AS qty FROM sale_items si JOIN products pr ON pr.id = si.product_id
+                        WHERE si.sale_id = s.id AND si.deleted_at IS NULL GROUP BY pr.name) x) AS products,
+              s.total_qty::text AS "totalQty", s.subtotal::text AS "subAmount",
+              s.discount_amount::text AS discount, s.total::text AS total,
+              s.received::text AS received, s.remaining::text AS remaining,
+              (SELECT string_agg(DISTINCT initcap(y.method::text), ', ') FROM sale_payments y
+                WHERE y.sale_id = s.id AND y.deleted_at IS NULL) AS payment,
+              (SELECT string_agg(DISTINCT a.account_name, ', ') FROM sale_payments y JOIN account_sheets a ON a.id = y.account_sheet_id
+                WHERE y.sale_id = s.id AND y.deleted_at IS NULL) AS account
+         FROM sales s
          JOIN patients p ON p.id = s.patient_id
-         JOIN products pr ON pr.id = si.product_id
-         LEFT JOIN bundles bu ON bu.id = si.bundle_id
          JOIN branches b ON b.id = s.branch_id
         ${f.where}
-        ORDER BY s.date DESC, s.invoice_seq DESC, si.created_at`,
+        ORDER BY s.date DESC, s.invoice_seq DESC`,
       f.params,
     );
     const report = build(
@@ -106,20 +116,26 @@ export const reportsService = {
       [
         { key: 'invoiceNo', label: 'Invoice' },
         { key: 'date', label: 'Date' },
-        { key: 'patient', label: 'Customer' },
+        { key: 'entryDate', label: 'Entry Date' },
+        { key: 'customer', label: 'Customer' },
         { key: 'phone', label: 'Phone' },
+        { key: 'customerCity', label: 'City' },
         { key: 'saleType', label: 'Sale Type' },
         { key: 'city', label: 'Sale City' },
-        { key: 'product', label: 'Product' },
-        { key: 'bundle', label: 'Bundle' },
-        { key: 'qty', label: 'Qty' },
-        { key: 'unitPrice', label: 'Price' },
-        { key: 'lineTotal', label: 'Amount' },
+        { key: 'products', label: 'Products' },
+        { key: 'totalQty', label: 'Total Qty' },
+        { key: 'subAmount', label: 'Total Amount' },
+        { key: 'discount', label: 'Discount' },
+        { key: 'total', label: 'After Discount' },
+        { key: 'received', label: 'Received' },
+        { key: 'remaining', label: 'Remaining' },
+        { key: 'payment', label: 'Payment' },
+        { key: 'account', label: 'Account' },
       ],
       rows,
-      ['lineTotal'],
+      ['subAmount', 'discount', 'total', 'received', 'remaining'],
     );
-    return { ...report, totals: { ...report.totals, ...sumBy(rows, ['qty'], 3) } };
+    return { ...report, totals: { ...report.totals, ...sumBy(rows, ['totalQty'], 3) } };
   },
 
   async purchases(scope: ReportScope, q: PurchasesQuery) {

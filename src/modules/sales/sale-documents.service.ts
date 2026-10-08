@@ -79,8 +79,7 @@ export const saleDocumentsService = {
   },
 
   async deliverySlips(branchId: string, query: DeliverySlipsQuery) {
-    const from =
-      query.from ?? (query.invoiceFrom || query.invoiceTo || query.dispatchedOn ? undefined : today());
+    const from = query.from ?? (query.invoiceFrom || query.invoiceTo ? undefined : today());
     const to = query.to ?? from;
     const qb = repo(Sale)
       .createQueryBuilder('sale')
@@ -91,10 +90,9 @@ export const saleDocumentsService = {
       .andWhere("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
-    if (query.dispatchedOn)
-      qb.andWhere('sale.dispatchedOn = :dispatchedOn', { dispatchedOn: query.dispatchedOn });
-    if (from) qb.andWhere('sale.date >= :from', { from });
-    if (to) qb.andWhere('sale.date <= :to', { to });
+    const dateColumn = query.dateBy === 'dispatched' ? 'sale.dispatchedOn' : 'sale.date';
+    if (from) qb.andWhere(`${dateColumn} >= :from`, { from });
+    if (to) qb.andWhere(`${dateColumn} <= :to`, { to });
     if (query.invoiceFrom) qb.andWhere('sale.invoiceSeq >= :invoiceFrom', { invoiceFrom: query.invoiceFrom });
     if (query.invoiceTo) qb.andWhere('sale.invoiceSeq <= :invoiceTo', { invoiceTo: query.invoiceTo });
     const rows = await qb.orderBy('sale.invoiceSeq', 'DESC').getMany();

@@ -61,13 +61,12 @@ describe('appointments and payments', () => {
         type: 'cash',
       })
     ).body.data.id;
-    const bankId = (await api('post', '/branch/banks', admin).send({ name: 'Meezan Bank' })).body.data.id;
     bankSheetId = (
       await api('post', '/branch/account-sheets', admin).send({
         accountName: 'Clinic Meezan',
         accountCode: 'M1',
         type: 'bank',
-        bankId,
+        bankName: 'Meezan Bank',
       })
     ).body.data.id;
   });

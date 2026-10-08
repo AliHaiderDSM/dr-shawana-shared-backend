@@ -164,11 +164,8 @@ describe('master data', () => {
     });
   });
 
-  describe('banks and account sheets', () => {
-    it('requires a bank for bank accounts and blocks deleting a used bank', async () => {
-      const bank = (
-        await request(app).post('/api/v1/branch/banks').set(bearer(admin)).send({ name: 'Meezan Bank' })
-      ).body.data;
+  describe('account sheets', () => {
+    it('needs a bank name for bank accounts and adds a new bank on the way', async () => {
       const noBank = await request(app)
         .post('/api/v1/branch/account-sheets')
         .set(bearer(admin))
@@ -179,10 +176,18 @@ describe('master data', () => {
         accountName: 'Clinic Meezan',
         accountCode: '0101',
         type: 'bank',
-        bankId: bank.id,
+        bankName: 'Meezan Bank',
       });
       expect(sheet.status).toBe(201);
       expect(sheet.body.data).toMatchObject({ bank: { name: 'Meezan Bank' } });
+
+      const second = await request(app).post('/api/v1/branch/account-sheets').set(bearer(admin)).send({
+        accountName: 'Clinic Meezan 2',
+        accountCode: '0102',
+        type: 'bank',
+        bankName: 'meezan bank',
+      });
+      expect(second.body.data.bankId).toBe(sheet.body.data.bankId);
 
       const cash = await request(app)
         .post('/api/v1/branch/account-sheets')
@@ -190,12 +195,23 @@ describe('master data', () => {
         .send({ accountName: 'Cash in hand', accountCode: 'CASH', type: 'cash' });
       expect(cash.body.data).toMatchObject({ bankId: null });
 
-      expect((await request(app).delete(`/api/v1/branch/banks/${bank.id}`).set(bearer(admin))).status).toBe(
-        409,
-      );
+      const moved = await request(app)
+        .patch(`/api/v1/branch/account-sheets/${second.body.data.id}`)
+        .set(bearer(admin))
+        .send({ bankName: 'HBL' });
+      expect(moved.status).toBe(200);
+      expect(moved.body.data).toMatchObject({ type: 'bank', bank: { name: 'HBL' } });
+      const toCash = await request(app)
+        .patch(`/api/v1/branch/account-sheets/${second.body.data.id}`)
+        .set(bearer(admin))
+        .send({ type: 'cash' });
+      expect(toCash.body.data).toMatchObject({ type: 'cash', bankId: null, bank: null });
+
+      expect((await request(app).get('/api/v1/branch/banks').set(bearer(admin))).status).toBe(404);
 
       const options = await request(app).get('/api/v1/branch/account-sheets/options').set(bearer(admin));
       expect(options.body.data.map((o: { bankName: string | null }) => o.bankName)).toEqual([
+        null,
         null,
         'Meezan Bank',
       ]);
@@ -204,20 +220,23 @@ describe('master data', () => {
         .get('/api/v1/branch/account-sheets/options')
         .set(bearer(frontDesk));
       expect(deskOptions.status).toBe(200);
-      expect(deskOptions.body.data).toHaveLength(2);
+      expect(deskOptions.body.data).toHaveLength(3);
       expect((await request(app).get('/api/v1/branch/account-sheets').set(bearer(frontDesk))).status).toBe(
         403,
       );
     });
 
-    it('does not let another branch use this branch bank', async () => {
-      const bank = (await request(app).post('/api/v1/branch/banks').set(bearer(admin)).send({ name: 'HBL' }))
-        .body.data;
-      const res = await request(app)
+    it('keeps banks per branch', async () => {
+      const mine = await request(app)
+        .post('/api/v1/branch/account-sheets')
+        .set(bearer(admin))
+        .send({ accountName: 'A', accountCode: '1', type: 'bank', bankName: 'Alfalah' });
+      const theirs = await request(app)
         .post('/api/v1/branch/account-sheets')
         .set(bearer(otherAdmin))
-        .send({ accountName: 'X', accountCode: '1', type: 'bank', bankId: bank.id });
-      expect(res.status).toBe(404);
+        .send({ accountName: 'B', accountCode: '1', type: 'bank', bankName: 'Alfalah' });
+      expect(theirs.status).toBe(201);
+      expect(theirs.body.data.bankId).not.toBe(mine.body.data.bankId);
     });
   });
 });
