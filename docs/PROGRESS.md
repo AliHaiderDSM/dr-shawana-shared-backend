@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Dispatch delivers, slips by sale ids (done 2026-10-09)
+
+- Dispatching an online order sets `deliveryStatus` to delivered, with both `dispatchedOn` and `deliveredOn` set to the dispatch date.
+- The `deliveryStatus=dispatched` filters on sales and deliveries match dispatched and delivered alike.
+- `GET /branch/sales/delivery-slips?saleIds=a,b,c` returns slips for just those sales, at most 300.
+
 ## Appointment list: entered by (done 2026-10-08)
 
 - `GET /branch/appointments` items carry `createdByName`, the staff member who entered the appointment.

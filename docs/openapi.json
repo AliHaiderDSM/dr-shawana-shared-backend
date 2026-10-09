@@ -38441,6 +38441,16 @@
           {
             "schema": {
               "type": "string",
+              "description": "Comma-separated sale ids: print just these orders, any date"
+            },
+            "required": false,
+            "description": "Comma-separated sale ids: print just these orders, any date",
+            "name": "saleIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "enum": [
                 "booked",
                 "dispatched"

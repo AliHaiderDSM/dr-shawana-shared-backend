@@ -219,7 +219,7 @@ describe('POS sales', () => {
     expect(await stock(serum)).toBe(before);
     const dispatched = await api('post', `/branch/sales/${onlineSaleId}/dispatch`, admin).send({});
     expect(dispatched.status).toBe(200);
-    expect(dispatched.body.data.deliveryStatus).toBe('dispatched');
+    expect(dispatched.body.data.deliveryStatus).toBe('delivered');
     expect(Number(await stock(serum))).toBe(Number(before) - 1);
   });
 
@@ -588,7 +588,15 @@ describe('POS sales', () => {
         date: '2026-10-05',
       });
       expect(sent.status).toBe(200);
-      expect(sent.body.data).toMatchObject({ deliveryStatus: 'dispatched', dispatchedOn: '2026-10-05' });
+      expect(sent.body.data).toMatchObject({
+        deliveryStatus: 'delivered',
+        dispatchedOn: '2026-10-05',
+        deliveredOn: '2026-10-05',
+      });
+      const picked = await api('get', `/branch/sales/delivery-slips?saleIds=${order.body.data.id}`, admin);
+      expect(picked.body.data.slips.map((x: { saleId: string }) => x.saleId)).toEqual([order.body.data.id]);
+      const sentList = await api('get', '/branch/sales?deliveryStatus=dispatched', admin);
+      expect(sentList.body.data.map((x: { id: string }) => x.id)).toContain(order.body.data.id);
       const sentSlips = await api(
         'get',
         '/branch/sales/delivery-slips?dateBy=dispatched&from=2026-10-05&to=2026-10-05',

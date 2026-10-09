@@ -502,7 +502,16 @@ function applyFilters(qb: SelectQueryBuilder<Sale>, query: SaleListQuery) {
   if (query.createdBy) qb.andWhere('sale.createdBy = :createdBy', { createdBy: query.createdBy });
   if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
   if (query.city) qb.andWhere('sale.city ILIKE :city', { city: escapeLike(query.city) });
-  if (query.deliveryStatus) qb.andWhere('sale.deliveryStatus = :ds', { ds: query.deliveryStatus });
+  if (query.deliveryStatus) {
+    qb.andWhere('sale.deliveryStatus IN (:...ds)', {
+      ds:
+        query.deliveryStatus === 'pending' ||
+        query.deliveryStatus === 'returned' ||
+        query.deliveryStatus === 'cancelled'
+          ? [query.deliveryStatus]
+          : ['dispatched', 'delivered'],
+    });
+  }
   if (query.paymentStatus) qb.andWhere('sale.paymentStatus = :ps', { ps: query.paymentStatus });
   if (query.due) qb.andWhere('sale.remaining > 0');
   if (query.completed) {
@@ -877,8 +886,9 @@ export const salesService = {
       await repo(Sale, em).update(
         { id },
         {
-          deliveryStatus: 'dispatched',
+          deliveryStatus: 'delivered',
           dispatchedOn: date,
+          deliveredOn: date,
           dispatchedBy: actor.userId,
           updatedBy: actor.userId,
         },
@@ -889,7 +899,7 @@ export const salesService = {
         'dispatch',
         em,
         { deliveryStatus: 'pending' },
-        { deliveryStatus: 'dispatched', dispatchedOn: date },
+        { deliveryStatus: 'delivered', dispatchedOn: date },
       );
       return toSaleDto(await getSale(branchId, id, em));
     });
@@ -972,7 +982,14 @@ export const salesService = {
     const qb = detailed(branchId).andWhere("sale.saleType = 'online'");
     if (query.date && query.by === 'dispatch') qb.andWhere('sale.dispatchedOn = :date', { date: query.date });
     else if (query.date) qb.andWhere('sale.date = :date', { date: query.date });
-    if (query.status) qb.andWhere('sale.deliveryStatus = :status', { status: query.status });
+    if (query.status) {
+      qb.andWhere('sale.deliveryStatus IN (:...statuses)', {
+        statuses:
+          query.status === 'dispatched' || query.status === 'delivered'
+            ? ['dispatched', 'delivered']
+            : [query.status],
+      });
+    }
     const rows = await qb
       .orderBy('sale.date', 'ASC')
       .addOrderBy('sale.invoiceSeq', 'ASC')

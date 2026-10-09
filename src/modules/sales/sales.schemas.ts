@@ -202,6 +202,13 @@ export const deliverySlipsQuerySchema = z.object({
   to: dateInput.optional(),
   invoiceFrom: z.coerce.number().int().positive().optional(),
   invoiceTo: z.coerce.number().int().positive().optional(),
+  saleIds: z
+    .string()
+    .trim()
+    .transform((v) => v.split(',').filter(Boolean))
+    .pipe(z.array(z.uuid()).min(1).max(300))
+    .optional()
+    .openapi({ type: 'string', description: 'Comma-separated sale ids: print just these orders, any date' }),
   dateBy: z.enum(['booked', 'dispatched']).optional().openapi({
     description:
       'booked (default): from/to is the sale date. dispatched: from/to is the dispatch date of online orders',

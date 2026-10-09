@@ -79,7 +79,7 @@ export const saleDocumentsService = {
   },
 
   async deliverySlips(branchId: string | null, query: DeliverySlipsQuery) {
-    const from = query.from ?? (query.invoiceFrom || query.invoiceTo ? undefined : today());
+    const from = query.from ?? (query.invoiceFrom || query.invoiceTo || query.saleIds ? undefined : today());
     const to = query.to ?? from;
     const qb = repo(Sale)
       .createQueryBuilder('sale')
@@ -89,6 +89,7 @@ export const saleDocumentsService = {
       .leftJoinAndSelect('item.product', 'product')
       .where("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
     if (branchId) qb.andWhere('sale.branchId = :branchId', { branchId });
+    if (query.saleIds) qb.andWhere('sale.id IN (:...saleIds)', { saleIds: query.saleIds });
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
     const dateColumn =
