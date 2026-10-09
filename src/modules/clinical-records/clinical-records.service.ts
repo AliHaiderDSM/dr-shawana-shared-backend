@@ -133,9 +133,13 @@ export const bloodWorkService = {
     const tests = BLOOD_TESTS.filter((test) => rows.some((r) => r.test === test)).map((test) => ({
       test,
       unit: rows.find((r) => r.test === test)?.unit ?? BLOOD_TEST_UNITS[test],
-      points: rows
-        .filter((r) => r.test === test)
-        .map((r) => ({ id: r.id, date: r.testDate, value: r.value })),
+      points: [
+        ...new Map(
+          rows
+            .filter((r) => r.test === test)
+            .map((r) => [r.testDate, { id: r.id, date: r.testDate, value: r.value }] as const),
+        ).values(),
+      ],
     }));
     return { results: rows.map(toBloodDto), dates, tests };
   },
@@ -146,6 +150,22 @@ export const bloodWorkService = {
       if (input.consultationId) await assertConsultation(branchId, patientId, input.consultationId, em);
       const created: BloodWorkResult[] = [];
       for (const result of input.results) {
+        const existing = await bloodResults
+          .query(branchId, em)
+          .andWhere('bw.patientId = :patientId', { patientId })
+          .andWhere('bw.test = :test', { test: result.test })
+          .andWhere('bw.testDate = :testDate', { testDate: result.testDate })
+          .orderBy('bw.createdAt', 'DESC')
+          .getOne();
+        if (existing) {
+          Object.assign(existing, {
+            value: result.value as never,
+            unit: result.unit ?? existing.unit,
+            updatedBy: actor.userId,
+          });
+          created.push(await bloodResults.save(existing, em));
+          continue;
+        }
         created.push(
           await bloodResults.create(
             branchId,

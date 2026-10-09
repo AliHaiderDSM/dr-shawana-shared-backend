@@ -294,6 +294,16 @@ describe('consultations and clinical records', () => {
         points: [{ value: '45.500' }, { value: '30.000' }],
       });
 
+      const again = await api('post', `/branch/patients/${patientId}/blood-work`, frontDesk).send({
+        results: [{ test: 'fsh', value: '50', testDate: '2026-08-20' }],
+      });
+      expect(again.body.data[0].id).toBe(add.body.data[0].id);
+      const replaced = await api('get', `/branch/patients/${patientId}/blood-work`, doctorUser);
+      expect(replaced.body.data.tests[0].points).toEqual([
+        expect.objectContaining({ date: '2026-08-20', value: '50.000' }),
+        expect.objectContaining({ date: '2026-09-25', value: '30.000' }),
+      ]);
+
       const id = add.body.data[2].id;
       const fixed = await api('patch', `/branch/patients/${patientId}/blood-work/${id}`, frontDesk).send({
         value: '31',

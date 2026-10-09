@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Blood work upsert by date (done 2026-10-09)
+
+- `POST /branch/patients/:id/blood-work` updates the existing row when the same test already has a result on that date.
+- The list returns one point per test and date (the latest).
+
 ## Referral patient name, link form defaults (done 2026-10-09)
 
 - The referral section accepts `name`, which updates the patient like `dateOfBirth`, and returns it.
