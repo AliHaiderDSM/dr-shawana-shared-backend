@@ -36637,6 +36637,19 @@
               "enum": [
                 "true"
               ],
+              "description": "Sales not completed yet: a payment is missing or awaiting approval, or an online order is not dispatched. Cancelled orders are left out."
+            },
+            "required": false,
+            "description": "Sales not completed yet: a payment is missing or awaiting approval, or an online order is not dispatched. Cancelled orders are left out.",
+            "name": "pending",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ],
               "description": "Only sales with money still to receive (unpaid or partly paid)"
             },
             "required": false,

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Sales pending filter (done 2026-10-09)
+
+- `GET /branch/sales?pending=true` returns sales that are not completed, leaving out cancelled and returned orders.
+
 ## Dispatch delivers, slips by sale ids (done 2026-10-09)
 
 - Dispatching an online order sets `deliveryStatus` to delivered, with both `dispatchedOn` and `deliveredOn` set to the dispatch date.

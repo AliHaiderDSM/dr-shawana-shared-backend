@@ -612,6 +612,9 @@ describe('POS sales', () => {
         deliveryStatus: string | null;
       }[];
       expect(completed.map((s) => s.id)).not.toContain(order.body.data.id);
+      const pending = (await api('get', '/branch/sales?pending=true', admin)).body.data as { id: string }[];
+      expect(pending.map((s) => s.id)).toContain(order.body.data.id);
+      expect(pending.some((p) => completed.some((s) => s.id === p.id))).toBe(false);
       expect(
         completed.every(
           (s) =>

@@ -183,6 +183,10 @@ export const saleListQuerySchema = listQuerySchema(['date', 'createdAt', 'invoic
       description:
         'Only fully paid and approved sales that are handed over: office sales, or online orders dispatched or delivered',
     }),
+    pending: z.enum(['true']).optional().openapi({
+      description:
+        'Sales not completed yet: a payment is missing or awaiting approval, or an online order is not dispatched. Cancelled orders are left out.',
+    }),
     due: z
       .enum(['true'])
       .optional()
