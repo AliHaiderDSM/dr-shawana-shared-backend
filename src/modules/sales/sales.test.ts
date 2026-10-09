@@ -657,6 +657,12 @@ describe('POS sales', () => {
         refund: { amount: '600', method: 'online', accountSheetId: bankSheet },
       });
       expect(tooBig.status).toBe(422);
+      const unapproved = await api('post', `/branch/sales/${order.body.data.id}/cancel`, admin).send({
+        refund: { amount: '500', method: 'online', accountSheetId: bankSheet },
+      });
+      expect(unapproved.status).toBe(422);
+      expect(unapproved.body.error.message).toContain('Approve the payments first');
+      await api('post', `/branch/sales/${order.body.data.id}/payments/approve`, admin).send({});
       const cancelled = await api('post', `/branch/sales/${order.body.data.id}/cancel`, admin).send({
         refund: { amount: '500', method: 'online', accountSheetId: bankSheet, date: '2026-10-05' },
       });

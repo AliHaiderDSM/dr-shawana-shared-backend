@@ -171,13 +171,22 @@ async function refundFields(
   if (!(await accountSheetsRepository.findById(branchId, refund.accountSheetId, manager))) {
     throw AppError.badRequest('The refund account does not exist in this branch');
   }
-  const available = new Decimal(sale.received).minus(await refundedFor(manager, sale.id, excludeReturnId));
+  const [paid] = (await manager.query(
+    `SELECT COALESCE(SUM(amount) FILTER (WHERE approved_at IS NOT NULL), 0)::text AS approved,
+            COALESCE(SUM(amount) FILTER (WHERE approved_at IS NULL), 0)::text AS waiting
+       FROM sale_payments WHERE sale_id = $1 AND deleted_at IS NULL`,
+    [sale.id],
+  )) as { approved: string; waiting: string }[];
+  const available = new Decimal(paid?.approved ?? 0).minus(
+    await refundedFor(manager, sale.id, excludeReturnId),
+  );
   if (new Decimal(refund.amount).greaterThan(available)) {
+    const waiting = new Decimal(paid?.waiting ?? 0);
     throw AppError.unprocessable(
-      `The refund cannot be more than the ${toMoney(available).toFixed(2)} received`,
-      {
-        available: toMoney(available).toFixed(2),
-      },
+      waiting.greaterThan(0)
+        ? `Approve the payments first. Only ${toMoney(available).toFixed(2)} is approved and can be refunded; ${toMoney(waiting).toFixed(2)} is awaiting approval.`
+        : `The refund cannot be more than the ${toMoney(available).toFixed(2)} received`,
+      { available: toMoney(available).toFixed(2), awaitingApproval: toMoney(waiting).toFixed(2) },
     );
   }
   return {
