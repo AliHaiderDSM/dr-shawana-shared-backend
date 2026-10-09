@@ -22,6 +22,16 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient link intake form (done 2026-10-09)
+
+- **Link tokens:** they now carry `appointmentId` and `issuedBy`, the staff member who copied the link. Older links stay history-only.
+- **`GET /public/patient-history/:token`** adds:
+  - `phone`;
+  - `form`: appointmentNo, date, and the saved data of the basic_info, medical_history and additional_symptoms sections;
+  - `resources`: the plans ticked Yes.
+- **`PUT /public/patient-history/:token/sections/:key`** saves one of those three sections into the appointment's consultation, opening the consultation if needed. It uses the same validation as Remarks 2.0, and the audit records it as the issuing staff member.
+- **`POST /public/patient-history/:token/medical-records`** takes multipart "data" ({type, note}) and "files", and adds a medical record or imaging entry to the appointment.
+
 ## No approval after cancel (done 2026-10-09)
 
 - `POST /branch/sales/:id/payments/approve` returns 409 for a cancelled order.

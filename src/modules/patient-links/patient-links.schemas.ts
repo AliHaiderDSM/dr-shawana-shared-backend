@@ -5,6 +5,13 @@ import { securedDocs } from '../../lib/openapi-crud';
 
 export const tokenParamsSchema = z.object({ token: z.string().min(10).max(2000) });
 export const tokenFileParamsSchema = tokenParamsSchema.extend({ fileId: z.uuid() });
+export const tokenSectionParamsSchema = tokenParamsSchema.extend({
+  key: z.enum(['basic_info', 'medical_history', 'additional_symptoms']),
+});
+export const publicRecordSchema = z.object({
+  type: z.enum(['medical_record', 'imaging']).default('medical_record'),
+  note: z.string().trim().max(5000).nullable().optional(),
+});
 
 export const patientLinkSchema = registry.register(
   'PatientLink',
@@ -18,6 +25,20 @@ export const publicPatientHistorySchema = registry.register(
       .object({ name: z.string(), phone: z.string().nullable(), address: z.string().nullable() })
       .nullable(),
     patient: z.object({ name: z.string(), city: z.string() }),
+    phone: z.string().optional(),
+    form: z
+      .object({
+        appointmentNo: z.number().int(),
+        date: z.iso.date(),
+        sections: z.record(z.string(), z.record(z.string(), z.unknown()).nullable()),
+      })
+      .nullable()
+      .optional()
+      .openapi({ description: 'The intake form of the linked appointment; null for history-only links' }),
+    resources: z.array(z.string()).optional().openapi({
+      description:
+        'Educational resources ticked Yes: glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine',
+    }),
     expiresAt: z.iso.datetime(),
     appointments: z.array(
       z.object({
@@ -100,6 +121,36 @@ registry.registerPath({
       description: 'Signed URL',
       ...jsonContent(dataEnvelope(z.object({ url: z.string(), expiresIn: z.number() }))),
     },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  tags: ['Public'],
+  method: 'put',
+  path: '/public/patient-history/{token}/sections/{key}',
+  summary:
+    'The patient fills an intake section of the linked appointment (basic info, diagnosed with, other symptoms). No login.',
+  request: { params: tokenSectionParamsSchema, body: jsonContent(z.record(z.string(), z.unknown())) },
+  responses: {
+    200: {
+      description: 'Saved',
+      ...jsonContent(
+        dataEnvelope(z.object({ key: z.string(), data: z.record(z.string(), z.unknown()).nullable() })),
+      ),
+    },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  tags: ['Public'],
+  method: 'post',
+  path: '/public/patient-history/{token}/medical-records',
+  summary: 'The patient uploads medical records or imaging (multipart "data" + "files"). No login.',
+  request: { params: tokenParamsSchema },
+  responses: {
+    200: { description: 'Uploaded', ...jsonContent(dataEnvelope(z.object({ id: z.uuid() }))) },
     ...errorResponses,
   },
 });

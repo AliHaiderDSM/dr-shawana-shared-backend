@@ -71,6 +71,42 @@ describe('patient history links', () => {
     expect(JSON.stringify(history.body.data)).not.toContain(patientId);
   });
 
+  it('lets the patient fill the intake form and shows the ticked resources', async () => {
+    const { token } = (await api(`/branch/appointments/${appointmentId}/patient-link`, admin)).body.data;
+    const empty = await api(`/public/patient-history/${token}`);
+    expect(empty.body.data.form).toMatchObject({ appointmentNo: 1, sections: { basic_info: null } });
+    expect(empty.body.data.resources).toEqual([]);
+
+    const bad = await request(app)
+      .put(`/api/v1/public/patient-history/${token}/sections/basic_info`)
+      .send({ name: 'Ayesha' });
+    expect(bad.status).toBe(400);
+    const saved = await request(app).put(`/api/v1/public/patient-history/${token}/sections/basic_info`).send({
+      name: 'Ayesha Khan',
+      age: 41,
+      city: 'Lahore',
+      country: 'Pakistan',
+      weightKg: '68',
+      heightFeet: '5.4',
+      maritalStatus: 'single',
+    });
+    expect(saved.status).toBe(200);
+    expect(
+      (await request(app).put(`/api/v1/public/patient-history/${token}/sections/plans`).send({})).status,
+    ).toBe(400);
+
+    const consultation = await api(`/branch/appointments/${appointmentId}/consultation`, admin);
+    expect(consultation.body.data.sections.basic_info.data).toMatchObject({ name: 'Ayesha Khan', age: 41 });
+    await request(app)
+      .put(`/api/v1/branch/consultations/${consultation.body.data.id}/sections/plans`)
+      .set(bearer(admin))
+      .send({ glpDietPlan: 'yes', hairCareRoutine: 'yes', liverDetox: 'no' });
+
+    const after = await api(`/public/patient-history/${token}`);
+    expect(after.body.data.form.sections.basic_info).toMatchObject({ weightKg: expect.anything() });
+    expect(after.body.data.resources).toEqual(['glpDietPlan', 'hairCareRoutine']);
+  });
+
   it('rejects tampered tokens and unknown files', async () => {
     const { token } = (await api(`/branch/appointments/${appointmentId}/patient-link`, admin)).body.data;
     const [body, signature] = token.split('.');
