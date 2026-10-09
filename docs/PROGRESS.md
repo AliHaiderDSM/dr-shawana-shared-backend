@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient history report in posSoft order (done 2026-10-10)
+
+- Rows carry `sr`, `patientCode` (PatID-n, by patient creation order) and `namePhone`. There is no doctor column.
+- Numeric fields (age, BMI, MRS answers and scores, labs) default to 0.
+
 ## Symptom severity, consultation history (done 2026-10-10)
 
 - `additional_symptoms` accepts `severity` {symptom: 0–3}.

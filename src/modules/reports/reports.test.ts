@@ -349,7 +349,9 @@ describe('accounts, expenses, reports and dashboard', () => {
 
       const history = await report('patient-history', admin);
       expect(history.body.data.rows[0]).toMatchObject({
-        patient: 'Ayesha',
+        sr: 1,
+        patientCode: expect.stringMatching(/^PatID-\d+$/),
+        namePhone: expect.stringContaining('Ayesha'),
         menopauseStage: 'perimenopause',
         hotFlushes: 4,
         somaticMrs: 4,

@@ -490,7 +490,18 @@ export const reportsService = {
         .find((b) => b.patientId === patientId && b.test === test && b.testDate <= date)
         ?.value.toString() ?? '';
 
-    const rows = consultations.map((c) => {
+    const numbers = patientIds.length
+      ? ((await query(
+          `SELECT id, n::int AS n FROM (
+             SELECT id, ROW_NUMBER() OVER (ORDER BY created_at, id) AS n FROM patients
+           ) ranked WHERE id = ANY($1)`,
+          [patientIds],
+        )) as { id: string; n: number }[])
+      : [];
+    const patientNo = new Map(numbers.map((p) => [p.id, p.n]));
+    const zero = (value: unknown) => (value === null || value === undefined || value === '' ? 0 : value);
+
+    const rows = consultations.map((c, index) => {
       const section = (key: string) => (c.sections ?? []).find((s) => s.sectionKey === key)?.data ?? {};
       const mrs = section('mrs_scale');
       const scores = mrsScores(mrs);
@@ -498,15 +509,14 @@ export const reportsService = {
       const date = c.appointment?.date ?? '';
       return {
         branch: c.branch?.code,
-        patientId: c.patientId,
-        patient: c.patient?.name,
-        phone: c.patient?.phone,
-        age: c.patient?.age,
+        sr: index + 1,
+        patientCode: `PatID-${patientNo.get(c.patientId) ?? '?'}`,
+        namePhone: [c.patient?.name, c.patient?.phone].filter(Boolean).join('\n'),
+        age: zero(c.patient?.age),
         city: c.patient?.city,
         country: c.patient?.country,
         date,
-        doctor: c.doctor?.displayName,
-        bmi: section('basic_info').bmi ?? '',
+        bmi: zero(section('basic_info').bmi),
         menopauseStage: ((section('clinical_assessment').menopauseStage as string[] | undefined) ?? []).join(
           ', ',
         ),
@@ -524,15 +534,15 @@ export const reportsService = {
             'sexualProblems',
             'bladderProblems',
             'vaginalDryness',
-          ].map((k) => [k, mrs[k] ?? '']),
+          ].map((k) => [k, zero(mrs[k])]),
         ),
-        somaticMrs: hasMrs ? scores.somatic : '',
-        psychologicalMrs: hasMrs ? scores.psychological : '',
-        urogenitalMrs: hasMrs ? scores.urogenital : '',
-        totalMrs: hasMrs ? scores.total : '',
-        fsh: latest(c.patientId, 'fsh', date),
-        estradiol: latest(c.patientId, 'estradiol', date),
-        totalTestosterone: latest(c.patientId, 'testosterone_total', date),
+        somaticMrs: hasMrs ? scores.somatic : 0,
+        psychologicalMrs: hasMrs ? scores.psychological : 0,
+        urogenitalMrs: hasMrs ? scores.urogenital : 0,
+        totalMrs: hasMrs ? scores.total : 0,
+        fsh: zero(latest(c.patientId, 'fsh', date)),
+        estradiol: zero(latest(c.patientId, 'estradiol', date)),
+        totalTestosterone: zero(latest(c.patientId, 'testosterone_total', date)),
         progesteroneTreatment: treatment(c.id, /^pres_progest/),
         estradiolTreatment: treatment(c.id, /^pres_estradiol[12]$/),
         vaginalTreatment: treatment(c.id, /^pres_(estradiolVaginal|dheaVaginal|mixVaginal)$/),
@@ -544,13 +554,13 @@ export const reportsService = {
       scope,
       'Patient History Report',
       [
-        { key: 'patient', label: 'Name' },
-        { key: 'phone', label: 'Phone' },
+        { key: 'sr', label: 'Sr No.' },
+        { key: 'patientCode', label: 'ID' },
+        { key: 'namePhone', label: 'Name / Phone' },
         { key: 'age', label: 'Age' },
         { key: 'city', label: 'City' },
         { key: 'country', label: 'Country' },
         { key: 'date', label: 'Date' },
-        { key: 'doctor', label: 'Doctor' },
         { key: 'bmi', label: 'BMI' },
         { key: 'menopauseStage', label: 'Menopause Status' },
         { key: 'menopauseAge', label: 'Age at Menopause' },
