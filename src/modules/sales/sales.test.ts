@@ -668,6 +668,18 @@ describe('POS sales', () => {
       });
       expect(cancelled.status).toBe(200);
       expect(cancelled.body.data.deliveryStatus).toBe('cancelled');
+      const unpaid = await api('post', '/branch/sales', admin).send({
+        patientId,
+        saleType: 'online',
+        date: '2026-10-04',
+        items: [{ productId: toner, qty: '1' }],
+        payments: [{ method: 'online', amount: '300', accountSheetId: bankSheet, date: '2026-10-04' }],
+      });
+      expect((await api('post', `/branch/sales/${unpaid.body.data.id}/cancel`, admin).send({})).status).toBe(
+        200,
+      );
+      const late = await api('post', `/branch/sales/${unpaid.body.data.id}/payments/approve`, admin).send({});
+      expect(late.status).toBe(409);
       expect((await balance(toner)).reservedQuantity).toBe('0.000');
       const refunds = (await api('get', `/branch/returns?saleId=${order.body.data.id}`, admin)).body.data;
       expect(refunds).toEqual([

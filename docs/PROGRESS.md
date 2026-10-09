@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## No approval after cancel (done 2026-10-09)
+
+- `POST /branch/sales/:id/payments/approve` returns 409 for a cancelled order.
+
 ## Refunds only from approved payments (done 2026-10-09)
 
 - A refund (on a return or a cancelled order) can be at most the approved payments minus earlier refunds. If payments are still awaiting approval, the 422 says "Approve the payments first".

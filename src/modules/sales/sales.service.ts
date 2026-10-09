@@ -1164,6 +1164,11 @@ export const salesService = {
   async approvePayments(actor: Actor, branchId: string, id: string, paymentIds?: string[]) {
     return withTransaction(async (em) => {
       const sale = await getSale(branchId, id, em);
+      if (sale.deliveryStatus === 'cancelled') {
+        throw AppError.conflict(
+          `${sale.invoiceNo} was cancelled, so its payments can no longer be approved. Approve and refund before cancelling.`,
+        );
+      }
       const pending = (sale.payments ?? []).filter(
         (p) => !p.approvedAt && (!paymentIds?.length || paymentIds.includes(p.id)),
       );
