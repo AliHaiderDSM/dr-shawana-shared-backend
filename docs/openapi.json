@@ -6316,6 +6316,11 @@
                 "type": "string",
                 "format": "date"
               },
+              "defaults": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Patient name, age, city and country to prefill the basic information"
+              },
               "sections": {
                 "type": "object",
                 "additionalProperties": {
@@ -6330,6 +6335,7 @@
             "required": [
               "appointmentNo",
               "date",
+              "defaults",
               "sections"
             ],
             "description": "The intake form of the linked appointment; null for history-only links"
@@ -8673,6 +8679,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 255
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
           },
           "dateOfBirth": {
             "type": "string",

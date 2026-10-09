@@ -78,7 +78,10 @@ async function formContext(token: string, ip: string | null) {
 
 async function publicForm(appointmentId: string | null) {
   if (!appointmentId) return { form: null, resources: [] as string[] };
-  const appointment = await repo(Appointment).findOne({ where: { id: appointmentId } });
+  const appointment = await repo(Appointment).findOne({
+    where: { id: appointmentId },
+    relations: { patient: true },
+  });
   if (!appointment) return { form: null, resources: [] as string[] };
   const viewer = { branchId: appointment.branchId, doctorId: null };
   const consultation = await consultationsService.forAppointment(viewer, appointmentId).catch(() => null);
@@ -87,6 +90,12 @@ async function publicForm(appointmentId: string | null) {
     form: {
       appointmentNo: appointment.appointmentNo,
       date: appointment.date,
+      defaults: {
+        name: appointment.patient?.name ?? null,
+        age: appointment.patient?.age ?? null,
+        city: appointment.patient?.city ?? null,
+        country: appointment.patient?.country ?? null,
+      },
       sections: Object.fromEntries(
         PUBLIC_SECTIONS.map((key) => [key, consultation?.sections[key]?.data ?? null]),
       ) as Record<PublicSectionKey, Record<string, unknown> | null>,

@@ -70,7 +70,7 @@ function patientValues(patient: Patient | undefined, key: SectionKey) {
   if (key === 'basic_info') {
     return { name: patient.name, age: patient.age, city: patient.city, country: patient.country };
   }
-  if (key === 'referral') return { dateOfBirth: patient.dateOfBirth };
+  if (key === 'referral') return { name: patient.name, dateOfBirth: patient.dateOfBirth };
   return {};
 }
 

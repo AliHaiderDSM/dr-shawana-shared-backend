@@ -30,6 +30,9 @@ export const publicPatientHistorySchema = registry.register(
       .object({
         appointmentNo: z.number().int(),
         date: z.iso.date(),
+        defaults: z
+          .record(z.string(), z.unknown())
+          .openapi({ description: 'Patient name, age, city and country to prefill the basic information' }),
         sections: z.record(z.string(), z.record(z.string(), z.unknown()).nullable()),
       })
       .nullable()

@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Referral patient name, link form defaults (done 2026-10-09)
+
+- The referral section accepts `name`, which updates the patient like `dateOfBirth`, and returns it.
+- The public link `form` carries `defaults` (patient name, age, city, country).
+
 ## Patient link intake form (done 2026-10-09)
 
 - **Link tokens:** they now carry `appointmentId` and `issuedBy`, the staff member who copied the link. Older links stay history-only.

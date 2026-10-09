@@ -381,6 +381,7 @@ const requiredText = (max: number) => z.string().trim().min(1).max(max);
 export const referralSchema = z.object({
   referredTo: requiredText(255),
   specialty: requiredText(255),
+  name: z.string().trim().min(1).max(150).optional(),
   dateOfBirth: dateInput,
   date: dateInput,
   referringDoctorName: requiredText(150),
@@ -413,7 +414,7 @@ export type SectionData<K extends SectionKey> = z.output<(typeof SECTION_SCHEMAS
 
 export const PATIENT_FIELDS_BY_SECTION: Partial<Record<SectionKey, readonly string[]>> = {
   basic_info: ['name', 'age', 'city', 'country'],
-  referral: ['dateOfBirth'],
+  referral: ['name', 'dateOfBirth'],
 };
 
 export function bmiOf(weightKg: number, heightFeet: number) {

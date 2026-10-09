@@ -74,7 +74,11 @@ describe('patient history links', () => {
   it('lets the patient fill the intake form and shows the ticked resources', async () => {
     const { token } = (await api(`/branch/appointments/${appointmentId}/patient-link`, admin)).body.data;
     const empty = await api(`/public/patient-history/${token}`);
-    expect(empty.body.data.form).toMatchObject({ appointmentNo: 1, sections: { basic_info: null } });
+    expect(empty.body.data.form).toMatchObject({
+      appointmentNo: 1,
+      defaults: { name: 'Ayesha', city: 'Lahore' },
+      sections: { basic_info: null },
+    });
     expect(empty.body.data.resources).toEqual([]);
 
     const bad = await request(app)
