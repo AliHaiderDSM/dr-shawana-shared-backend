@@ -1,5 +1,6 @@
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
+import { AppDataSource } from '../../database/data-source';
 import { repo, withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
@@ -163,6 +164,61 @@ export const consultationsService = {
   },
 
   get: (viewer: Viewer, id: string) => toDetail(viewer, id),
+
+  async history(viewer: Viewer, id: string) {
+    const consultation = await getConsultation(viewer, id);
+    const date = consultation.appointment?.date ?? null;
+    const [visits, prescriptions, previous] = await Promise.all([
+      AppDataSource.query(
+        `SELECT a.id, a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
+                a.visit_type AS "visitType", a.status, a.issues, a.remark, d.display_name AS doctor
+           FROM appointments a
+           LEFT JOIN doctors d ON d.id = a.doctor_id
+          WHERE a.patient_id = $1 AND a.id <> $2 AND a.deleted_at IS NULL AND a.status <> 'cancelled'
+          ORDER BY a.date DESC, a.time_from DESC
+          LIMIT 30`,
+        [consultation.patientId, consultation.appointmentId],
+      ) as Promise<Record<string, unknown>[]>,
+      AppDataSource.query(
+        `SELECT p.id, p.prescription_no AS "prescriptionNo", to_char(p.date, 'YYYY-MM-DD') AS date,
+                d.display_name AS doctor, (p.consultation_id = $2) AS "thisVisit"
+           FROM prescriptions p
+           LEFT JOIN doctors d ON d.id = p.doctor_id
+          WHERE p.patient_id = $1 AND p.deleted_at IS NULL
+          ORDER BY p.date DESC, p.prescription_no DESC`,
+        [consultation.patientId, id],
+      ) as Promise<
+        { id: string; prescriptionNo: number; date: string; doctor: string | null; thisVisit: boolean }[]
+      >,
+      AppDataSource.query(
+        `SELECT cs.data, a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date
+           FROM consultation_sections cs
+           JOIN consultations c ON c.id = cs.consultation_id AND c.deleted_at IS NULL
+           JOIN appointments a ON a.id = c.appointment_id
+          WHERE c.patient_id = $1 AND c.id <> $2 AND cs.section_key = 'additional_symptoms'
+            AND cs.deleted_at IS NULL AND ($3::date IS NULL OR a.date <= $3::date)
+          ORDER BY a.date DESC, a.time_from DESC
+          LIMIT 1`,
+        [consultation.patientId, id, date],
+      ) as Promise<{ data: Record<string, unknown>; appointmentNo: number; date: string }[]>,
+    ]);
+    return {
+      visits,
+      prescriptions: prescriptions.map((p) => ({
+        ...p,
+        thisVisit: p.thisVisit === true,
+        previous: p.thisVisit !== true && (date === null || p.date < date),
+      })),
+      previousSymptoms: previous[0]
+        ? {
+            appointmentNo: previous[0].appointmentNo,
+            date: previous[0].date,
+            symptoms: (previous[0].data.symptoms as string[] | undefined) ?? [],
+            severity: (previous[0].data.severity as Record<string, number> | undefined) ?? {},
+          }
+        : null,
+    };
+  },
 
   async open(actor: Actor, viewer: Viewer, appointmentId: string) {
     return withTransaction(async (em) => {

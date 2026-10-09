@@ -265,6 +265,44 @@ describe('consultations and clinical records', () => {
       expect((await api('delete', `/branch/consultations/${consultationId}`, frontDesk)).status).toBe(403);
     });
 
+    it('keeps symptom severity and shows the last visit and prescriptions in the history', async () => {
+      const saved = await api(
+        'put',
+        `/branch/consultations/${consultationId}/sections/additional_symptoms`,
+        doctorUser,
+      ).send({
+        symptoms: ['hair_loss', 'dry_eyes'],
+        severity: { hair_loss: 2, dry_eyes: 1 },
+      });
+      expect(saved.status).toBe(200);
+      expect(saved.body.data.section.data.severity).toEqual({ hair_loss: 2, dry_eyes: 1 });
+      const tooHigh = await api(
+        'put',
+        `/branch/consultations/${consultationId}/sections/additional_symptoms`,
+        doctorUser,
+      ).send({
+        symptoms: ['hair_loss'],
+        severity: { hair_loss: 5 },
+      });
+      expect(tooHigh.status).toBe(400);
+
+      const followup = await api(
+        'post',
+        `/branch/appointments/${followupAppointmentId}/consultation`,
+        frontDesk,
+      );
+      const history = await api('get', `/branch/consultations/${followup.body.data.id}/history`, doctorUser);
+      expect(history.status).toBe(200);
+      expect(history.body.data.previousSymptoms).toMatchObject({
+        date: '2026-09-01',
+        symptoms: ['hair_loss', 'dry_eyes'],
+        severity: { hair_loss: 2 },
+      });
+      expect(history.body.data.visits.map((v: { date: string }) => v.date)).toContain('2026-09-01');
+      const first = await api('get', `/branch/consultations/${consultationId}/history`, doctorUser);
+      expect(first.body.data.previousSymptoms).toBeNull();
+    });
+
     it('marks a consultation completed', async () => {
       const res = await api('post', `/branch/consultations/${consultationId}/status`, doctorUser).send({
         status: 'completed',

@@ -305,8 +305,14 @@ export const ADDITIONAL_SYMPTOMS = [
   'voice_changes',
 ] as const;
 
+export const SYMPTOM_SEVERITIES = [0, 1, 2, 3] as const;
+
 export const additionalSymptomsSchema = z.object({
   symptoms: flags(ADDITIONAL_SYMPTOMS),
+  severity: z
+    .partialRecord(z.enum(ADDITIONAL_SYMPTOMS), z.coerce.number().int().min(0).max(3))
+    .default({})
+    .openapi({ description: 'Severity 0–3 of each ticked symptom' }),
   other: text(1000),
 });
 

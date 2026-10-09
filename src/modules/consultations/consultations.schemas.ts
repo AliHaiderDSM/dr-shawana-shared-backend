@@ -237,3 +237,52 @@ registry.registerPath({
     ...errorResponses,
   },
 });
+
+export const consultationHistorySchema = registry.register(
+  'ConsultationHistory',
+  z.object({
+    visits: z.array(
+      z.object({
+        id: z.uuid(),
+        appointmentNo: z.number().int(),
+        date: z.iso.date(),
+        visitType: z.string(),
+        status: z.string(),
+        issues: z.string().nullable(),
+        remark: z.string().nullable(),
+        doctor: z.string().nullable(),
+      }),
+    ),
+    prescriptions: z.array(
+      z.object({
+        id: z.uuid(),
+        prescriptionNo: z.number().int(),
+        date: z.iso.date(),
+        doctor: z.string().nullable(),
+        thisVisit: z.boolean(),
+        previous: z.boolean(),
+      }),
+    ),
+    previousSymptoms: z
+      .object({
+        appointmentNo: z.number().int(),
+        date: z.iso.date(),
+        symptoms: z.array(z.string()),
+        severity: z.record(z.string(), z.number()),
+      })
+      .nullable(),
+  }),
+);
+
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/consultations/{id}/history',
+  summary:
+    'The patient’s other appointments with their issues and remarks, every prescription (previous or new), and the additional symptoms of the last earlier visit',
+  request: byId,
+  responses: {
+    200: { description: 'History', ...jsonContent(dataEnvelope(consultationHistorySchema)) },
+    ...errorResponses,
+  },
+});

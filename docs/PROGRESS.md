@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Symptom severity, consultation history (done 2026-10-10)
+
+- `additional_symptoms` accepts `severity` {symptom: 0–3}.
+- `GET /branch/consultations/:id/history` returns:
+  - the other appointments of the patient (issues, remark, doctor);
+  - every prescription, flagged `previous` or `thisVisit`;
+  - `previousSymptoms` from the latest earlier visit.
+
 ## Blood work upsert by date (done 2026-10-09)
 
 - `POST /branch/patients/:id/blood-work` updates the existing row when the same test already has a result on that date.
