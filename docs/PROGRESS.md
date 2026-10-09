@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Appointment fee (done 2026-10-10)
+
+- Migration `1791500000000-AppointmentFee` adds `appointments.fee`. Existing rows get the larger of the doctor fee and the amount already received.
+- Create defaults the fee to the doctor fee, and update can change it.
+- The DTO adds `fee`, `remainingAmount` and `paymentStatus` (paid / partial / unpaid).
+- The patient-history report is open to `consultations.view`; doctors see only their own patients.
+
 ## Patient history report in posSoft order (done 2026-10-10)
 
 - Rows carry `sr`, `patientCode` (PatID-n, by patient creation order) and `namePhone`. There is no doctor column.

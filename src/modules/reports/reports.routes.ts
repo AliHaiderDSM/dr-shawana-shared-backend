@@ -78,7 +78,12 @@ mount(
   doctorSalesQuerySchema,
   reportsService.doctorSales,
 );
-mount('patient-history', adminOrAccountant, patientHistoryQuerySchema, reportsService.patientHistory);
+mount(
+  'patient-history',
+  requirePermission('consultations.view'),
+  patientHistoryQuerySchema,
+  reportsService.patientHistory,
+);
 mount('finance', requirePermission('accounts.view'), financeQuerySchema, reportsService.finance);
 mount(
   'accounts-balance',

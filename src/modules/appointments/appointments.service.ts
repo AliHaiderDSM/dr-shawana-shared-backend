@@ -1,3 +1,4 @@
+import { Decimal, toMoney } from '../../database/transformers';
 import { AppDataSource } from '../../database/data-source';
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
@@ -52,6 +53,24 @@ const toFileDto = (f: AppointmentAttachment | MedicalRecordFile) => ({
   createdAt: f.createdAt,
 });
 
+function balanceOf(fee: Decimal | string | null | undefined, paid: AppointmentPayment[]) {
+  const total = new Decimal(fee ?? 0);
+  const received = paid.reduce((sum, p) => sum.plus(p.amount), new Decimal(0));
+  const remaining = Decimal.max(total.minus(received), 0);
+  const status = received.isZero()
+    ? total.isZero()
+      ? 'paid'
+      : 'unpaid'
+    : remaining.isZero()
+      ? 'paid'
+      : 'partial';
+  return {
+    fee: toMoney(total),
+    remainingAmount: toMoney(remaining),
+    paymentStatus: status as 'paid' | 'partial' | 'unpaid',
+  };
+}
+
 function toAppointmentDto(a: Appointment, paid: AppointmentPayment[] = []) {
   const { patient, doctor, payments: _payments, ...rest } = withoutInternals(a);
   return {
@@ -67,6 +86,7 @@ function toAppointmentDto(a: Appointment, paid: AppointmentPayment[] = []) {
       : null,
     doctor: doctor ? { id: doctor.id, name: doctor.displayName } : null,
     ...paymentTotals(paid),
+    ...balanceOf(a.fee, paid),
   };
 }
 
@@ -240,7 +260,7 @@ export const appointmentsService = {
 
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
-        await doctorsService.lockBookable(branchId, input.doctorId, em);
+        const doctor = await doctorsService.lockBookable(branchId, input.doctorId, em);
         const patient = input.patient
           ? await patientsService.createRecord(actor, branchId, input.patient, em)
           : await patientsService.require(input.patientId as string, em);
@@ -262,6 +282,7 @@ export const appointmentsService = {
             mode: input.mode,
             visitType: input.visitType,
             issues: input.issues ?? null,
+            fee: (input.fee ?? doctor.consultationFee) as never,
             status: 'booked',
             source: 'dashboard',
           },

@@ -72,6 +72,9 @@ export const createAppointmentSchema = registry.register(
       mode: z.enum(APPOINTMENT_MODES),
       visitType: z.enum(VISIT_TYPES),
       issues: optionalText(20000),
+      fee: moneyInput
+        .optional()
+        .openapi({ description: "Appointment fee. Defaults to the doctor's consultation fee" }),
       medicalRecord: z
         .object({ note: optionalText(20000), date: dateInput.optional() })
         .optional()
@@ -97,6 +100,7 @@ export const updateAppointmentSchema = registry.register(
       mode: z.enum(APPOINTMENT_MODES),
       visitType: z.enum(VISIT_TYPES),
       issues: z.string().trim().max(20000).nullable(),
+      fee: moneyInput,
     }),
   ).refine(timeRangeValid, timeRangeIssue),
 );
@@ -229,7 +233,12 @@ const appointmentBase = {
   remark: z.string().nullable(),
   status: z.enum(APPOINTMENT_STATUSES),
   source: z.enum(APPOINTMENT_SOURCES),
+  fee: moneyOutput,
   receivedAmount: moneyOutput,
+  remainingAmount: moneyOutput.openapi({ description: 'Fee minus received, never below zero' }),
+  paymentStatus: z.enum(['paid', 'partial', 'unpaid']).openapi({
+    description: 'paid: fee fully received; partial: an advance was received; unpaid: nothing yet',
+  }),
   paymentMethods: z.array(z.enum(PAYMENT_METHODS)),
   createdBy: z.uuid().nullable(),
   createdAt: z.iso.datetime(),

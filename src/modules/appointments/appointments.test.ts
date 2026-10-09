@@ -117,6 +117,9 @@ describe('appointments and payments', () => {
       patient: { name: 'Ayesha Khan', phone: '03001234567' },
       doctor: { id: doctorId, name: 'Dr. Shawana' },
       receivedAmount: '3000.00',
+      fee: '0.00',
+      remainingAmount: '0.00',
+      paymentStatus: 'paid',
       paymentMethods: ['cash', 'online'],
     });
     expect(res.body.data.appointmentNo).toEqual(expect.any(Number));
@@ -407,5 +410,32 @@ describe('appointments and payments', () => {
     expect((await api('get', `/branch/appointments/${appointmentId}`, frontDesk)).status).toBe(404);
     const report = await api('get', '/branch/appointment-payments', admin);
     expect(report.body.data).toEqual([]);
+  });
+
+  it('tracks an advance against the appointment fee', async () => {
+    const advance = await api('post', '/branch/appointments', frontDesk).send(
+      booking({
+        date: '2026-12-01',
+        timeFrom: '16:00',
+        timeTo: '16:30',
+        fee: '5000',
+        payments: [{ method: 'cash', amount: '2000', accountSheetId: cashSheetId }],
+      }),
+    );
+    expect(advance.status).toBe(201);
+    expect(advance.body.data).toMatchObject({
+      fee: '5000.00',
+      receivedAmount: '2000.00',
+      remainingAmount: '3000.00',
+      paymentStatus: 'partial',
+    });
+    const lowered = await api('patch', `/branch/appointments/${advance.body.data.id}`, frontDesk).send({
+      fee: '2000',
+    });
+    expect(lowered.body.data).toMatchObject({ remainingAmount: '0.00', paymentStatus: 'paid' });
+    const unpaid = await api('post', '/branch/appointments', frontDesk).send(
+      booking({ date: '2026-12-02', timeFrom: '16:00', timeTo: '16:30', fee: '1500' }),
+    );
+    expect(unpaid.body.data).toMatchObject({ paymentStatus: 'unpaid', remainingAmount: '1500.00' });
   });
 });

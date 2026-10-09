@@ -1,5 +1,7 @@
 import { Check, Column, Entity, Generated, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { type Decimal } from 'decimal.js';
 import { BranchScopedEntity } from '../../database/branch-scoped.entity';
+import { moneyColumn } from '../../database/transformers';
 import { Doctor } from '../doctors/doctor.entity';
 import { Patient } from '../patients/patient.entity';
 import { AppointmentPayment } from './appointment-payment.entity';
@@ -63,6 +65,9 @@ export class Appointment extends BranchScopedEntity {
 
   @Column({ type: 'text', nullable: true })
   issues: string | null;
+
+  @Column({ ...moneyColumn({ default: '0' }), name: 'fee' })
+  fee: Decimal;
 
   @Column({ type: 'text', nullable: true })
   remark: string | null;
