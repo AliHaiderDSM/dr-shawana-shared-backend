@@ -267,3 +267,24 @@ registry.registerPath({
   request: { params: recordFileParamsSchema, query: branchQuerySchema },
   responses: { 204: { description: 'Removed' }, ...errorResponses },
 });
+
+export const readReportSchema = registry.register(
+  'ReadBloodReport',
+  z.object({
+    testDate: z.iso.date().nullable(),
+    results: z.array(z.object({ test: z.enum(BLOOD_TESTS), value: z.string(), unit: z.string() })),
+  }),
+);
+
+registry.registerPath({
+  ...securedDocs('Clinical records'),
+  method: 'post',
+  path: '/branch/patients/{id}/blood-work/read-report',
+  summary:
+    'Read blood work values from an uploaded report (multipart "file": PDF or image) with AI. Nothing is saved; the caller reviews and saves.',
+  request: { params: idParamsSchema, query: branchQuerySchema },
+  responses: {
+    200: { description: 'Values found', ...jsonContent(dataEnvelope(readReportSchema)) },
+    ...errorResponses,
+  },
+});

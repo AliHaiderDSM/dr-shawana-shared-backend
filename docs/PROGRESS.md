@@ -22,6 +22,22 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## OpenAI for report reading (done 2026-10-10)
+
+- `AI_PROVIDER` chooses `openai` or `gemini`, and defaults to openai when `OPENAI_API_KEY` is set.
+- OpenAI uses the Responses API with `OPENAI_MODEL` (default gpt-5.4-mini), PDF as input_file and photos as input_image, a strict JSON schema, and low reasoning effort.
+- Errors name the key to check (401) and report a missing balance (429).
+
+## Gemini model update (done 2026-10-10)
+
+- gemini-2.5-flash is closed to new keys, so the default is now gemini-3.8-flash with `thinkingLevel: low`, which keeps answers fast. Gemini 2 models use `thinkingBudget: 0`.
+- Gemini failures are logged with their reason. A 404 tells you to change GEMINI_MODEL, and a 400/403 shows Google’s message.
+
+## AI blood report reading (done 2026-10-10)
+
+- `POST /branch/patients/:id/blood-work/read-report` takes a multipart "file" (PDF or image). It calls Gemini (`GEMINI_API_KEY`, `GEMINI_MODEL` defaulting to gemini-2.5-flash) with a JSON schema, and returns {testDate, results} for the known tests. Nothing is saved.
+- Errors: 503 without a key, 400 for other file types, 502 when the AI fails or is rate limited.
+
 ## Appointment fee (done 2026-10-10)
 
 - Migration `1791500000000-AppointmentFee` adds `appointments.fee`. Existing rows get the larger of the doctor fee and the amount already received.

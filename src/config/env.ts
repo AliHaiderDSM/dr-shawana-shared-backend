@@ -52,6 +52,12 @@ const envSchema = z
           .filter(Boolean),
       ),
 
+    AI_PROVIDER: z.enum(['openai', 'gemini']).optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    OPENAI_MODEL: z.string().default('gpt-5.4-mini'),
+    GEMINI_API_KEY: z.string().optional(),
+    GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
+
     SUPER_ADMIN_EMAIL: z.union([z.email(), z.literal('')]).optional(),
     SUPER_ADMIN_PASSWORD: z.string().optional(),
   })

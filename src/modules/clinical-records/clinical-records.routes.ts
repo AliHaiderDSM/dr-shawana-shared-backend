@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
-import { documentsUpload, jsonDataField, uploadedFiles } from '../../lib/upload';
+import { documentsUpload, documentUpload, jsonDataField, requireFile, uploadedFiles } from '../../lib/upload';
+import { readBloodReport } from './report-reader';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
@@ -41,6 +42,17 @@ clinicalRecordsRouter.post(
   async (req, res) => {
     const input = validBody(req, addBloodWorkSchema);
     sendCreated(res, await bloodWorkService.add(actorFrom(req), branchIdOf(req), idOf(req), input));
+  },
+);
+
+clinicalRecordsRouter.post(
+  `${base}/blood-work/read-report`,
+  ...scoped,
+  canCreate,
+  documentUpload('file'),
+  validate({ params: idParamsSchema }),
+  async (req, res) => {
+    sendOk(res, await readBloodReport(requireFile(req)));
   },
 );
 
