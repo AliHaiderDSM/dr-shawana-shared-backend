@@ -336,3 +336,9 @@ export const saleSchema = registry.register(
 export type DispatchInput = z.output<typeof dispatchSchema>;
 export type CancelOrderInput = z.output<typeof cancelOrderSchema>;
 export type DeliveriesQuery = z.output<typeof deliveriesQuerySchema>;
+
+export const onlineCatalogQuerySchema = z.object({
+  search: z.string().trim().max(100).optional(),
+  categoryId: z.uuid().optional(),
+  branchId: z.uuid().optional(),
+});

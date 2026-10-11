@@ -35,10 +35,11 @@ export async function stockProducts(
   if (ids.length === 0) return new Map();
   const rows: { saleProductId: string; stockProductId: string | null; name: string }[] = await manager.query(
     `SELECT sp.id AS "saleProductId", sp.name,
+            CASE WHEN sp.branch_id = $1 THEN sp.id ELSE
             (SELECT dp.id FROM products dp
               WHERE dp.branch_id = $1 AND dp.deleted_at IS NULL AND sp.origin_product_id IS NOT NULL
                 AND dp.origin_product_id = sp.origin_product_id
-              ORDER BY dp.created_at LIMIT 1) AS "stockProductId"
+              ORDER BY dp.created_at LIMIT 1) END AS "stockProductId"
        FROM products sp WHERE sp.id = ANY($2)`,
     [sale.fulfillmentBranchId, ids],
   );

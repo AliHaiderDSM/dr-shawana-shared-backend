@@ -17,6 +17,7 @@ import {
   createSalePaymentSchema,
   createSaleSchema,
   deliveriesQuerySchema,
+  onlineCatalogQuerySchema,
   deliveryCalendarQuerySchema,
   deliverySlipsQuerySchema,
   dispatchSchema,
@@ -364,4 +365,39 @@ registry.registerPath({
   summary: 'Remove a payment; totals are recomputed',
   request: paymentRequest,
   responses: { 204: { description: 'Removed' }, ...errorResponses },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/branch/sales/online-catalog',
+  summary:
+    'Products an online order can take: the Dispatch Department catalog with the stock still free (stock minus orders waiting for dispatch). Empty when there is no Dispatch Department.',
+  request: { query: onlineCatalogQuerySchema },
+  responses: {
+    200: {
+      description: 'Catalog',
+      ...jsonContent(
+        dataEnvelope(
+          z.object({
+            dispatch: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+            items: z.array(
+              z.object({
+                id: z.uuid(),
+                name: z.string(),
+                batchNo: z.string().nullable(),
+                unit: z.string(),
+                salePrice: moneyOutput,
+                imageUrl: z.string().nullable(),
+                trackSerials: z.boolean(),
+                categoryName: z.string().nullable(),
+                available: quantityOutput,
+              }),
+            ),
+          }),
+        ),
+      ),
+    },
+    ...errorResponses,
+  },
 });

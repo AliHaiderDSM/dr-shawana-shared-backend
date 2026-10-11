@@ -290,4 +290,34 @@ describe('Dispatch Department ships every online order from its own stock', () =
     const lahoreToner = await productIn(lahoreId, 'Rose Toner');
     expect((await stock(lahoreToner, lahoreId))!.quantity).toBe('0.000');
   });
+
+  it('lets any branch book online from the Dispatch Department catalog without holding the product', async () => {
+    const catalog = await as(isbDesk, 'get', '/branch/sales/online-catalog?search=serum');
+    expect(catalog.status).toBe(200);
+    expect(catalog.body.data.dispatch).toMatchObject({ id: dispatchId });
+    const serumRow = (catalog.body.data.items as { id: string; name: string; available: string }[]).find(
+      (i) => i.name === 'Vitamin C Serum',
+    )!;
+    expect(serumRow.available).toBe('5.000');
+    const isbProducts = (await as(isbDesk, 'get', '/branch/products?pageSize=100')).body.data as {
+      name: string;
+    }[];
+    expect(isbProducts.map((p) => p.name)).not.toContain('Vitamin C Serum');
+
+    const order = await online(isbDesk, [{ productId: serumRow.id, qty: '2' }], isbCash);
+    expect(order.status).toBe(201);
+    expect(order.body.data.fulfillmentBranchId).toBe(dispatchId);
+    const after = (await as(isbDesk, 'get', '/branch/sales/online-catalog?search=serum')).body.data.items as {
+      name: string;
+      available: string;
+    }[];
+    expect(after.find((i) => i.name === 'Vitamin C Serum')!.available).toBe('3.000');
+
+    const sent = await as(dispatcher, 'post', `/branch/sales/${order.body.data.id}/dispatch`).send({
+      serials: [serials[3], serials[4]],
+    });
+    expect(sent.status).toBe(200);
+    expect((await stock(serumRow.id, dispatchId))!.quantity).toBe('3.000');
+    expect((await as(isbDesk, 'get', '/branch/sales/online-catalog', undefined)).status).toBe(200);
+  });
 });

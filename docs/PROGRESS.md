@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Online catalog from the Dispatch Department (done 2026-10-11)
+
+- `GET /branch/sales/online-catalog` lists the Dispatch Department products with the stock still free (sellable stock minus orders waiting for dispatch). Search and category filters. Empty when there is no department.
+- An online order may use Dispatch Department product ids directly. The branch does not need to hold the product; the Main Warehouse only sends it to the department.
+- Sale, payments and refunds stay with the booking branch. Office sales still need branch stock.
+- Test: a branch that never received the product books it online from the catalog, the free stock drops, and the dispatch takes it from the department.
+
 ## Dispatch Department (done 2026-10-11)
 
 - **New branch kind `dispatch`.** There can be only one. A Super Admin creates it with `POST /admin/branches {kind:'dispatch'}`. Creating it moves every waiting online order to it.

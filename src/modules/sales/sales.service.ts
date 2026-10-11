@@ -8,7 +8,7 @@ import { AppError } from '../../lib/errors';
 import { removeQuietly, uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
 import { withoutInternals } from '../../lib/http';
 import { applyListQuery, escapeLike, pageMeta } from '../../lib/pagination';
-import { BUCKETS, createSignedUrl } from '../../lib/storage';
+import { BUCKETS, createSignedUrl, publicUrl } from '../../lib/storage';
 import { today } from '../../lib/validation';
 import { accountSheetsRepository } from '../accounts/accounts.repository';
 import { auditService } from '../audit/audit.service';
@@ -183,11 +183,17 @@ async function resolveLines(
   branchId: string,
   inputs: SaleItemInput[],
   manager: EntityManager,
+  stockBranchId: string = branchId,
 ): Promise<Line[]> {
   const productIds = inputs.map((i) => i.productId).filter((id): id is string => Boolean(id));
   const bundleIds = inputs.map((i) => i.bundleId).filter((id): id is string => Boolean(id));
   const products = productIds.length
-    ? await repo(Product, manager).findBy(productIds.map((id) => ({ id, branchId })))
+    ? await repo(Product, manager).findBy(
+        productIds.flatMap((id) => [
+          { id, branchId },
+          ...(stockBranchId !== branchId ? [{ id, branchId: stockBranchId }] : []),
+        ]),
+      )
     : [];
   const bundles = bundleIds.length
     ? await repo(Bundle, manager).findBy(bundleIds.map((id) => ({ id, branchId })))
@@ -798,7 +804,7 @@ export const salesService = {
         const patient = input.patient
           ? await patientsService.createRecord(actor, branchId, input.patient, em)
           : await patientsService.require(input.patientId as string, em);
-        const lines = await resolveLines(branchId, input.items, em);
+        const lines = await resolveLines(branchId, input.items, em, fulfiller?.id ?? branchId);
         const received = input.payments.reduce((sum, p) => sum.plus(p.amount), new Decimal(0));
         const totals = saleTotals(lines, received, input, input.payments.length > 0);
         const seq = await nextSequence(em, branchId, 'sale');
@@ -867,7 +873,7 @@ export const salesService = {
         if (input.serials?.length) {
           throw AppError.badRequest('Online orders are scanned when they are dispatched');
         }
-        const lines = await resolveLines(branchId, input.items, em);
+        const lines = await resolveLines(branchId, input.items, em, sale.fulfillmentBranchId ?? branchId);
         for (const old of sale.items ?? []) await saleItems.softDelete(old, actor.userId, em);
         await insertItems(em, actor, sale, lines);
         if (sale.fulfillmentBranchId) await assertDispatchAvailable(em, sale, soldByProduct(lines));
@@ -1028,6 +1034,66 @@ export const salesService = {
       );
       return toSaleDto(await getOrder(branchId, id, em));
     });
+  },
+
+  async onlineCatalog(query: { search?: string; categoryId?: string }) {
+    const department = await dispatchDepartment(AppDataSource.manager);
+    if (!department) return { dispatch: null, items: [] };
+    const params: unknown[] = [department.id, today()];
+    const where = ['p.branch_id = $1', 'p.deleted_at IS NULL', "p.status = 'active'"];
+    if (query.search) {
+      params.push(`%${escapeLike(query.search)}%`);
+      where.push(
+        `(p.name ILIKE $${params.length} OR p.sku ILIKE $${params.length} OR p.batch_no ILIKE $${params.length} OR p.barcode ILIKE $${params.length})`,
+      );
+    }
+    if (query.categoryId) {
+      params.push(query.categoryId);
+      where.push(`c.name = (SELECT name FROM categories WHERE id = $${params.length})`);
+    }
+    const rows: {
+      id: string;
+      name: string;
+      batchNo: string | null;
+      unit: string;
+      salePrice: string;
+      imagePath: string | null;
+      trackSerials: boolean;
+      categoryName: string | null;
+      sellable: string;
+      reserved: string;
+    }[] = await AppDataSource.query(
+      `SELECT p.id, p.name, p.batch_no AS "batchNo", p.unit, p.sale_price::text AS "salePrice",
+              p.image_path AS "imagePath", p.track_serials AS "trackSerials", c.name AS "categoryName",
+              COALESCE((SELECT SUM(m.qty) FROM stock_movements m LEFT JOIN product_batches b ON b.id = m.batch_id
+                         WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $2::date)), 0)::text AS sellable,
+              COALESCE((SELECT SUM(si.qty) FROM sale_items si
+                          JOIN sales s ON s.id = si.sale_id
+                          JOIN products sp ON sp.id = si.product_id
+                         WHERE si.deleted_at IS NULL AND ${RESERVING} AND s.fulfillment_branch_id = $1
+                           AND (si.product_id = p.id
+                             OR (sp.origin_product_id IS NOT NULL AND sp.origin_product_id = p.origin_product_id))), 0)::text AS reserved
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+        WHERE ${where.join(' AND ')}
+        ORDER BY p.name
+        LIMIT 300`,
+      params,
+    );
+    return {
+      dispatch: { id: department.id, name: department.name },
+      items: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        batchNo: r.batchNo,
+        unit: r.unit,
+        salePrice: toMoney(r.salePrice),
+        imageUrl: publicUrl(BUCKETS.productImages, r.imagePath),
+        trackSerials: r.trackSerials,
+        categoryName: r.categoryName,
+        available: toQuantity(Decimal.max(new Decimal(r.sellable).minus(r.reserved), 0)),
+      })),
+    };
   },
 
   async deliveryCalendar(branchId: string, month: string) {

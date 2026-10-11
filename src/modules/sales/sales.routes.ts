@@ -14,6 +14,7 @@ import {
   approvePaymentsSchema,
   cancelOrderSchema,
   deliveriesQuerySchema,
+  onlineCatalogQuerySchema,
   deliveryCalendarQuerySchema,
   deliverySlipsQuerySchema,
   dispatchSchema,
@@ -52,6 +53,15 @@ salesRouter.get(
   async (req, res) => {
     const { month } = validQuery(req, deliveryCalendarQuerySchema);
     sendOk(res, await salesService.deliveryCalendar(branchIdOf(req), month));
+  },
+);
+
+salesRouter.get(
+  `${path}/online-catalog`,
+  can('create'),
+  validate({ query: onlineCatalogQuerySchema }),
+  async (req, res) => {
+    sendOk(res, await salesService.onlineCatalog(validQuery(req, onlineCatalogQuerySchema)));
   },
 );
 
