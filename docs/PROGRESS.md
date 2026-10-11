@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Reclaim orphan logins (2026-10-11)
+
+- Creating staff with an email that already has a Supabase Auth login, but no staff profile (for example after the public schema was reset), reuses that login: new password, metadata and unblocked. A login that still has a profile stays a conflict.
+
 ## Online catalog from the Dispatch Department (done 2026-10-11)
 
 - `GET /branch/sales/online-catalog` lists the Dispatch Department products with the stock still free (sellable stock minus orders waiting for dispatch). Search and category filters. Empty when there is no department.
