@@ -1,4 +1,5 @@
 import { type Session } from '@supabase/supabase-js';
+import { AppDataSource } from '../../database/data-source';
 import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
@@ -23,13 +24,19 @@ function assertCanSignIn(profile: StaffProfile | null): asserts profile is Staff
   }
 }
 
-function toMe(profile: StaffProfile) {
+async function toMe(profile: StaffProfile) {
   const branch = profile.branch;
+  const [dispatch] = (await AppDataSource.query(
+    `SELECT id FROM branches WHERE kind::text = 'dispatch' AND deleted_at IS NULL LIMIT 1`,
+  )) as { id: string }[];
   return {
     profile: toStaffDto(profile),
     role: profile.role,
-    branch: branch ? { id: branch.id, name: branch.name, code: branch.code, city: branch.city } : null,
+    branch: branch
+      ? { id: branch.id, name: branch.name, code: branch.code, city: branch.city, kind: branch.kind }
+      : null,
     permissions: permissionsFor(profile.role),
+    dispatchDepartmentId: dispatch?.id ?? null,
   };
 }
 
@@ -39,14 +46,14 @@ async function loadProfile(userId: string) {
   return profile;
 }
 
-function toSession(session: Session, profile: StaffProfile) {
+async function toSession(session: Session, profile: StaffProfile) {
   return {
     accessToken: session.access_token,
     refreshToken: session.refresh_token,
     tokenType: 'bearer' as const,
     expiresIn: session.expires_in,
     expiresAt: session.expires_at ?? null,
-    me: toMe(profile),
+    me: await toMe(profile),
   };
 }
 
@@ -88,14 +95,14 @@ export const authService = {
   },
 
   async me(userId: string) {
-    return toMe(await loadProfile(userId));
+    return await toMe(await loadProfile(userId));
   },
 
   async updateOwnProfile(actor: Actor, input: UpdateOwnProfileInput) {
     const profile = await loadProfile(actor.userId);
     Object.assign(profile, input, { updatedBy: actor.userId });
     await staffRepository.save(profile);
-    return toMe(profile);
+    return await toMe(profile);
   },
 
   async changePassword(actor: Actor, currentPassword: string, newPassword: string) {

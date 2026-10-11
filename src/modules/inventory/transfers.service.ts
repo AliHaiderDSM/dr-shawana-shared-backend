@@ -14,7 +14,7 @@ const stockIns = branchScopedRepository(StockIn, 'si');
 interface BranchRow {
   id: string;
   name: string;
-  kind: 'branch' | 'warehouse';
+  kind: 'branch' | 'warehouse' | 'dispatch';
   status: string;
 }
 
@@ -130,7 +130,7 @@ export const transfersService = {
          FROM branches b WHERE b.id = $1`,
       [branchId],
     )) as { kind: string; hasWarehouse: boolean }[];
-    if (row?.kind === 'branch' && row.hasWarehouse) {
+    if (row?.kind !== 'warehouse' && row?.kind !== undefined && row.hasWarehouse) {
       throw AppError.conflict('Branches do not send stock out. Only the Super Admin stock transfers stock.');
     }
   },
@@ -142,7 +142,7 @@ export const transfersService = {
          FROM branches b WHERE b.id = $1`,
       [branchId],
     )) as { kind: string; hasWarehouse: boolean }[];
-    if (row?.kind === 'branch' && row.hasWarehouse) {
+    if (row?.kind !== 'warehouse' && row?.kind !== undefined && row.hasWarehouse) {
       throw AppError.conflict(
         'Branches get their stock from the Super Admin stock. Ask the Super Admin to transfer it.',
       );
@@ -155,7 +155,9 @@ export const transfersService = {
       throw AppError.badRequest('Stock is transferred to branches from the Super Admin stock only');
     }
     const to = await branchOf(manager, toBranchId);
-    if (!to || to.kind !== 'branch') throw AppError.badRequest('Choose a branch to transfer to');
+    if (!to || (to.kind !== 'branch' && to.kind !== 'dispatch')) {
+      throw AppError.badRequest('Choose a branch or the Dispatch Department to transfer to');
+    }
     if (to.status !== 'active') throw AppError.badRequest(`${to.name} is inactive`);
     return to;
   },

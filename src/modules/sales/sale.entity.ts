@@ -21,6 +21,10 @@ export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 @Check('CHK_sales_delivery', `("sale_type" = 'online') = ("delivery_status" IS NOT NULL)`)
 @Check('CHK_sales_discount', `"discount_percent" >= 0 AND "discount_percent" <= 100`)
 export class Sale extends BranchScopedEntity {
+  @Index()
+  @Column({ name: 'fulfillment_branch_id', type: 'uuid', nullable: true })
+  fulfillmentBranchId: string | null;
+
   @Column({ name: 'invoice_seq', type: 'integer' })
   invoiceSeq: number;
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { dataEnvelope, errorResponses, jsonContent } from '../../lib/http';
 import { bearerAuth, registry } from '../../lib/openapi';
 import { ROLES } from '../../lib/permissions';
+import { BRANCH_KINDS } from '../branches/branch.entity';
 import { GENDERS } from '../staff/staff-profile.entity';
 import { passwordSchema, staffSchema } from '../staff/staff.schemas';
 
@@ -42,7 +43,13 @@ export const updateOwnProfileSchema = registry.register(
     .refine((v) => Object.keys(v).length > 0, 'Provide at least one field to update'),
 );
 
-const meBranchSchema = z.object({ id: z.uuid(), name: z.string(), code: z.string(), city: z.string() });
+const meBranchSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  code: z.string(),
+  city: z.string(),
+  kind: z.enum(BRANCH_KINDS),
+});
 
 export const meSchema = registry.register(
   'Me',
@@ -51,6 +58,10 @@ export const meSchema = registry.register(
     role: z.enum(ROLES),
     branch: meBranchSchema.nullable(),
     permissions: z.array(z.string()),
+    dispatchDepartmentId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: 'The Dispatch Department, when one exists: online orders ship from it' }),
   }),
 );
 

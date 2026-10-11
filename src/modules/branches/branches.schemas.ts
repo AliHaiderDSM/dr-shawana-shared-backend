@@ -21,7 +21,15 @@ const branchFields = z.object({
   logoPath: optionalText(500),
 });
 
-export const createBranchSchema = registry.register('CreateBranch', branchFields);
+export const createBranchSchema = registry.register(
+  'CreateBranch',
+  branchFields.extend({
+    kind: z.enum(['branch', 'dispatch']).default('branch').openapi({
+      description:
+        'dispatch: the single Dispatch Department that ships every online order from its own stock',
+    }),
+  }),
+);
 
 export const updateBranchSchema = registry.register(
   'UpdateBranch',
@@ -44,7 +52,8 @@ export const branchSchema = registry.register(
     email: z.string().nullable(),
     logoPath: z.string().nullable(),
     kind: z.enum(BRANCH_KINDS).openapi({
-      description: 'warehouse: the Super Admin stock (Super Admin only); branch: a selling branch',
+      description:
+        'warehouse: the Super Admin stock (Super Admin only); branch: a selling branch; dispatch: the Dispatch Department that ships online orders',
     }),
     status: z.enum(BRANCH_STATUSES),
     createdAt: z.iso.datetime(),

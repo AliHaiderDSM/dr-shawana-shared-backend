@@ -22,6 +22,7 @@ import {
   type ResolveItemInput,
   type ReturnListQuery,
 } from './returns.schemas';
+import { stockBranchOf, stockProducts } from '../sales/fulfilment';
 
 const returns = branchScopedRepository(SaleReturn, 'sr');
 const returnItems = branchScopedRepository(SaleReturnItem, 'ri');
@@ -52,6 +53,14 @@ async function restoreSources(manager: EntityManager, saleId: string) {
   ];
 }
 const SEQUENCE_KEY = 'sale_return';
+
+async function stockBranchOfSale(manager: EntityManager, saleId: string, fallback: string) {
+  const sale = await repo(Sale, manager).findOne({
+    where: { id: saleId },
+    select: { id: true, branchId: true, fulfillmentBranchId: true },
+  });
+  return sale ? stockBranchOf(sale) : fallback;
+}
 
 interface SaleLine {
   productId: string;
@@ -235,6 +244,12 @@ async function insertReturn(
     manager,
   );
   const ref = { type: REFERENCE, id: created.id, label: created.returnNo };
+  const stockMap = await stockProducts(
+    manager,
+    sale,
+    items.map((i) => i.productId),
+    false,
+  );
   for (const item of items) {
     if (!item.serials?.length) {
       await returnItems.create(
@@ -251,7 +266,7 @@ async function insertReturn(
       continue;
     }
     const pieces = await inventoryItemsService.take(manager, actor, {
-      branchId: sale.branchId,
+      branchId: stockBranchOf(sale),
       serials: item.serials,
       from: ['sold'],
       to: 'returned',
@@ -259,7 +274,7 @@ async function insertReturn(
       ref,
       date: fields.date,
       saleId: sale.id,
-      productIds: new Set([item.productId]),
+      productIds: new Set([stockMap.get(item.productId) ?? item.productId]),
     });
     for (const piece of pieces) {
       const line = await returnItems.create(
@@ -323,10 +338,11 @@ export const returnsService = {
   async get(branchId: string, id: string) {
     const record = await getReturn(branchId, id);
     const manager = repo(SaleReturn).manager;
-    const sold = await stockLedger.batchesFor(manager, branchId, [
+    const stockBranch = await stockBranchOfSale(manager, record.saleId, branchId);
+    const sold = await stockLedger.batchesFor(manager, stockBranch, [
       { referenceType: SALE_REFERENCE, referenceIds: [record.saleId] },
     ]);
-    const restocked = await stockLedger.batchesFor(manager, branchId, [
+    const restocked = await stockLedger.batchesFor(manager, stockBranch, [
       { referenceType: REFERENCE, referenceIds: [record.id] },
     ]);
     const pieces = await inventoryItemsService.itemsOf(manager, {
@@ -353,7 +369,12 @@ export const returnsService = {
     const sold = (await inventoryItemsService.itemsOf(manager, { saleId })).filter(
       (i) => i.status === 'sold',
     );
-    const tracked = await inventoryItemsService.trackedProducts(manager, branchId, [...lines.keys()]);
+    const stockMap = await stockProducts(manager, sale, [...lines.keys()], false);
+    const stockTracked = await inventoryItemsService.trackedProducts(manager, stockBranchOf(sale), [
+      ...new Set(stockMap.values()),
+    ]);
+    const tracked = new Set([...lines.keys()].filter((id) => stockTracked.has(stockMap.get(id) ?? id)));
+    const stockIdOf = (id: string) => stockMap.get(id) ?? id;
     return {
       saleId,
       invoiceNo: sale.invoiceNo,
@@ -366,7 +387,7 @@ export const returnsService = {
         returned: toQuantity(l.returned),
         returnable: toQuantity(Decimal.max(l.sold.minus(l.returned), 0)),
         trackSerials: tracked.has(l.productId),
-        serials: sold.filter((i) => i.productId === l.productId).map((i) => i.serial),
+        serials: sold.filter((i) => i.productId === stockIdOf(l.productId)).map((i) => i.serial),
       })),
     };
   },
@@ -393,10 +414,17 @@ export const returnsService = {
       if (problems.length) {
         throw AppError.unprocessable('More was returned than the sale still holds', { items: problems });
       }
-      const tracked = await inventoryItemsService.trackedProducts(
+      const stockMap = await stockProducts(
         em,
-        branchId,
+        sale,
         input.items.map((i) => i.productId),
+        false,
+      );
+      const stockTracked = await inventoryItemsService.trackedProducts(em, stockBranchOf(sale), [
+        ...new Set(stockMap.values()),
+      ]);
+      const tracked = new Set(
+        input.items.map((i) => i.productId).filter((id) => stockTracked.has(stockMap.get(id) ?? id)),
       );
       const unscanned = input.items.filter(
         (i) => tracked.has(i.productId) && !new Decimal(i.qty).equals(i.serials?.length ?? 0),
@@ -435,9 +463,11 @@ export const returnsService = {
     const sold = (await inventoryItemsService.itemsOf(manager, { saleId: sale.id })).filter(
       (i) => i.status === 'sold',
     );
+    const stockMap = await stockProducts(manager, sale, [...lines.keys()], false);
     const remaining = [...lines.values()]
       .map((l) => {
-        const serials = sold.filter((i) => i.productId === l.productId).map((i) => i.serial);
+        const stockId = stockMap.get(l.productId) ?? l.productId;
+        const serials = sold.filter((i) => i.productId === stockId).map((i) => i.serial);
         return {
           productId: l.productId,
           qty: l.sold.minus(l.returned),
@@ -492,6 +522,9 @@ export const returnsService = {
         ['returned', 'quarantined'].includes(p.status),
       );
       const pieceRef = { type: REFERENCE, id: record.id, label: record.returnNo };
+      const owner = await repo(Sale, em).findOneByOrFail({ id: record.saleId });
+      const stockBranch = stockBranchOf(owner);
+      const stockMap = await stockProducts(em, owner, [item.productId], false);
       if (pieces.length > 0) {
         await inventoryItemsService.setStatus(em, actor, {
           ids: pieces.map((p) => p.id),
@@ -503,7 +536,12 @@ export const returnsService = {
         if (input.disposition === 'restocked') {
           await stockLedger.apply(
             em,
-            { branchId, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
+            {
+              branchId: stockBranch,
+              referenceType: REFERENCE,
+              referenceId: record.id,
+              actorId: actor.userId,
+            },
             inventoryItemsService.movements(pieces, 1, {
               type: 'sale_return',
               date: today(),
@@ -514,10 +552,10 @@ export const returnsService = {
       } else if (input.disposition === 'restocked') {
         await stockLedger.apply(
           em,
-          { branchId, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
+          { branchId: stockBranch, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
           [
             {
-              productId: item.productId,
+              productId: stockMap.get(item.productId) ?? item.productId,
               type: 'sale_return',
               qty: item.qty,
               restoreFrom: await restoreSources(em, record.saleId),

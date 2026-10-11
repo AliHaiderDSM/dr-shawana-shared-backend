@@ -228,6 +228,11 @@ export const deliveryOrderSchema = registry.register(
     received: moneyOutput,
     remaining: moneyOutput,
     paymentStatus: z.enum(PAYMENT_STATUSES),
+    branch: z
+      .object({ id: z.uuid(), code: z.string(), name: z.string() })
+      .nullable()
+      .openapi({ description: 'Branch that booked the order' }),
+    createdBy: z.uuid().nullable(),
     city: z.string(),
     note: z.string().nullable(),
     customer: z

@@ -1,3 +1,4 @@
+import { In } from 'typeorm';
 import { repo } from '../../database/transaction';
 import { AppError } from '../../lib/errors';
 import { today } from '../../lib/validation';
@@ -88,7 +89,9 @@ export const saleDocumentsService = {
       .leftJoinAndSelect('sale.items', 'item', 'item.deletedAt IS NULL')
       .leftJoinAndSelect('item.product', 'product')
       .where("(sale.deliveryStatus IS NULL OR sale.deliveryStatus <> 'cancelled')");
-    if (branchId) qb.andWhere('sale.branchId = :branchId', { branchId });
+    const viewer = branchId ? await repo(Branch).findOneBy({ id: branchId }) : null;
+    if (viewer?.kind === 'dispatch') qb.andWhere('sale.fulfillmentBranchId = :branchId', { branchId });
+    else if (branchId) qb.andWhere('sale.branchId = :branchId', { branchId });
     if (query.saleIds) qb.andWhere('sale.id IN (:...saleIds)', { saleIds: query.saleIds });
     if (query.patientId) qb.andWhere('sale.patientId = :patientId', { patientId: query.patientId });
     if (query.saleType) qb.andWhere('sale.saleType = :saleType', { saleType: query.saleType });
@@ -106,6 +109,13 @@ export const saleDocumentsService = {
       .addOrderBy('sale.invoiceSeq', 'DESC')
       .getMany();
     const company = await companyService.get().catch(() => null);
+    const fulfillers = new Map(
+      (
+        await repo(Branch).findBy({
+          id: In([...new Set(rows.flatMap((r) => (r.fulfillmentBranchId ? [r.fulfillmentBranchId] : [])))]),
+        })
+      ).map((b) => [b.id, b]),
+    );
     const senderOf = (branch: Branch | undefined) => ({
       name: company?.name ?? branch?.name ?? '',
       phone: branch?.phone ?? company?.phone ?? null,
@@ -133,7 +143,7 @@ export const saleDocumentsService = {
           name: i.product?.name ?? '',
           qty: i.qty,
         })),
-        from: senderOf(sale.branch),
+        from: senderOf(sale.fulfillmentBranchId ? fulfillers.get(sale.fulfillmentBranchId) : sale.branch),
       })),
     };
   },

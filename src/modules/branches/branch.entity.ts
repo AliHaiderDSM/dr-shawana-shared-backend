@@ -4,7 +4,7 @@ import { BaseEntity } from '../../database/base.entity';
 export const BRANCH_STATUSES = ['active', 'inactive'] as const;
 export type BranchStatus = (typeof BRANCH_STATUSES)[number];
 
-export const BRANCH_KINDS = ['branch', 'warehouse'] as const;
+export const BRANCH_KINDS = ['branch', 'warehouse', 'dispatch'] as const;
 export type BranchKind = (typeof BRANCH_KINDS)[number];
 
 @Entity('branches')

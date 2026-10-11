@@ -59,10 +59,24 @@ export const branchesService = {
   async create(actor: Actor, input: CreateBranchInput) {
     return withTransaction(async (em) => {
       await assertCodeAvailable(input.code, undefined, em);
+      if (input.kind === 'dispatch') {
+        const [existing] = (await em.query(
+          `SELECT name FROM branches WHERE kind::text = 'dispatch' AND deleted_at IS NULL LIMIT 1`,
+        )) as { name: string }[];
+        if (existing) throw AppError.conflict(`${existing.name} is already the Dispatch Department`);
+      }
       const branch = await branchesRepository.create(
-        { ...input, kind: 'branch', status: 'active', createdBy: actor.userId },
+        { ...input, kind: input.kind ?? 'branch', status: 'active', createdBy: actor.userId },
         em,
       );
+      if (branch.kind === 'dispatch') {
+        await em.query(
+          `UPDATE sales SET fulfillment_branch_id = $1, updated_at = now()
+            WHERE sale_type = 'online' AND delivery_status = 'pending' AND deleted_at IS NULL
+              AND fulfillment_branch_id IS NULL`,
+          [branch.id],
+        );
+      }
       await catalogService.seedBranch(branch.id, em);
       await auditService.record(
         {

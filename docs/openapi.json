@@ -109,7 +109,8 @@
               "team_manager",
               "pharmacy",
               "store_keeper",
-              "delivery_print"
+              "delivery_print",
+              "dispatcher"
             ]
           },
           "password": {
@@ -245,7 +246,8 @@
               "team_manager",
               "pharmacy",
               "store_keeper",
-              "delivery_print"
+              "delivery_print",
+              "dispatcher"
             ]
           }
         }
@@ -288,7 +290,8 @@
               "team_manager",
               "pharmacy",
               "store_keeper",
-              "delivery_print"
+              "delivery_print",
+              "dispatcher"
             ]
           },
           "firstName": {
@@ -485,7 +488,8 @@
               "team_manager",
               "pharmacy",
               "store_keeper",
-              "delivery_print"
+              "delivery_print",
+              "dispatcher"
             ]
           },
           "branch": {
@@ -506,13 +510,22 @@
               },
               "city": {
                 "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "branch",
+                  "warehouse",
+                  "dispatch"
+                ]
               }
             },
             "required": [
               "id",
               "name",
               "code",
-              "city"
+              "city",
+              "kind"
             ]
           },
           "permissions": {
@@ -520,13 +533,22 @@
             "items": {
               "type": "string"
             }
+          },
+          "dispatchDepartmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The Dispatch Department, when one exists: online orders ship from it"
           }
         },
         "required": [
           "profile",
           "role",
           "branch",
-          "permissions"
+          "permissions",
+          "dispatchDepartmentId"
         ]
       },
       "Session": {
@@ -611,6 +633,15 @@
               "null"
             ],
             "maxLength": 500
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "branch",
+              "dispatch"
+            ],
+            "default": "branch",
+            "description": "dispatch: the single Dispatch Department that ships every online order from its own stock"
           }
         },
         "required": [
@@ -711,9 +742,10 @@
             "type": "string",
             "enum": [
               "branch",
-              "warehouse"
+              "warehouse",
+              "dispatch"
             ],
-            "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch"
+            "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch; dispatch: the Dispatch Department that ships online orders"
           },
           "status": {
             "type": "string",
@@ -3486,7 +3518,8 @@
             "type": "string",
             "enum": [
               "branch",
-              "warehouse"
+              "warehouse",
+              "dispatch"
             ]
           },
           "productId": {
@@ -12415,6 +12448,14 @@
               null
             ]
           },
+          "fulfillmentBranchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Dispatch Department that ships this online order from its own stock"
+          },
           "dispatchedOn": {
             "type": [
               "string",
@@ -12645,6 +12686,7 @@
           "remaining",
           "paymentStatus",
           "deliveryStatus",
+          "fulfillmentBranchId",
           "dispatchedOn",
           "deliveredOn",
           "paymentMethods",
@@ -12810,6 +12852,37 @@
               "awaiting_approval"
             ]
           },
+          "branch": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "description": "Branch that booked the order"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
           "city": {
             "type": "string"
           },
@@ -12896,6 +12969,8 @@
           "received",
           "remaining",
           "paymentStatus",
+          "branch",
+          "createdBy",
           "city",
           "note",
           "customer",
@@ -13634,7 +13709,8 @@
                 "team_manager",
                 "pharmacy",
                 "store_keeper",
-                "delivery_print"
+                "delivery_print",
+                "dispatcher"
               ]
             },
             "required": false,
@@ -15175,9 +15251,10 @@
                             "type": "string",
                             "enum": [
                               "branch",
-                              "warehouse"
+                              "warehouse",
+                              "dispatch"
                             ],
-                            "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch"
+                            "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch; dispatch: the Dispatch Department that ships online orders"
                           }
                         },
                         "required": [
@@ -37905,6 +37982,14 @@
                               null
                             ]
                           },
+                          "fulfillmentBranchId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "uuid",
+                            "description": "Dispatch Department that ships this online order from its own stock"
+                          },
                           "dispatchedOn": {
                             "type": [
                               "string",
@@ -38060,6 +38145,7 @@
                           "remaining",
                           "paymentStatus",
                           "deliveryStatus",
+                          "fulfillmentBranchId",
                           "dispatchedOn",
                           "deliveredOn",
                           "paymentMethods",

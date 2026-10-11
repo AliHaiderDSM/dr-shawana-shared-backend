@@ -22,6 +22,30 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Dispatch Department (done 2026-10-11)
+
+- **New branch kind `dispatch`.** There can be only one. A Super Admin creates it with `POST /admin/branches {kind:'dispatch'}`. Creating it moves every waiting online order to it.
+- **New role `dispatcher`.** Grants: dashboard view, sales view/update, deliveryReport view, returns view, stock view, inventoryReport view, products view.
+- **Migration `1791600000000-DispatchDepartment`:**
+  - enum values `branch_kind.dispatch` and `staff_role.dispatcher`;
+  - `sales.fulfillment_branch_id`.
+- **Online sale while a Dispatch Department exists:**
+  - The sale, its payments and returns stay with the booking branch.
+  - `fulfillment_branch_id` points at the department.
+  - The booking checks and reserves the department's stock, matched through `origin_product_id`. A product the department does not hold gives a 422.
+  - Dispatch is allowed only from the department. It takes the labels and stock from the department.
+  - Items of a dispatched order cannot change.
+- **Branch stock:** reservations ignore orders fulfilled elsewhere. `inventory/stock` reports the department's reserved qty.
+- **Department view:**
+  - `deliveries`, `delivery-calendar` and `delivery-slips` list orders by fulfillment.
+  - Items are mapped to the department's products, and each order carries its `branch`.
+  - Slips use the department's address as sender.
+- **Returns of fulfilled orders:**
+  - Labels are taken from the department and restocked there.
+  - The return record and refund stay with the branch.
+- **Transfers:** the Main Warehouse can stock out to the department. The department cannot receive stock from other places or send stock out.
+- **`/auth/me`:** returns `branch.kind` and `dispatchDepartmentId`.
+
 ## OpenAI for report reading (done 2026-10-10)
 
 - `AI_PROVIDER` chooses `openai` or `gemini`, and defaults to openai when `OPENAI_API_KEY` is set.

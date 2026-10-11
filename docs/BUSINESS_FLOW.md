@@ -342,3 +342,13 @@ These should be confirmed before development starts.
 | Dashboard | Next.js + Tailwind |
 | Mobile | Expo (React Native), later |
 
+
+### Dispatch Department
+
+- One location of kind `dispatch` ships every online order from its own stock. Its stock comes only from the Main Warehouse.
+- **Office sales are unchanged:** branch stock, branch accounts.
+- **Online orders:**
+  - Booked by branch staff. The sale, payments and refunds belong to the booking branch.
+  - Stock is reserved at the Dispatch Department and leaves its inventory on dispatch. Dispatchers scan the department's labels.
+  - Returned online stock is restocked at the Dispatch Department.
+- **Department staff:** dispatchers see one Deliveries board for all branches (which branch, when, who), and print the slips with the department as sender.

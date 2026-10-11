@@ -165,7 +165,7 @@ export const expiryAlertSchema = registry.register(
     batchId: z.uuid(),
     branchId: z.uuid(),
     branchName: z.string(),
-    branchKind: z.enum(['branch', 'warehouse']),
+    branchKind: z.enum(['branch', 'warehouse', 'dispatch']),
     productId: z.uuid(),
     productName: z.string(),
     unit: z.string(),

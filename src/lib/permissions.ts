@@ -8,6 +8,7 @@ export const ROLES = [
   'pharmacy',
   'store_keeper',
   'delivery_print',
+  'dispatcher',
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -134,6 +135,15 @@ const MATRIX: Record<Role, Grants> = {
   delivery_print: {
     dashboard: VIEW,
     deliveryReport: VIEW,
+  },
+  dispatcher: {
+    dashboard: VIEW,
+    sales: ['view', 'update'],
+    deliveryReport: VIEW,
+    returns: VIEW,
+    stock: VIEW,
+    inventoryReport: VIEW,
+    products: VIEW,
   },
 };
 

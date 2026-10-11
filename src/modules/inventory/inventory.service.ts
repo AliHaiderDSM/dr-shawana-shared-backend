@@ -123,7 +123,7 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
                        WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id AND bm.date <= $3), 0)::text AS "inBranch"
        FROM products p
        CROSS JOIN branches b
-      WHERE p.branch_id = $1 AND p.deleted_at IS NULL AND b.kind = 'branch' AND b.deleted_at IS NULL
+      WHERE p.branch_id = $1 AND p.deleted_at IS NULL AND b.kind::text IN ('branch', 'dispatch') AND b.deleted_at IS NULL
         ${filters.map((f) => `AND ${f}`).join(' ')}
       ORDER BY b.name`,
     params.slice(0, 3 + filters.length),
@@ -170,9 +170,15 @@ export const inventoryService = {
       `SELECT b.product_id AS "productId", b.name, b.batch_no AS "batchNo", b.category_id AS "categoryId",
               c.name AS "categoryName", b.unit, b.quantity::text AS quantity,
               b.expired_quantity::text AS "expiredQuantity",
-              COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
-                         WHERE si.product_id = b.product_id AND si.deleted_at IS NULL AND s.deleted_at IS NULL
-                           AND s.sale_type = 'online' AND s.delivery_status = 'pending'), 0)::numeric(12,3)::text AS "reservedQuantity",
+              COALESCE((SELECT SUM(si.qty) FROM sale_items si
+                          JOIN sales s ON s.id = si.sale_id
+                          JOIN products sp ON sp.id = si.product_id
+                          JOIN products tp ON tp.id = b.product_id
+                         WHERE si.deleted_at IS NULL AND s.deleted_at IS NULL
+                           AND s.sale_type = 'online' AND s.delivery_status = 'pending'
+                           AND ((s.fulfillment_branch_id IS NULL AND si.product_id = b.product_id)
+                             OR (s.fulfillment_branch_id = tp.branch_id AND tp.origin_product_id IS NOT NULL
+                                 AND sp.origin_product_id = tp.origin_product_id))), 0)::numeric(12,3)::text AS "reservedQuantity",
               b.low_stock_threshold::text AS "lowStockThreshold", b.is_low_stock AS "isLowStock"
          FROM product_stock_balances b
          LEFT JOIN categories c ON c.id = b.category_id

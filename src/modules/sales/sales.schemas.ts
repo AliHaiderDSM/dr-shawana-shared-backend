@@ -292,6 +292,10 @@ export const saleSchema = registry.register(
     remaining: moneyOutput,
     paymentStatus: z.enum(PAYMENT_STATUSES),
     deliveryStatus: z.enum(DELIVERY_STATUSES).nullable(),
+    fulfillmentBranchId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: 'Dispatch Department that ships this online order from its own stock' }),
     dispatchedOn: z.iso.date().nullable(),
     deliveredOn: z.iso.date().nullable(),
     paymentMethods: z.array(z.enum(PAYMENT_METHODS)),
