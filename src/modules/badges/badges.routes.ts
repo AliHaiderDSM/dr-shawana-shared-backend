@@ -96,10 +96,15 @@ badgesRouter.get(
       one(
         `SELECT COUNT(*)::int AS n FROM sale_returns r JOIN sales s ON s.id = r.sale_id
           WHERE r.status = 'pending' AND r.deleted_at IS NULL
-            AND (r.branch_id = $1 OR s.fulfillment_branch_id = $1)
-            AND EXISTS (SELECT 1 FROM sale_return_items x WHERE x.sale_return_id = r.id AND x.deleted_at IS NULL
-                          AND x.disposition = 'pending' AND x.proposed_disposition IS NULL)`,
-        [branchId],
+            AND (
+              ((r.branch_id = $1 OR s.fulfillment_branch_id = $1)
+                AND EXISTS (SELECT 1 FROM sale_return_items x WHERE x.sale_return_id = r.id AND x.deleted_at IS NULL
+                              AND x.disposition = 'pending' AND x.proposed_disposition IS NULL))
+              OR (r.branch_id = $1 AND $2::boolean
+                AND EXISTS (SELECT 1 FROM sale_return_items x WHERE x.sale_return_id = r.id AND x.deleted_at IS NULL
+                              AND x.proposed_disposition IS NOT NULL AND x.disposition IN ('pending', 'quarantined')))
+            )`,
+        [branchId, req.auth?.role === 'branch_admin'],
       ),
     ]);
     sendOk(res, { stockRequests, incomingStock, writeOffs, discountRequests, returns });

@@ -11,6 +11,7 @@ import { consultationsRouter } from './modules/consultations/consultations.route
 import { discountRequestsRouter } from './modules/discount-requests/discount-requests.routes';
 import { stockRequestsRouter } from './modules/stock-requests/stock-requests.routes';
 import { badgesRouter } from './modules/badges/badges.routes';
+import { traceRouter } from './modules/trace/trace.routes';
 import { doctorsRouter } from './modules/doctors/doctors.routes';
 import { expensesRouter } from './modules/expenses/expenses.routes';
 import { healthRouter } from './modules/health/health.routes';
@@ -33,6 +34,7 @@ export const apiRouter = Router();
 apiRouter.use(healthRouter);
 apiRouter.use(authRouter);
 apiRouter.use(badgesRouter);
+apiRouter.use(traceRouter);
 apiRouter.use(branchesRouter);
 apiRouter.use(companyRouter);
 apiRouter.use(staffRouter);

@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Trace by number, seller approves returns, stock out only on request (2026-10-12)
+
+- `GET /branch/trace/{number}`: any invoice, return, stock request, transfer, discount request or write-off number (any case) with its details, items, linked numbers and the audit steps (who, when). Branches only see records of their branch (or shipped by the Dispatch Department).
+- Online return checks now go to the admin of the branch that made the sale: `POST /branch/returns/{id}/items/{itemId}/approve|reject` (branch_admin of the selling branch; the Super Admin keeps `/admin/...`). The selling branch admin resolves directly. Badges count proposals for that admin.
+- The Super Admin stock sends a Stock Out only with an approved `stockRequestId` (422 otherwise), only those products, at most the approved quantities. Tests use `tests/helpers/stock-requests.ts`.
+
 ## Online return approval (2026-10-12)
 
 - Migration 1792100000000-ReturnApproval: return items keep the proposed outcome, who proposed it, when, and the note.

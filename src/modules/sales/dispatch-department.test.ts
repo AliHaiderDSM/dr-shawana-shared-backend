@@ -2,6 +2,7 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { approvedRequest } from '../../../tests/helpers/stock-requests';
 import { AppDataSource } from '../../database/data-source';
 
 const fake = installFakeSupabase();
@@ -50,6 +51,12 @@ describe('Dispatch Department ships every online order from its own stock', () =
       date: '2026-10-02',
       toBranchId,
       items,
+      stockRequestId: await approvedRequest(
+        app,
+        superAdmin,
+        toBranchId,
+        items as { productId: string; qty: string }[],
+      ),
     });
     if (res.status === 201) {
       const done = await as(

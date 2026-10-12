@@ -105,6 +105,29 @@ for (const action of ['approve', 'reject'] as const) {
         res,
         await returnsService.decideProposal(
           actorFrom(req),
+          null,
+          id,
+          itemId,
+          action === 'approve',
+          validBody(req, decideReturnItemSchema).note,
+        ),
+      );
+    },
+  );
+}
+
+for (const action of ['approve', 'reject'] as const) {
+  returnsRouter.post(
+    `${path}/:id/items/:itemId/${action}`,
+    requireRole('branch_admin'),
+    validate({ params: returnItemParamsSchema, body: decideReturnItemSchema }),
+    async (req, res) => {
+      const { id, itemId } = validParams(req, returnItemParamsSchema);
+      sendOk(
+        res,
+        await returnsService.decideProposal(
+          actorFrom(req),
+          branchIdOf(req),
           id,
           itemId,
           action === 'approve',

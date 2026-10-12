@@ -391,6 +391,16 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             config.kind === 'stock_out' && input.toBranchId
               ? await transfersService.assertRoute(em, branchId, input.toBranchId)
               : null;
+          if (config.kind === 'stock_out' && !input.stockRequestId) {
+            const [from] = (await em.query('SELECT kind FROM branches WHERE id = $1', [branchId])) as {
+              kind: string;
+            }[];
+            if (from?.kind === 'warehouse') {
+              throw AppError.unprocessable(
+                'The Super Admin stock goes out only for a branch stock request. Open the request in Stock Requests and use Send stock.',
+              );
+            }
+          }
           if (input.stockRequestId && !route) {
             throw AppError.badRequest('A stock request is answered with a transfer to the branch that asked');
           }

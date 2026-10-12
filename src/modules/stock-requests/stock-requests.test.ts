@@ -179,6 +179,23 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     expect(done.items).toEqual(
       expect.arrayContaining([expect.objectContaining({ productName: 'Rose Toner', receivedQty: '6.000' })]),
     );
+    const traced = await as(lahoreAdmin, 'get', '/branch/trace/lhr-sr-000001');
+    expect(traced.status).toBe(200);
+    expect(traced.body.data).toMatchObject({
+      kind: 'stock_request',
+      number: 'LHR-SR-000001',
+      status: 'received',
+      links: [{ kind: 'transfer', number: transferNo, status: 'received' }],
+    });
+    expect(traced.body.data.timeline.map((t: { action: string }) => t.action)).toEqual(
+      expect.arrayContaining(['create', 'approve', 'receive']),
+    );
+    const viaTransfer = await as(superAdmin, 'get', `/branch/trace/${transferNo}`);
+    expect(viaTransfer.body.data).toMatchObject({
+      kind: 'transfer',
+      links: [{ kind: 'stock_request', number: 'LHR-SR-000001' }],
+    });
+    expect((await as(lahoreDesk, 'get', '/branch/trace/NOPE-000001')).status).toBe(404);
     const stockIns = (await as(lahoreAdmin, 'get', '/branch/stock-ins')).body.data as { date: string }[];
     expect(stockIns.map((s) => s.date)).toEqual(['2026-10-03', '2026-10-03']);
   });

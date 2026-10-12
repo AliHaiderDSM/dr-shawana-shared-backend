@@ -82,13 +82,10 @@ export const returnListQuerySchema = listQuerySchema(['date', 'createdAt', 'retu
   status: z.enum(RETURN_STATUSES).optional(),
   reason: z.enum(RETURN_REASONS).optional(),
   disposition: z.enum(RETURN_DISPOSITIONS).optional(),
-  stage: z
-    .enum(['inspect', 'approve'])
-    .optional()
-    .openapi({
-      description:
-        'inspect: items nobody checked yet; approve: online return items waiting for the Super Admin',
-    }),
+  stage: z.enum(['inspect', 'approve']).optional().openapi({
+    description:
+      'inspect: items nobody checked yet; approve: online return items waiting for the Super Admin',
+  }),
   productId: z.uuid().optional(),
   saleId: z.uuid().optional(),
   from: dateInput.optional(),

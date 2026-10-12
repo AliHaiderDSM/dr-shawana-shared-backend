@@ -2,6 +2,7 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { approvedRequest } from '../../../tests/helpers/stock-requests';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -44,6 +45,14 @@ describe('Main Warehouse transfers to branches', () => {
     }
     return res;
   };
+
+  const sendOut = async (
+    body: { toBranchId: string; items: ({ productId: string; qty: string } & Record<string, unknown>)[] } & Record<string, unknown>,
+  ) =>
+    asAdmin('post', '/branch/stock-outs').send({
+      ...body,
+      stockRequestId: await approvedRequest(app, superAdmin, body.toBranchId, body.items),
+    });
 
   const stockOf = async (productId: string, branchId: string) => {
     const res = await asAdmin('get', '/branch/inventory/stock?pageSize=100', branchId);
@@ -126,14 +135,14 @@ describe('Main Warehouse transfers to branches', () => {
   });
 
   it('moves stock and labelled pieces to the chosen branch in one step', async () => {
-    const missing = await asAdmin('post', '/branch/stock-outs').send({
+    const missing = await sendOut({
       date: '2026-10-02',
       toBranchId: lahoreId,
       items: [{ productId: serum, qty: '4' }],
     });
     expect(missing.status).toBe(422);
 
-    const res = await asAdmin('post', '/branch/stock-outs').send({
+    const res = await sendOut({
       date: '2026-10-02',
       toBranchId: lahoreId,
       note: 'Weekly supply',
@@ -278,7 +287,7 @@ describe('Main Warehouse transfers to branches', () => {
     expect(sale.body.data.invoiceNo).toMatch(/^LHR-/);
 
     const again = await received(
-      await asAdmin('post', '/branch/stock-outs').send({
+      await sendOut({
         date: '2026-10-03',
         toBranchId: lahoreId,
         items: [{ productId: serum, qty: '2', serials: serials.slice(4, 6) }],
@@ -343,7 +352,7 @@ describe('Main Warehouse transfers to branches', () => {
       items: [{ productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
     });
     await received(
-      await asAdmin('post', '/branch/stock-outs').send({
+      await sendOut({
         date: '2026-10-04',
         toBranchId: lahoreId,
         items: [{ productId: toner, qty: '75' }],
@@ -478,5 +487,17 @@ describe('Main Warehouse transfers to branches', () => {
       items: [{ productId: toner, qty: '1' }],
     });
     expect(plain.status).toBe(400);
+    const outside = await asAdmin('post', '/branch/stock-outs').send({
+      date: '2026-10-04',
+      items: [{ productId: toner, qty: '1', destination: 'Karachi Office' }],
+    });
+    expect(outside.status).toBe(422);
+    expect(outside.body.error.message).toContain('stock request');
+    const direct = await asAdmin('post', '/branch/stock-outs').send({
+      date: '2026-10-04',
+      toBranchId: lahoreId,
+      items: [{ productId: toner, qty: '1' }],
+    });
+    expect(direct.status).toBe(422);
   });
 });

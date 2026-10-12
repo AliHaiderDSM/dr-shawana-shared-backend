@@ -115,3 +115,21 @@ for (const action of ['approve', 'reject'] as const) {
     responses: { 200: one(action === 'approve' ? 'Approved' : 'Rejected'), ...errorResponses },
   });
 }
+
+for (const action of ['approve', 'reject'] as const) {
+  registry.registerPath({
+    ...docs,
+    method: 'post',
+    path: `/branch/returns/{id}/items/{itemId}/${action}`,
+    summary:
+      action === 'approve'
+        ? 'Admin of the branch that made the sale approves what the dispatcher found; the stock follows now'
+        : 'Admin of the selling branch sends the item back to be checked again',
+    request: {
+      params: returnItemParamsSchema,
+      query: branchQuerySchema,
+      body: { content: { 'application/json': { schema: decideReturnItemSchema } } },
+    },
+    responses: { 200: one(action === 'approve' ? 'Approved' : 'Rejected'), ...errorResponses },
+  });
+}

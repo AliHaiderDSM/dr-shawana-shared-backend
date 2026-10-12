@@ -610,7 +610,8 @@ export const returnsService = {
         throw AppError.conflict('This item is already in quarantine');
       }
       const online = record.sale?.saleType === 'online';
-      if (online && !actor.isSuperAdmin) {
+      const sellerAdmin = actor.role === 'branch_admin' && record.branchId === branchId;
+      if (online && !actor.isSuperAdmin && !sellerAdmin) {
         await repo(SaleReturnItem, em).update(
           { id: item.id },
           {
@@ -647,13 +648,17 @@ export const returnsService = {
 
   async decideProposal(
     actor: Actor,
+    branchId: string | null,
     id: string,
     itemId: string,
     approve: boolean,
     note: string | null | undefined,
   ) {
     return withTransaction(async (em) => {
-      const record = await getReturn(null, id, em);
+      const record = await getReturn(branchId, id, em);
+      if (!actor.isSuperAdmin && (record.branchId !== branchId || actor.role !== 'branch_admin')) {
+        throw AppError.forbidden('Only the admin of the branch that made the sale approves this return');
+      }
       const item = record.items?.find((i) => i.id === itemId);
       if (!item) throw AppError.notFound('Return item');
       if (!item.proposedDisposition || item.proposedDisposition === 'pending') {
@@ -681,7 +686,7 @@ export const returnsService = {
           updatedBy: actor.userId,
         },
       );
-      const saved = await getReturn(null, id, em);
+      const saved = await getReturn(branchId, id, em);
       await audit(actor, saved, approve ? `item:approve:${proposed}` : 'item:reject', em, null, {
         itemId,
         disposition: proposed,

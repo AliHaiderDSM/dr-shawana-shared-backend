@@ -352,10 +352,11 @@ describe('POS sales', () => {
       totalQty: '1.000',
     });
     expect(deliveryReturn.returnNo).toMatch(/^LHR-RET-\d{6}$/);
+    const keeper = await createStaff(fake, { role: 'store_keeper', branchId: deliveryReturn.branchId });
     const restocked = await api(
       'post',
       `/branch/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/resolve`,
-      admin,
+      keeper,
     ).send({ disposition: 'restocked', note: 'Sealed' });
     expect(restocked.body.data.status).toBe('pending');
     expect(restocked.body.data.items[0]).toMatchObject({
@@ -363,13 +364,23 @@ describe('POS sales', () => {
       proposedDisposition: 'restocked',
     });
     expect(await stock(serum)).toBe('8.000');
-    const owner = await createStaff(fake, { role: 'super_admin', branchId: null });
-    const waiting = await request(app).get('/api/v1/branch/returns?stage=approve').set(bearer(owner));
+    expect((await api('get', '/branch/badges', admin)).body.data.returns).toBe(1);
+    const waiting = await api('get', '/branch/returns?stage=approve', admin);
     expect(waiting.body.data.map((r: { id: string }) => r.id)).toEqual([deliveryReturn.id]);
-    const approved = await request(app)
-      .post(`/api/v1/admin/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/approve`)
-      .set(bearer(owner))
-      .send({});
+    expect(
+      (
+        await api(
+          'post',
+          `/branch/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/approve`,
+          keeper,
+        ).send({})
+      ).status,
+    ).toBe(403);
+    const approved = await api(
+      'post',
+      `/branch/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/approve`,
+      admin,
+    ).send({});
     expect(approved.body.data.status).toBe('completed');
     expect(await stock(serum)).toBe('9.000');
     expect((await api('delete', `/branch/sales/${onlineSaleId}`, admin)).status).toBe(409);
