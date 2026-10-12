@@ -10,7 +10,9 @@ export class DispatchDepartment1791600000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "sales" ADD CONSTRAINT "FK_sales_fulfillment_branch" FOREIGN KEY ("fulfillment_branch_id") REFERENCES "branches"("id") ON DELETE RESTRICT`,
     );
-    await queryRunner.query(`CREATE INDEX "IDX_sales_fulfillment_branch" ON "sales" ("fulfillment_branch_id")`);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_sales_fulfillment_branch" ON "sales" ("fulfillment_branch_id")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

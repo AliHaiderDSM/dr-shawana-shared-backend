@@ -33,6 +33,13 @@ export const saleItemInputSchema = z
     discountPercent: percentInput
       .optional()
       .openapi({ description: 'Discount on this line only, before the sale discount' }),
+    discountRequestId: z
+      .uuid()
+      .optional()
+      .openapi({
+        description:
+          'The approved discount request that allows discountPercent (not needed for the Super Admin)',
+      }),
   })
   .refine((v) => (v.productId ? 1 : 0) + (v.bundleId ? 1 : 0) === 1, {
     message: 'Give either productId or bundleId',

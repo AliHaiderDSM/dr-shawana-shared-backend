@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Discount requests (2026-10-12)
+
+- New module discount-requests (migration 1791800000000-DiscountRequests): a branch asks for a discount on one product or bundle (qty, %, note); the Super Admin approves or rejects with a note (`/admin/discount-requests/{id}/approve|reject`, pending count at `/admin/discount-requests/pending-count`).
+- A sale line with discountPercent needs an approved request (`items[].discountRequestId`) for the same item, the same %, and qty up to the approved qty. The request becomes used and links to the sale; editing the sale keeps it, dropping the line frees it. The Super Admin needs no request.
+- Every create, cancel, approve and reject is in the audit log.
+
 ## Branch codes, emails, dispatch after verified payment (2026-10-12)
 
 - Branch codes: 2–12 letters or digits with a dash between parts (LHR, LHR-00001), saved in capitals. Migration 1791700000000-BranchCodeFormat widens the column to 12 and replaces the check.

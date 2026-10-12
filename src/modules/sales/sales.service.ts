@@ -25,6 +25,7 @@ import { StockMovement } from '../inventory/stock-movement.entity';
 import { patientsService } from '../patients/patients.service';
 import { returnsService } from '../returns/returns.service';
 import { Product } from '../products/product.entity';
+import { discountRequestsService } from '../discount-requests/discount-requests.service';
 import { nextSequence } from '../sequences/sequences';
 import { SaleItem } from './sale-item.entity';
 import { SalePaymentProof } from './sale-payment-proof.entity';
@@ -829,6 +830,7 @@ export const salesService = {
           em,
         );
         await insertItems(em, actor, sale, lines);
+        await discountRequestsService.consume(em, actor, branchId, sale.id, input.items);
         for (const payment of input.payments) {
           const proofs = proofIndexesOf(payment).flatMap((index) => uploaded[index] ?? []);
           await insertPayment(em, actor, sale, payment, proofs);
@@ -876,6 +878,7 @@ export const salesService = {
         const lines = await resolveLines(branchId, input.items, em, sale.fulfillmentBranchId ?? branchId);
         for (const old of sale.items ?? []) await saleItems.softDelete(old, actor.userId, em);
         await insertItems(em, actor, sale, lines);
+        await discountRequestsService.consume(em, actor, branchId, sale.id, input.items);
         if (sale.fulfillmentBranchId) await assertDispatchAvailable(em, sale, soldByProduct(lines));
         else await assertAvailable(em, branchId, soldByProduct(lines), { excludeSaleId: sale.id });
       } else if (input.items && sale.fulfillmentBranchId) {
@@ -886,6 +889,7 @@ export const salesService = {
         const lines = await resolveLines(branchId, input.items, em);
         for (const old of sale.items ?? []) await saleItems.softDelete(old, actor.userId, em);
         await insertItems(em, actor, sale, lines);
+        await discountRequestsService.consume(em, actor, branchId, sale.id, input.items);
         const wanted = soldByProduct(lines);
         const net = await netStock(em, sale);
         await assertAvailable(em, branchId, wanted, {

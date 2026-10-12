@@ -463,18 +463,65 @@ describe('POS sales', () => {
     expect(next.body.data.invoiceNo).toBe('LHR-000003');
   });
 
-  it('takes a discount on one line and the sale discount on top', async () => {
-    const res = await api('post', '/branch/sales', admin).send({
+  it('takes a line discount only after the Super Admin approves it, with the sale discount on top', async () => {
+    const superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
+    const body = (discountRequestId?: string) => ({
       patientId,
       saleType: 'office',
       discountPercent: '10',
       items: [
-        { productId: serum, qty: '2', discountPercent: '25' },
+        {
+          productId: serum,
+          qty: '2',
+          discountPercent: '25',
+          ...(discountRequestId ? { discountRequestId } : {}),
+        },
         { productId: serum, qty: '1' },
       ],
       payments: pay(),
     });
+    const unasked = await api('post', '/branch/sales', admin).send(body());
+    expect(unasked.status).toBe(422);
+    expect(unasked.body.error.message).toContain('approval');
+    const asked = await api('post', '/branch/discount-requests', frontDesk).send({
+      productId: serum,
+      qty: '2',
+      discountPercent: '25',
+      note: 'Regular patient',
+    });
+    expect(asked.status).toBe(201);
+    expect(asked.body.data).toMatchObject({
+      status: 'pending',
+      discountAmount: '500.00',
+      requestedBy: { id: frontDesk.id, role: 'front_desk' },
+    });
+    const requestId = asked.body.data.id as string;
+    expect((await api('post', '/branch/sales', admin).send(body(requestId))).status).toBe(422);
+    expect((await api('post', `/admin/discount-requests/${requestId}/approve`, admin).send({})).status).toBe(
+      403,
+    );
+    expect((await api('get', '/admin/discount-requests/pending-count', superAdmin)).body.data).toEqual({
+      pending: 1,
+    });
+    const all = await api('get', '/branch/discount-requests?status=pending', superAdmin);
+    expect(all.body.data.map((r: { id: string }) => r.id)).toEqual([requestId]);
+    const approved = await api('post', `/admin/discount-requests/${requestId}/approve`, superAdmin).send({
+      note: 'OK',
+    });
+    expect(approved.body.data).toMatchObject({ status: 'approved', decidedBy: { id: superAdmin.id } });
+    const res = await api('post', '/branch/sales', admin).send(body(requestId));
     expect(res.status).toBe(201);
+    const after = (await api('get', `/branch/discount-requests?ids=${requestId}`, admin)).body.data[0];
+    expect(after).toMatchObject({
+      status: 'used',
+      saleId: res.body.data.id,
+      invoiceNo: res.body.data.invoiceNo,
+    });
+    expect((await api('post', '/branch/sales', admin).send(body(requestId))).status).toBe(422);
+    const bySuper = await api('post', `/branch/sales?branchId=${res.body.data.branchId}`, superAdmin).send(
+      body(),
+    );
+    expect(bySuper.status).toBe(201);
     expect(res.body.data.items.map((i: { discountAmount: string; lineTotal: string }) => i)).toEqual([
       expect.objectContaining({ discountPercent: '25.00', discountAmount: '500.00', lineTotal: '1500.00' }),
       expect.objectContaining({ discountPercent: '0.00', discountAmount: '0.00', lineTotal: '1000.00' }),

@@ -87,7 +87,7 @@ export const staffService = {
     });
 
     try {
-      return await withTransaction(async (em) => {
+      const created = await withTransaction(async (em) => {
         const profile = await staffRepository.insert(
           {
             id: userId,
@@ -120,6 +120,7 @@ export const staffService = {
         await afterInsert?.(em, profile);
         return profile;
       });
+      return created;
     } catch (err) {
       await staffAccounts.remove(userId).catch((cleanupError: unknown) => {
         logger.error({ err: cleanupError, userId }, 'Failed to remove auth user after profile insert failed');
@@ -180,7 +181,7 @@ export const staffService = {
   },
 
   async resetPassword(actor: Actor, branchId: string, id: string, password: string) {
-    return withTransaction(async (em) => {
+    const result = await withTransaction(async (em) => {
       const profile = await getInBranch(branchId, id, em);
       assertNotSelf(actor, profile);
       assertCanManage(actor, profile.role);
@@ -194,6 +195,7 @@ export const staffService = {
       await staffAccounts.setPassword(id, password);
       return toStaffDto(saved);
     });
+    return result;
   },
 
   async setStatus(actor: Actor, branchId: string, id: string, status: StaffStatus) {
