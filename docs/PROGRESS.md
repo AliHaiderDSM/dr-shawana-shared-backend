@@ -25,7 +25,7 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ## Lab Officer and store receipts (2026-10-12)
 
 - Migration 1792400000000-StoreReceipts: staff role lab_officer (Super Admin stock only, with the Warehouse Keeper); Stock In rows get grn_no, receipt_status, received_qty, receipt_note, confirmed_by/at.
-- Every Stock In at the Super Admin stock (Lab Officer or Super Admin) gets a GRN (`MAINWH-GRN-000001`) and waits: no stock movement yet, generated labels are quarantined. `POST /branch/stock-receipts/{grnNo}/confirm` (Warehouse Keeper only) adds the received quantity as stock on the confirm date; short lines keep the received quantity and a note, missing labels are written off. `GET /branch/stock-receipts` lists them; badges count waiting GRNs; trace finds GRN numbers.
+- Every Stock In at the Super Admin stock gets a GRN (`MAINWH-GRN-000001`). The Super Admin's own entry is stock at once (confirmed by them). A Lab Officer entry waits: no stock movement yet, generated labels are quarantined. `POST /branch/stock-receipts/{grnNo}/confirm` (Warehouse Keeper only) adds the received quantity as stock on the confirm date; short lines keep the received quantity and a note, missing labels are written off. `GET /branch/stock-receipts` lists them; badges count waiting GRNs; trace finds GRN numbers.
 - Lab Officer grants: stock view/create, products view, suppliers view/create; no sales. Only the Super Admin or the Warehouse Keeper sends stock out of the Super Admin stock.
 
 ## Lab report summaries (2026-10-12)

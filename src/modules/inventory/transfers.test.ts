@@ -109,7 +109,7 @@ describe('Main Warehouse transfers to branches', () => {
       ],
     });
     expect(received.status).toBe(201);
-    expect(Number((await stockOf(serum, warehouseId)) ?? 0)).toBe(0);
+    expect(await stockOf(serum, warehouseId)).toBe('10.000');
     keeper = await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId });
     await confirmReceipts(app, keeper);
     serials = (await asAdmin('get', `/branch/inventory/items?productId=${serum}`)).body.data.map(

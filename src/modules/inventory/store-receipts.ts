@@ -82,7 +82,7 @@ registry.registerPath({
   method: 'get',
   path: '/branch/stock-receipts',
   summary:
-    'Stock In entries of the Super Admin stock by GRN number. A new entry waits until the Warehouse Keeper counts and confirms it; only then it is stock.',
+    'Stock In entries of the Super Admin stock by GRN number. A Lab Officer entry waits until the Warehouse Keeper counts and confirms it; a Super Admin entry is stock at once.',
   request: { query: listQuerySchema },
   responses: {
     200: { description: 'Receipts', ...jsonContent(dataEnvelope(z.array(receiptSchema))) },

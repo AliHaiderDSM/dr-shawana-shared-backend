@@ -402,7 +402,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           const [here] = (await em.query('SELECT kind::text AS kind, code FROM branches WHERE id = $1', [
             branchId,
           ])) as { kind: string; code: string }[];
-          const pendingReceipt = config.kind === 'stock_in' && here?.kind === 'warehouse';
+          const storeEntry = config.kind === 'stock_in' && here?.kind === 'warehouse';
+          const pendingReceipt = storeEntry && !actor.isSuperAdmin;
           if (
             config.kind === 'stock_out' &&
             here?.kind === 'warehouse' &&
@@ -411,7 +412,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           ) {
             throw AppError.forbidden('Only the Warehouse Keeper sends stock out of the Super Admin stock');
           }
-          const grnNo = pendingReceipt
+          const grnNo = storeEntry
             ? `${here!.code}-GRN-${String(await nextSequence(em, branchId, 'grn')).padStart(6, '0')}`
             : null;
           if (config.kind === 'stock_out' && !input.stockRequestId) {
@@ -443,6 +444,15 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
                 date: input.date,
                 note: input.note ?? null,
                 ...(pendingReceipt ? { grnNo, receiptStatus: 'pending' } : {}),
+                ...(storeEntry && !pendingReceipt
+                  ? {
+                      grnNo,
+                      receiptStatus: 'confirmed',
+                      receivedQty: fields.qty,
+                      confirmedBy: actor.userId,
+                      confirmedAt: new Date(),
+                    }
+                  : {}),
                 ...(route
                   ? {
                       toBranchId: route.id,

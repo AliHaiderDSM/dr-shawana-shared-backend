@@ -60,17 +60,9 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       ],
     });
     expect(stocked.status).toBe(201);
-    expect(stocked.body.data[0]).toMatchObject({ grnNo: 'MAINWH-GRN-000001', receiptStatus: 'pending' });
-    expect(Number((await stockOf('Vitamin C Serum', warehouseId)) ?? 0)).toBe(0);
-    expect(
-      (await as(superAdmin, 'post', '/branch/stock-receipts/MAINWH-GRN-000001/confirm', warehouseId).send({}))
-        .status,
-    ).toBe(403);
-    const confirmed = await as(keeper, 'post', '/branch/stock-receipts/MAINWH-GRN-000001/confirm').send({
-      date: '2026-10-01',
-    });
-    expect(confirmed.status).toBe(200);
-    expect(confirmed.body.data).toMatchObject({ status: 'confirmed', confirmedBy: { id: keeper.id } });
+    expect(stocked.body.data[0]).toMatchObject({ grnNo: 'MAINWH-GRN-000001', receiptStatus: 'confirmed' });
+    expect(await stockOf('Vitamin C Serum', warehouseId)).toBe('20.000');
+    expect((await as(keeper, 'get', '/branch/stock-receipts?status=pending')).body.data).toEqual([]);
   });
 
   it('runs a request from the branch to the Super Admin, the transfer, and the branch receipt', async () => {
