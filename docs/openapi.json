@@ -11737,6 +11737,18 @@
           "refund"
         ]
       },
+      "DecideReturnItem": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          }
+        }
+      },
       "SaleReturn": {
         "type": "object",
         "properties": {
@@ -11954,6 +11966,42 @@
                     "null"
                   ]
                 },
+                "proposedDisposition": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "pending",
+                    "quarantined",
+                    "restocked",
+                    "damaged",
+                    "expired",
+                    "supplier",
+                    null
+                  ],
+                  "description": "Online returns: what the dispatcher found, waiting for the Super Admin"
+                },
+                "proposedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "proposedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "proposalNote": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "serial": {
                   "type": [
                     "string",
@@ -11970,7 +12018,11 @@
                 "disposition",
                 "resolvedAt",
                 "resolvedBy",
-                "resolutionNote"
+                "resolutionNote",
+                "proposedDisposition",
+                "proposedBy",
+                "proposedAt",
+                "proposalNote"
               ]
             }
           },
@@ -14038,6 +14090,33 @@
           "request",
           "note",
           "items"
+        ]
+      },
+      "SidebarBadges": {
+        "type": "object",
+        "properties": {
+          "stockRequests": {
+            "type": "integer"
+          },
+          "incomingStock": {
+            "type": "integer"
+          },
+          "writeOffs": {
+            "type": "integer"
+          },
+          "discountRequests": {
+            "type": "integer"
+          },
+          "returns": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stockRequests",
+          "incomingStock",
+          "writeOffs",
+          "discountRequests",
+          "returns"
         ]
       },
       "CreateJournalEntry": {
@@ -44193,6 +44272,89 @@
         }
       }
     },
+    "/branch/badges": {
+      "get": {
+        "tags": [
+          "Sidebar"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Counts for the red sidebar badges. Super Admin: requests waiting for a decision or to send, transfers not received yet, write-offs and discounts to approve, returns to inspect. Branch: approved or on-the-way stock requests, transfers to receive, write-offs and discounts waiting or ready, returns to inspect.",
+        "responses": {
+          "200": {
+            "description": "Counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SidebarBadges"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/returns": {
       "get": {
         "tags": [
@@ -44294,6 +44456,20 @@
             },
             "required": false,
             "name": "disposition",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "inspect",
+                "approve"
+              ],
+              "description": "inspect: items nobody checked yet; approve: online return items waiting for the Super Admin"
+            },
+            "required": false,
+            "description": "inspect: items nobody checked yet; approve: online return items waiting for the Super Admin",
+            "name": "stage",
             "in": "query"
           },
           {
@@ -44980,6 +45156,230 @@
         "responses": {
           "200": {
             "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReturn"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/returns/{id}/items/{itemId}/approve": {
+      "post": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin approves what the dispatcher found on an online return item (restock, damaged, expired...); the stock follows now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideReturnItem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReturn"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/returns/{id}/items/{itemId}/reject": {
+      "post": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin sends the item back to be checked again",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideReturnItem"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rejected",
             "content": {
               "application/json": {
                 "schema": {

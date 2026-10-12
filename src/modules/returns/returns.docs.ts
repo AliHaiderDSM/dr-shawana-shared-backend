@@ -10,6 +10,7 @@ import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
 import {
   createReturnSchema,
+  decideReturnItemSchema,
   resolveItemSchema,
   returnableSchema,
   returnItemParamsSchema,
@@ -97,3 +98,20 @@ registry.registerPath({
   request: byId,
   responses: { 204: { description: 'Deleted' }, ...errorResponses },
 });
+
+for (const action of ['approve', 'reject'] as const) {
+  registry.registerPath({
+    ...docs,
+    method: 'post',
+    path: `/admin/returns/{id}/items/{itemId}/${action}`,
+    summary:
+      action === 'approve'
+        ? 'Super Admin approves what the dispatcher found on an online return item (restock, damaged, expired...); the stock follows now'
+        : 'Super Admin sends the item back to be checked again',
+    request: {
+      params: returnItemParamsSchema,
+      body: { content: { 'application/json': { schema: decideReturnItemSchema } } },
+    },
+    responses: { 200: one(action === 'approve' ? 'Approved' : 'Rejected'), ...errorResponses },
+  });
+}

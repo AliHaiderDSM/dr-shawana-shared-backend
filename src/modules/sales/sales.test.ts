@@ -356,8 +356,21 @@ describe('POS sales', () => {
       'post',
       `/branch/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/resolve`,
       admin,
-    ).send({ disposition: 'restocked' });
-    expect(restocked.body.data.status).toBe('completed');
+    ).send({ disposition: 'restocked', note: 'Sealed' });
+    expect(restocked.body.data.status).toBe('pending');
+    expect(restocked.body.data.items[0]).toMatchObject({
+      disposition: 'pending',
+      proposedDisposition: 'restocked',
+    });
+    expect(await stock(serum)).toBe('8.000');
+    const owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    const waiting = await request(app).get('/api/v1/branch/returns?stage=approve').set(bearer(owner));
+    expect(waiting.body.data.map((r: { id: string }) => r.id)).toEqual([deliveryReturn.id]);
+    const approved = await request(app)
+      .post(`/api/v1/admin/returns/${deliveryReturn.id}/items/${deliveryReturn.items[0].id}/approve`)
+      .set(bearer(owner))
+      .send({});
+    expect(approved.body.data.status).toBe('completed');
     expect(await stock(serum)).toBe('9.000');
     expect((await api('delete', `/branch/sales/${onlineSaleId}`, admin)).status).toBe(409);
     expect(

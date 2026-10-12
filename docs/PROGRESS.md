@@ -22,6 +22,17 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Online return approval (2026-10-12)
+
+- Migration 1792100000000-ReturnApproval: return items keep the proposed outcome, who proposed it, when, and the note.
+- Online returns: the dispatcher (now returns view+update) or branch staff check each item; the outcome is saved as a proposal and the stock does not move. `/admin/returns/{id}/items/{itemId}/approve` applies it (restock, damaged, expired, supplier, quarantine); reject clears it for a new check. Office returns resolve at once as before. The Super Admin resolves directly.
+- The Dispatch Department sees returns of the orders it shipped; the Super Admin lists every branch without ?branchId= (`stage=inspect|approve` filter). Only the selling branch deletes a return or sets its refund.
+- Badges: returns count items to check (branch, Dispatch Department) or proposals to approve (Super Admin).
+
+## Sidebar badges (2026-10-12)
+
+- `GET /branch/badges`: counts for stock requests, incoming transfers, write-offs, discount requests and returns to inspect. Super Admin counts what waits for them everywhere; a branch counts its own (Dispatch Department also counts returns of the orders it shipped).
+
 ## Write-off approval, staff overview, dispatch roles, request caps (2026-10-12)
 
 - Migration 1792000000000-WriteOffApproval: write-offs have status pending/approved/rejected, the scanned labels, and who decided.

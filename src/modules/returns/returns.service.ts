@@ -14,7 +14,7 @@ import { inventoryItemsService } from '../inventory/inventory-items.service';
 import { stockLedger } from '../inventory/stock-ledger';
 import { Sale } from '../sales/sale.entity';
 import { nextSequence } from '../sequences/sequences';
-import { SaleReturnItem } from './sale-return-item.entity';
+import { SaleReturnItem, type ReturnDisposition } from './sale-return-item.entity';
 import { SaleReturn, type ReturnReason } from './sale-return.entity';
 import {
   type CreateReturnInput,
@@ -99,21 +99,27 @@ function toReturnDto(r: SaleReturn) {
       resolvedAt: i.resolvedAt,
       resolvedBy: i.resolvedBy,
       resolutionNote: i.resolutionNote,
+      proposedDisposition: i.proposedDisposition,
+      proposedBy: i.proposedBy,
+      proposedAt: i.proposedAt,
+      proposalNote: i.proposalNote,
     })),
   };
 }
 
-function detailed(branchId: string, manager?: EntityManager) {
-  return returns
-    .query(branchId, manager)
-    .leftJoinAndSelect('sr.sale', 'sale')
+function detailed(branchId: string | null, manager?: EntityManager) {
+  const qb = repo(SaleReturn, manager).createQueryBuilder('sr').leftJoinAndSelect('sr.sale', 'sale');
+  if (branchId) {
+    qb.where('(sr.branchId = :branchId OR sale.fulfillmentBranchId = :branchId)', { branchId });
+  }
+  return qb
     .leftJoinAndSelect('sale.patient', 'patient')
     .leftJoinAndSelect('sr.items', 'item', 'item.deletedAt IS NULL')
     .leftJoinAndSelect('item.product', 'product')
     .leftJoinAndSelect('sr.refundAccountSheet', 'sheet');
 }
 
-async function getReturn(branchId: string, id: string, manager?: EntityManager) {
+async function getReturn(branchId: string | null, id: string, manager?: EntityManager) {
   const found = await detailed(branchId, manager).andWhere('sr.id = :id', { id }).getOne();
   if (!found) throw AppError.notFound('Return');
   return found;
@@ -304,6 +310,18 @@ function assertDispatched(sale: Sale) {
 
 function applyFilters(qb: SelectQueryBuilder<SaleReturn>, query: ReturnListQuery) {
   if (query.status) qb.andWhere('sr.status = :status', { status: query.status });
+  if (query.stage === 'approve') {
+    qb.andWhere(
+      `EXISTS (SELECT 1 FROM sale_return_items x WHERE x.sale_return_id = sr.id AND x.deleted_at IS NULL
+         AND x.proposed_disposition IS NOT NULL AND x.disposition IN ('pending', 'quarantined'))`,
+    );
+  }
+  if (query.stage === 'inspect') {
+    qb.andWhere(
+      `EXISTS (SELECT 1 FROM sale_return_items x WHERE x.sale_return_id = sr.id AND x.deleted_at IS NULL
+         AND x.proposed_disposition IS NULL AND x.disposition = 'pending')`,
+    );
+  }
   if (query.reason) qb.andWhere('sr.reason = :reason', { reason: query.reason });
   if (query.saleId) qb.andWhere('sr.saleId = :saleId', { saleId: query.saleId });
   if (query.from) qb.andWhere('sr.date >= :from', { from: query.from });
@@ -325,8 +343,81 @@ function applyFilters(qb: SelectQueryBuilder<SaleReturn>, query: ReturnListQuery
   return qb;
 }
 
+async function applyResolution(
+  em: EntityManager,
+  actor: Actor,
+  record: SaleReturn,
+  item: SaleReturnItem,
+  disposition: Exclude<ReturnDisposition, 'pending'>,
+  note: string | null | undefined,
+) {
+  const pieces = (await inventoryItemsService.itemsOf(em, { saleReturnItemIds: [item.id] })).filter((p) =>
+    ['returned', 'quarantined'].includes(p.status),
+  );
+  const pieceRef = { type: REFERENCE, id: record.id, label: record.returnNo };
+  const owner = await repo(Sale, em).findOneByOrFail({ id: record.saleId });
+  const stockBranch = stockBranchOf(owner);
+  const stockMap = await stockProducts(em, owner, [item.productId], false);
+  if (pieces.length > 0) {
+    await inventoryItemsService.setStatus(em, actor, {
+      ids: pieces.map((p) => p.id),
+      to: PIECE_STATUS[disposition],
+      event: PIECE_EVENT[disposition],
+      ref: pieceRef,
+      note: note ?? null,
+    });
+    if (disposition === 'restocked') {
+      await stockLedger.apply(
+        em,
+        {
+          branchId: stockBranch,
+          referenceType: REFERENCE,
+          referenceId: record.id,
+          actorId: actor.userId,
+        },
+        inventoryItemsService.movements(pieces, 1, {
+          type: 'sale_return',
+          date: today(),
+          note: `${record.returnNo} restocked`,
+        }),
+      );
+    }
+  } else if (disposition === 'restocked') {
+    await stockLedger.apply(
+      em,
+      { branchId: stockBranch, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
+      [
+        {
+          productId: stockMap.get(item.productId) ?? item.productId,
+          type: 'sale_return',
+          qty: item.qty,
+          restoreFrom: await restoreSources(em, record.saleId),
+          date: today(),
+          note: `${record.returnNo} restocked`,
+        },
+      ],
+    );
+  }
+  await repo(SaleReturnItem, em).update(
+    { id: item.id },
+    {
+      disposition: disposition,
+      resolvedAt: new Date(),
+      resolvedBy: actor.userId,
+      resolutionNote: note ?? null,
+      updatedBy: actor.userId,
+    },
+  );
+  const open = (record.items ?? []).filter(
+    (i) => i.id !== item.id && (i.disposition === 'pending' || i.disposition === 'quarantined'),
+  );
+  if (open.length === 0 && disposition !== 'quarantined') {
+    await repo(SaleReturn, em).update({ id: record.id }, { status: 'completed', updatedBy: actor.userId });
+  }
+}
+
 export const returnsService = {
-  async list(branchId: string, query: ReturnListQuery) {
+  async list(branchId: string | null, query: ReturnListQuery) {
     const { items, meta } = await paginate(
       applyFilters(detailed(branchId), query),
       { ...query, search: undefined },
@@ -335,10 +426,10 @@ export const returnsService = {
     return { items: items.map(toReturnDto), meta };
   },
 
-  async get(branchId: string, id: string) {
+  async get(branchId: string | null, id: string) {
     const record = await getReturn(branchId, id);
     const manager = repo(SaleReturn).manager;
-    const stockBranch = await stockBranchOfSale(manager, record.saleId, branchId);
+    const stockBranch = await stockBranchOfSale(manager, record.saleId, record.branchId);
     const sold = await stockLedger.batchesFor(manager, stockBranch, [
       { referenceType: SALE_REFERENCE, referenceIds: [record.saleId] },
     ]);
@@ -518,72 +609,26 @@ export const returnsService = {
       if (item.disposition === 'quarantined' && input.disposition === 'quarantined') {
         throw AppError.conflict('This item is already in quarantine');
       }
-      const pieces = (await inventoryItemsService.itemsOf(em, { saleReturnItemIds: [item.id] })).filter((p) =>
-        ['returned', 'quarantined'].includes(p.status),
-      );
-      const pieceRef = { type: REFERENCE, id: record.id, label: record.returnNo };
-      const owner = await repo(Sale, em).findOneByOrFail({ id: record.saleId });
-      const stockBranch = stockBranchOf(owner);
-      const stockMap = await stockProducts(em, owner, [item.productId], false);
-      if (pieces.length > 0) {
-        await inventoryItemsService.setStatus(em, actor, {
-          ids: pieces.map((p) => p.id),
-          to: PIECE_STATUS[input.disposition],
-          event: PIECE_EVENT[input.disposition],
-          ref: pieceRef,
-          note: input.note ?? null,
-        });
-        if (input.disposition === 'restocked') {
-          await stockLedger.apply(
-            em,
-            {
-              branchId: stockBranch,
-              referenceType: REFERENCE,
-              referenceId: record.id,
-              actorId: actor.userId,
-            },
-            inventoryItemsService.movements(pieces, 1, {
-              type: 'sale_return',
-              date: today(),
-              note: `${record.returnNo} restocked`,
-            }),
-          );
-        }
-      } else if (input.disposition === 'restocked') {
-        await stockLedger.apply(
-          em,
-          { branchId: stockBranch, referenceType: REFERENCE, referenceId: record.id, actorId: actor.userId },
-          [
-            {
-              productId: stockMap.get(item.productId) ?? item.productId,
-              type: 'sale_return',
-              qty: item.qty,
-              restoreFrom: await restoreSources(em, record.saleId),
-              date: today(),
-              note: `${record.returnNo} restocked`,
-            },
-          ],
+      const online = record.sale?.saleType === 'online';
+      if (online && !actor.isSuperAdmin) {
+        await repo(SaleReturnItem, em).update(
+          { id: item.id },
+          {
+            proposedDisposition: input.disposition,
+            proposedBy: actor.userId,
+            proposedAt: new Date(),
+            proposalNote: input.note ?? null,
+            updatedBy: actor.userId,
+          },
         );
-      }
-      await repo(SaleReturnItem, em).update(
-        { id: item.id },
-        {
+        const proposed = await getReturn(branchId, id, em);
+        await audit(actor, proposed, `item:propose:${input.disposition}`, em, null, {
+          itemId,
           disposition: input.disposition,
-          resolvedAt: new Date(),
-          resolvedBy: actor.userId,
-          resolutionNote: input.note ?? null,
-          updatedBy: actor.userId,
-        },
-      );
-      const open = (record.items ?? []).filter(
-        (i) => i.id !== item.id && (i.disposition === 'pending' || i.disposition === 'quarantined'),
-      );
-      if (open.length === 0 && input.disposition !== 'quarantined') {
-        await repo(SaleReturn, em).update(
-          { id: record.id },
-          { status: 'completed', updatedBy: actor.userId },
-        );
+        });
+        return toReturnDto(proposed);
       }
+      await applyResolution(em, actor, record, item, input.disposition, input.note);
       const saved = await getReturn(branchId, id, em);
       await audit(
         actor,
@@ -596,6 +641,52 @@ export const returnsService = {
           disposition: input.disposition,
         },
       );
+      return toReturnDto(saved);
+    });
+  },
+
+  async decideProposal(
+    actor: Actor,
+    id: string,
+    itemId: string,
+    approve: boolean,
+    note: string | null | undefined,
+  ) {
+    return withTransaction(async (em) => {
+      const record = await getReturn(null, id, em);
+      const item = record.items?.find((i) => i.id === itemId);
+      if (!item) throw AppError.notFound('Return item');
+      if (!item.proposedDisposition || item.proposedDisposition === 'pending') {
+        throw AppError.conflict('Nothing is waiting for approval on this item');
+      }
+      if (item.disposition !== 'pending' && item.disposition !== 'quarantined') {
+        throw AppError.conflict('This item has already been inspected');
+      }
+      const proposed = item.proposedDisposition;
+      if (approve) {
+        await applyResolution(
+          em,
+          actor,
+          record,
+          item,
+          proposed,
+          [item.proposalNote, note].filter(Boolean).join(' · ') || null,
+        );
+      }
+      await repo(SaleReturnItem, em).update(
+        { id: item.id },
+        {
+          ...(approve ? {} : { proposedDisposition: null, proposedBy: null, proposedAt: null }),
+          proposalNote: approve ? item.proposalNote : note ? `Rejected: ${note}` : item.proposalNote,
+          updatedBy: actor.userId,
+        },
+      );
+      const saved = await getReturn(null, id, em);
+      await audit(actor, saved, approve ? `item:approve:${proposed}` : 'item:reject', em, null, {
+        itemId,
+        disposition: proposed,
+        note: note ?? null,
+      });
       return toReturnDto(saved);
     });
   },
@@ -616,6 +707,8 @@ export const returnsService = {
   async remove(actor: Actor, branchId: string, id: string) {
     await withTransaction(async (em) => {
       const record = await getReturn(branchId, id, em);
+      if (record.branchId !== branchId)
+        throw AppError.forbidden('Only the branch that sold it deletes a return');
       if ((record.items ?? []).some((i) => i.disposition !== 'pending')) {
         throw AppError.conflict('A return cannot be deleted after its items have been inspected');
       }

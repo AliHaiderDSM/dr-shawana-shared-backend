@@ -5,9 +5,11 @@ import { branchIdOf, idOf } from '../../lib/request';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
+import { requireRole } from '../../middleware/requireRole';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import {
   createReturnSchema,
+  decideReturnItemSchema,
   resolveItemSchema,
   returnItemParamsSchema,
   returnListQuerySchema,
@@ -22,10 +24,17 @@ const path = '/branch/returns';
 const byId = validate({ params: idParamsSchema });
 const can = (action: 'view' | 'create' | 'update' | 'delete') => requirePermission(`returns.${action}`);
 
-returnsRouter.use(path, authenticate, branchScope());
+returnsRouter.use(path, authenticate, (req, res, next) =>
+  branchScope({
+    allowAllForSuperAdmin: req.method === 'GET' && !req.path.startsWith('/sale/'),
+  })(req, res, next),
+);
 
 returnsRouter.get(path, can('view'), validate({ query: returnListQuerySchema }), async (req, res) => {
-  const { items, meta } = await returnsService.list(branchIdOf(req), validQuery(req, returnListQuerySchema));
+  const { items, meta } = await returnsService.list(
+    req.branchId ?? null,
+    validQuery(req, returnListQuerySchema),
+  );
   sendOk(res, items, meta);
 });
 
@@ -47,7 +56,7 @@ returnsRouter.post(path, can('create'), validate({ body: createReturnSchema }), 
 });
 
 returnsRouter.get(`${path}/:id`, can('view'), byId, async (req, res) => {
-  sendOk(res, await returnsService.get(branchIdOf(req), idOf(req)));
+  sendOk(res, await returnsService.get(req.branchId ?? null, idOf(req)));
 });
 
 returnsRouter.post(
@@ -83,3 +92,25 @@ returnsRouter.delete(`${path}/:id`, can('delete'), byId, async (req, res) => {
   await returnsService.remove(actorFrom(req), branchIdOf(req), idOf(req));
   sendNoContent(res);
 });
+
+for (const action of ['approve', 'reject'] as const) {
+  returnsRouter.post(
+    `/admin/returns/:id/items/:itemId/${action}`,
+    authenticate,
+    requireRole(),
+    validate({ params: returnItemParamsSchema, body: decideReturnItemSchema }),
+    async (req, res) => {
+      const { id, itemId } = validParams(req, returnItemParamsSchema);
+      sendOk(
+        res,
+        await returnsService.decideProposal(
+          actorFrom(req),
+          id,
+          itemId,
+          action === 'approve',
+          validBody(req, decideReturnItemSchema).note,
+        ),
+      );
+    },
+  );
+}

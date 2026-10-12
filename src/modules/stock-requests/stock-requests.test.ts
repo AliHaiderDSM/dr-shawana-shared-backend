@@ -152,6 +152,14 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     expect(await stockOf('Vitamin C Serum', warehouseId)).toBe('15.000');
     expect(await stockOf('Vitamin C Serum', lahoreId)).toBeUndefined();
 
+    expect((await as(lahoreAdmin, 'get', '/branch/badges')).body.data).toMatchObject({
+      incomingStock: 1,
+      stockRequests: 1,
+    });
+    expect((await as(superAdmin, 'get', '/branch/badges')).body.data).toMatchObject({
+      incomingStock: 1,
+      stockRequests: 0,
+    });
     const incoming = (await as(lahoreAdmin, 'get', '/branch/incoming-stock?status=waiting')).body.data;
     expect(incoming).toEqual([
       expect.objectContaining({

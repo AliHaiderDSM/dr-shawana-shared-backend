@@ -73,10 +73,22 @@ export const setRefundSchema = registry.register(
 export const returnItemParamsSchema = z.object({ id: z.uuid(), itemId: z.uuid() });
 export const saleParamsSchema = z.object({ saleId: z.uuid() });
 
+export const decideReturnItemSchema = registry.register(
+  'DecideReturnItem',
+  z.object({ note: optionalText(500) }),
+);
+
 export const returnListQuerySchema = listQuerySchema(['date', 'createdAt', 'returnSeq'], '-date').extend({
   status: z.enum(RETURN_STATUSES).optional(),
   reason: z.enum(RETURN_REASONS).optional(),
   disposition: z.enum(RETURN_DISPOSITIONS).optional(),
+  stage: z
+    .enum(['inspect', 'approve'])
+    .optional()
+    .openapi({
+      description:
+        'inspect: items nobody checked yet; approve: online return items waiting for the Super Admin',
+    }),
   productId: z.uuid().optional(),
   saleId: z.uuid().optional(),
   from: dateInput.optional(),
@@ -95,6 +107,13 @@ export const returnItemSchema = z.object({
   resolvedAt: z.iso.datetime().nullable(),
   resolvedBy: z.uuid().nullable(),
   resolutionNote: z.string().nullable(),
+  proposedDisposition: z
+    .enum(RETURN_DISPOSITIONS)
+    .nullable()
+    .openapi({ description: 'Online returns: what the dispatcher found, waiting for the Super Admin' }),
+  proposedBy: z.uuid().nullable(),
+  proposedAt: z.iso.datetime().nullable(),
+  proposalNote: z.string().nullable(),
   serial: z.string().nullable().optional().openapi({ description: 'The returned label (detail only)' }),
 });
 

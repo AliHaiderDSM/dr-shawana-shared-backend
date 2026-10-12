@@ -297,15 +297,21 @@ describe('Dispatch Department ships every online order from its own stock', () =
 
     const ret = (await as(lahoreAdmin, 'get', `/branch/returns?saleId=${order.id}`)).body.data[0];
     expect(ret).toBeDefined();
+    const seen = (await as(dispatcher, 'get', '/branch/returns?stage=inspect')).body.data as { id: string }[];
+    expect(seen.map((r) => r.id)).toContain(ret.id);
     for (const item of ret.items as { id: string }[]) {
-      const resolved = await as(
-        lahoreAdmin,
+      const proposed = await as(
+        dispatcher,
         'post',
         `/branch/returns/${ret.id}/items/${item.id}/resolve`,
       ).send({
         disposition: 'restocked',
       });
-      expect(resolved.status).toBe(200);
+      expect(proposed.status).toBe(200);
+      const approved = await as(superAdmin, 'post', `/admin/returns/${ret.id}/items/${item.id}/approve`).send(
+        {},
+      );
+      expect(approved.status).toBe(200);
     }
     const dspToner = await productIn(dispatchId, 'Rose Toner');
     const dspSerum = await productIn(dispatchId, 'Vitamin C Serum');

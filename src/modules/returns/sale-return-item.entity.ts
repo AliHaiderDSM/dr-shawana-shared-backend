@@ -55,4 +55,22 @@ export class SaleReturnItem extends BranchScopedEntity {
 
   @Column({ name: 'resolution_note', type: 'text', nullable: true })
   resolutionNote: string | null;
+
+  @Column({
+    name: 'proposed_disposition',
+    type: 'enum',
+    enum: RETURN_DISPOSITIONS,
+    enumName: 'sale_return_disposition',
+    nullable: true,
+  })
+  proposedDisposition: ReturnDisposition | null;
+
+  @Column({ name: 'proposed_by', type: 'uuid', nullable: true })
+  proposedBy: string | null;
+
+  @Column({ name: 'proposed_at', type: 'timestamptz', nullable: true })
+  proposedAt: Date | null;
+
+  @Column({ name: 'proposal_note', type: 'text', nullable: true })
+  proposalNote: string | null;
 }
