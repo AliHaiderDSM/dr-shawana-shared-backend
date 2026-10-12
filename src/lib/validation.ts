@@ -18,6 +18,18 @@ export const positiveQuantityInput = decimal(3).refine((v) => Number(v) > 0, 'Mu
 
 export const dateInput = z.iso.date().openapi({ example: '2026-09-30' });
 
+const EMAIL_PATTERN = /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9_%+-])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/;
+
+export const emailInput = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(150)
+  .refine((v) => EMAIL_PATTERN.test(v) && !v.includes('..'), 'Enter a valid email address, e.g. name@example.com')
+  .openapi({ format: 'email', example: 'name@example.com' });
+
+export const optionalEmailInput = emailInput.nullable().optional();
+
 export const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
 
 export const requiredText = (min: number, max: number) => z.string().trim().min(min).max(max);

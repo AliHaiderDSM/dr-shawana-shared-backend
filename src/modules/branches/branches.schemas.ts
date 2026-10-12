@@ -3,6 +3,7 @@ import { dataEnvelope, errorResponses, idParamsSchema, jsonContent, pageEnvelope
 import { bearerAuth, registry } from '../../lib/openapi';
 import { listQuerySchema } from '../../lib/pagination';
 import { createBranchAdminSchema, staffSchema } from '../staff/staff.schemas';
+import { optionalEmailInput } from '../../lib/validation';
 import { BRANCH_KINDS, BRANCH_STATUSES } from './branch.entity';
 
 const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
@@ -13,11 +14,13 @@ const branchFields = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(/^[A-Z0-9]{2,10}$/, 'Use 2-10 letters or digits, e.g. LHR'),
+    .min(2, 'Use at least 2 characters')
+    .max(12, 'Use at most 12 characters')
+    .regex(/^[A-Z0-9]+(-[A-Z0-9]+)*$/, 'Use letters and digits, with a dash between parts, e.g. LHR or LHR-00001'),
   city: z.string().trim().min(2).max(100),
   address: optionalText(500),
   phone: optionalText(30),
-  email: z.email().trim().toLowerCase().max(150).nullable().optional(),
+  email: optionalEmailInput,
   logoPath: optionalText(500),
 });
 

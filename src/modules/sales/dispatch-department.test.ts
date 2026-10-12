@@ -2,9 +2,13 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { AppDataSource } from '../../database/data-source';
 
 const fake = installFakeSupabase();
 const app = createApp();
+
+const verifyPayments = (saleId: string) =>
+  AppDataSource.query(`UPDATE sale_payments SET approved_at = now() WHERE sale_id = $1`, [saleId]);
 
 describe('Dispatch Department ships every online order from its own stock', () => {
   let superAdmin: { id: string };
@@ -236,6 +240,11 @@ describe('Dispatch Department ships every online order from its own stock', () =
       (await as(lahoreAdmin, 'post', `/branch/sales/${order.id}/dispatch`).send({ serials: [serials[2]] }))
         .status,
     ).toBe(403);
+    const unpaid = await as(dispatcher, 'post', `/branch/sales/${order.id}/dispatch`).send({
+      serials: [serials[2]],
+    });
+    expect(unpaid.status).toBe(409);
+    await verifyPayments(order.id);
     const wrongLabel = await as(dispatcher, 'post', `/branch/sales/${order.id}/dispatch`).send({
       date: '2026-10-04',
       serials: [serials[0]],
@@ -313,6 +322,7 @@ describe('Dispatch Department ships every online order from its own stock', () =
     }[];
     expect(after.find((i) => i.name === 'Vitamin C Serum')!.available).toBe('3.000');
 
+    await verifyPayments(order.body.data.id);
     const sent = await as(dispatcher, 'post', `/branch/sales/${order.body.data.id}/dispatch`).send({
       serials: [serials[3], serials[4]],
     });

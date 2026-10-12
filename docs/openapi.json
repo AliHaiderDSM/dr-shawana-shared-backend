@@ -68,7 +68,8 @@
           "email": {
             "type": "string",
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "username": {
             "type": "string",
@@ -144,7 +145,8 @@
           "email": {
             "type": "string",
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "username": {
             "type": "string",
@@ -205,7 +207,8 @@
           "email": {
             "type": "string",
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "username": {
             "type": "string",
@@ -598,7 +601,9 @@
           },
           "code": {
             "type": "string",
-            "pattern": "^[A-Z0-9]{2,10}$"
+            "minLength": 2,
+            "maxLength": 12,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
           },
           "city": {
             "type": "string",
@@ -625,7 +630,8 @@
               "null"
             ],
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "logoPath": {
             "type": [
@@ -660,7 +666,9 @@
           },
           "code": {
             "type": "string",
-            "pattern": "^[A-Z0-9]{2,10}$"
+            "minLength": 2,
+            "maxLength": 12,
+            "pattern": "^[A-Z0-9]+(-[A-Z0-9]+)*$"
           },
           "city": {
             "type": "string",
@@ -687,7 +695,8 @@
               "null"
             ],
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "logoPath": {
             "type": [
@@ -799,7 +808,8 @@
               "null"
             ],
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "address": {
             "type": [
@@ -4912,7 +4922,8 @@
               "null"
             ],
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "details": {
             "type": [
@@ -4958,7 +4969,8 @@
               "email": {
                 "type": "string",
                 "maxLength": 150,
-                "format": "email"
+                "format": "email",
+                "example": "name@example.com"
               },
               "username": {
                 "type": "string",
@@ -5027,7 +5039,8 @@
               "null"
             ],
             "maxLength": 150,
-            "format": "email"
+            "format": "email",
+            "example": "name@example.com"
           },
           "details": {
             "type": [

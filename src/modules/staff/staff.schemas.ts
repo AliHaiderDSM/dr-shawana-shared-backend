@@ -10,6 +10,7 @@ import {
 import { bearerAuth, registry } from '../../lib/openapi';
 import { listQuerySchema } from '../../lib/pagination';
 import { BRANCH_ROLES, ROLES } from '../../lib/permissions';
+import { emailInput } from '../../lib/validation';
 import { GENDERS, STAFF_STATUSES } from './staff-profile.entity';
 
 export const passwordSchema = z.string().min(8).max(72);
@@ -25,7 +26,7 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable().opti
 export const staffDetailsSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
-  email: z.email().trim().toLowerCase().max(150),
+  email: emailInput,
   username: usernameSchema,
   phone: optionalText(30),
   gender: z.enum(GENDERS).nullable().optional(),

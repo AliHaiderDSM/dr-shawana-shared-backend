@@ -3,7 +3,7 @@ import { branchQuerySchema, dataEnvelope, errorResponses, idParamsSchema, jsonCo
 import { registry } from '../../lib/openapi';
 import { multipartImage, registerCrudDocs, securedDocs } from '../../lib/openapi-crud';
 import { listQuerySchema } from '../../lib/pagination';
-import { atLeastOneField, dateInput, moneyInput, moneyOutput, optionalText } from '../../lib/validation';
+import { atLeastOneField, dateInput, moneyInput, moneyOutput, optionalEmailInput, optionalText } from '../../lib/validation';
 import { passwordSchema, staffDetailsSchema } from '../staff/staff.schemas';
 import { APPOINTMENT_STATUSES } from '../appointments/appointment.entity';
 import { DOCTOR_STATUSES } from './doctor.entity';
@@ -11,7 +11,7 @@ import { DOCTOR_STATUSES } from './doctor.entity';
 const doctorFields = z.object({
   displayName: z.string().trim().min(1).max(150),
   phone: optionalText(30),
-  email: z.email().trim().toLowerCase().max(150).nullable().optional(),
+  email: optionalEmailInput,
   details: optionalText(5000),
   consultationFee: moneyInput,
   commissionPercent: z

@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Branch codes, emails, dispatch after verified payment (2026-10-12)
+
+- Branch codes: 2–12 letters or digits with a dash between parts (LHR, LHR-00001), saved in capitals. Migration 1791700000000-BranchCodeFormat widens the column to 12 and replaces the check.
+- One strict email rule (`emailInput`, `optionalEmailInput` in lib/validation) for staff, branches, company and doctors: a real domain with a dot, no double dots, trimmed and lower-cased.
+- An online order is dispatched only when every payment on it is approved; otherwise 409 with the unverified payment ids.
+
 ## Reclaim orphan logins (2026-10-11)
 
 - Creating staff with an email that already has a Supabase Auth login, but no staff profile (for example after the public schema was reset), reuses that login: new password, metadata and unblocked. A login that still has a profile stays a conflict.

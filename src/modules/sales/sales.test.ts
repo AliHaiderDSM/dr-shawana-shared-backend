@@ -577,6 +577,12 @@ describe('POS sales', () => {
         }),
       ]);
 
+      const early = await api('post', `/branch/sales/${order.body.data.id}/dispatch`, admin).send({
+        date: '2026-10-05',
+      });
+      expect(early.status).toBe(409);
+      expect(early.body.error.message).toContain('not verified');
+      await api('post', `/branch/sales/${order.body.data.id}/payments/approve`, admin).send({});
       expect(
         (
           await api('post', `/branch/sales/${order.body.data.id}/dispatch`, admin).send({
@@ -611,9 +617,9 @@ describe('POS sales', () => {
         saleType: string;
         deliveryStatus: string | null;
       }[];
-      expect(completed.map((s) => s.id)).not.toContain(order.body.data.id);
+      expect(completed.map((s) => s.id)).toContain(order.body.data.id);
       const pending = (await api('get', '/branch/sales?pending=true', admin)).body.data as { id: string }[];
-      expect(pending.map((s) => s.id)).toContain(order.body.data.id);
+      expect(pending.map((s) => s.id)).not.toContain(order.body.data.id);
       expect(pending.some((p) => completed.some((s) => s.id === p.id))).toBe(false);
       expect(
         completed.every(

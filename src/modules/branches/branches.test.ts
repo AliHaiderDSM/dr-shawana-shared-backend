@@ -87,6 +87,25 @@ describe('super admin branches', () => {
       .send({ name: 'X', code: 'bad code!', city: '' });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    for (const bad of [
+      { code: 'LHR--1' },
+      { code: '-LHR' },
+      { code: 'LHR-0000000001' },
+      { email: 'ali@gmail' },
+      { email: 'ali..x@gmail.com' },
+    ]) {
+      const rejected = await request(app)
+        .post('/api/v1/admin/branches')
+        .set(bearer(superAdmin))
+        .send({ ...newBranch, code: 'GUJ', ...bad });
+      expect(rejected.status).toBe(400);
+    }
+    const dashed = await request(app)
+      .post('/api/v1/admin/branches')
+      .set(bearer(superAdmin))
+      .send({ ...newBranch, code: 'lhr-00001', email: ' Office@DSM.pk ' });
+    expect(dashed.status).toBe(201);
+    expect(dashed.body.data).toMatchObject({ code: 'LHR-00001', email: 'office@dsm.pk' });
   });
 
   it('is forbidden for branch admins', async () => {

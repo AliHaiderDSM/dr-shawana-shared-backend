@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { dataEnvelope, errorResponses, jsonContent } from '../../lib/http';
+import { optionalEmailInput } from '../../lib/validation';
 import { bearerAuth, registry } from '../../lib/openapi';
 
 const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
@@ -9,7 +10,7 @@ export const updateCompanyInfoSchema = registry.register(
   z.object({
     name: z.string().trim().min(2).max(150),
     phone: optionalText(30),
-    email: z.email().trim().toLowerCase().max(150).nullable().optional(),
+    email: optionalEmailInput,
     address: optionalText(500),
     logoPath: optionalText(500),
   }),

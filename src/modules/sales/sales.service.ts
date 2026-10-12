@@ -983,6 +983,13 @@ export const salesService = {
       if (!awaitingDispatch(sale)) {
         throw AppError.conflict(`${sale.invoiceNo} is ${sale.deliveryStatus}, not waiting for dispatch`);
       }
+      const unverified = (sale.payments ?? []).filter((p) => !p.approvedAt);
+      if (unverified.length) {
+        throw AppError.conflict(
+          `${sale.invoiceNo} cannot be dispatched yet: ${unverified.length === 1 ? '1 payment is' : `${unverified.length} payments are`} not verified. Approve the payment first.`,
+          { unverifiedPayments: unverified.map((p) => p.id) },
+        );
+      }
       const date = input.date ?? today();
       if (date < sale.date) throw AppError.badRequest('The dispatch date cannot be before the order date');
       await postSaleStock(
