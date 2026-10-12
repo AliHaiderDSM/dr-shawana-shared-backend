@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Lab report summaries (2026-10-12)
+
+- Migration 1792300000000-LabReportSummaries. The same AI call that reads the 9 blood work values now also writes a clinical summary of the whole report: patient and report details, abnormal results with the lab ranges (high/low), normal findings by category, a 2–4 sentence overview, doctor review points and unclear values. It is saved on the patient (`lab_report_summaries`) and returned by read-report.
+- `GET /branch/patients/{id}/report-summaries` and `DELETE .../report-summaries/{summaryId}`.
+
 ## AI report reading fix (2026-10-12)
 
 - gemini-3.8-flash (and 3.7, flash-latest) hang on image + JSON schema requests; gemini-3.5-flash answers in about 3 s. Default GEMINI_MODEL is now gemini-3.5-flash, with GEMINI_FALLBACK_MODEL (default gemini-3.5-flash) tried when the main model times out (40 s) or fails on Google's side.

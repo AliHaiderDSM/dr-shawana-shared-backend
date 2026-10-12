@@ -268,20 +268,75 @@ registry.registerPath({
   responses: { 204: { description: 'Removed' }, ...errorResponses },
 });
 
+export const summaryParamsSchema = z.object({ id: z.uuid(), summaryId: z.uuid() });
+
+export const reportSummarySchema = registry.register(
+  'LabReportSummary',
+  z.object({
+    id: z.uuid(),
+    testDate: z.iso.date().nullable(),
+    fileName: z.string().nullable(),
+    valuesFound: z.number().int(),
+    model: z.string().nullable(),
+    createdAt: z.string(),
+    createdBy: z.string().nullable(),
+    summary: z.object({
+      patient: z.array(z.object({ label: z.string(), value: z.string() })),
+      abnormal: z.array(
+        z.object({
+          test: z.string(),
+          value: z.string(),
+          unit: z.string(),
+          range: z.string(),
+          flag: z.string(),
+        }),
+      ),
+      normal: z.array(z.object({ category: z.string(), tests: z.string() })),
+      overview: z.string(),
+      reviewPoints: z.array(z.string()),
+      unreadable: z.array(z.string()),
+    }),
+  }),
+);
+
 export const readReportSchema = registry.register(
   'ReadBloodReport',
   z.object({
     testDate: z.iso.date().nullable(),
     results: z.array(z.object({ test: z.enum(BLOOD_TESTS), value: z.string(), unit: z.string() })),
+    summary: reportSummarySchema
+      .nullable()
+      .openapi({ description: 'AI summary of the whole report, saved on the patient' }),
   }),
 );
+
+registry.registerPath({
+  ...securedDocs('Clinical records'),
+  method: 'get',
+  path: '/branch/patients/{id}/report-summaries',
+  summary: 'AI summaries of the lab reports read for this patient, newest first',
+  request: { params: idParamsSchema, query: branchQuerySchema },
+  responses: {
+    200: { description: 'Summaries', ...jsonContent(dataEnvelope(z.array(reportSummarySchema))) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...securedDocs('Clinical records'),
+  method: 'delete',
+  path: '/branch/patients/{id}/report-summaries/{summaryId}',
+  summary: 'Remove one AI report summary',
+  request: { params: summaryParamsSchema, query: branchQuerySchema },
+  responses: { 204: { description: 'Removed' }, ...errorResponses },
+});
 
 registry.registerPath({
   ...securedDocs('Clinical records'),
   method: 'post',
   path: '/branch/patients/{id}/blood-work/read-report',
   summary:
-    'Read blood work values from an uploaded report (multipart "file": PDF or image) with AI. Nothing is saved; the caller reviews and saves.',
+    'Read blood work values from an uploaded report (multipart "file": PDF or image) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.',
   request: { params: idParamsSchema, query: branchQuerySchema },
   responses: {
     200: { description: 'Values found', ...jsonContent(dataEnvelope(readReportSchema)) },

@@ -3,6 +3,7 @@ import { AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { BLOOD_TESTS, type BloodTest } from './blood-work-result.entity';
 import { BLOOD_TEST_UNITS } from './clinical-records.schemas';
+import { type ReportSummary } from './lab-report-summary.entity';
 
 const READABLE_TYPES = [
   'application/pdf',
@@ -33,7 +34,16 @@ Rules:
 - "value" is the number only (no "<", ">", units or ranges). Skip a test that is not on the report or has no number.
 - "unit" is the unit printed next to the result.
 - "testDate" is the sample collection or report date as YYYY-MM-DD, or null when the report shows none.
-- Never guess a value.`;
+- Never guess a value.
+
+Also write "summary": a concise, professional clinical summary of the WHOLE report for doctor review (every test on it, not only the list above).
+- "patient": label/value pairs printed on the report (name, age, sex, lab, sample or report date, referring doctor, report id). Leave out what is not printed.
+- "abnormal": every result outside the lab's own reference range, most important first: test name as printed, exact value, unit, the lab's range, and flag "high" or "low" ("abnormal" when the lab marks it without a direction).
+- "normal": normal results grouped by category (for example "Thyroid", "Vitamins & iron"), each with the test names in one short line.
+- "overview": 2 to 4 sentences of clinical overview. Keep lab findings and interpretation apart; no diagnosis that the report does not support, no treatment or prescription.
+- "reviewPoints": short follow-up considerations for the doctor.
+- "unreadable": values or names that are unclear and need checking. Never guess an unclear value.
+Use the lab's reference ranges only. Do not repeat information. Write in English.`;
 
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -51,13 +61,99 @@ const RESPONSE_SCHEMA = {
         required: ['test', 'value'],
       },
     },
+    summary: {
+      type: 'OBJECT',
+      properties: {
+        patient: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: { label: { type: 'STRING' }, value: { type: 'STRING' } },
+            required: ['label', 'value'],
+          },
+        },
+        abnormal: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              test: { type: 'STRING' },
+              value: { type: 'STRING' },
+              unit: { type: 'STRING' },
+              range: { type: 'STRING' },
+              flag: { type: 'STRING', enum: ['high', 'low', 'abnormal'] },
+            },
+            required: ['test', 'value', 'flag'],
+          },
+        },
+        normal: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: { category: { type: 'STRING' }, tests: { type: 'STRING' } },
+            required: ['category', 'tests'],
+          },
+        },
+        overview: { type: 'STRING' },
+        reviewPoints: { type: 'ARRAY', items: { type: 'STRING' } },
+        unreadable: { type: 'ARRAY', items: { type: 'STRING' } },
+      },
+      required: ['patient', 'abnormal', 'normal', 'overview', 'reviewPoints', 'unreadable'],
+    },
   },
-  required: ['results'],
+  required: ['results', 'summary'],
 };
 
 export interface ReadReport {
   testDate: string | null;
   results: { test: BloodTest; value: string; unit: string }[];
+  summary: ReportSummary | null;
+  model: string;
+}
+
+const text = (value: unknown, max = 300) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+const list = (value: unknown) => (Array.isArray(value) ? value.slice(0, 60) : []);
+
+function toSummary(raw: unknown): ReportSummary | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const summary: ReportSummary = {
+    patient: list(r.patient)
+      .map((p) => ({
+        label: text((p as Record<string, unknown>)?.label, 60),
+        value: text((p as Record<string, unknown>)?.value, 160),
+      }))
+      .filter((p) => p.label && p.value),
+    abnormal: list(r.abnormal)
+      .map((a) => {
+        const row = (a ?? {}) as Record<string, unknown>;
+        const flag = text(row.flag, 10).toLowerCase();
+        return {
+          test: text(row.test, 120),
+          value: text(row.value, 40),
+          unit: text(row.unit, 30),
+          range: text(row.range, 60),
+          flag: ['high', 'low'].includes(flag) ? flag : 'abnormal',
+        };
+      })
+      .filter((a) => a.test && a.value),
+    normal: list(r.normal)
+      .map((n) => ({
+        category: text((n as Record<string, unknown>)?.category, 80),
+        tests: text((n as Record<string, unknown>)?.tests, 400),
+      }))
+      .filter((n) => n.category && n.tests),
+    overview: text(r.overview, 1500),
+    reviewPoints: list(r.reviewPoints)
+      .map((p) => text(p, 300))
+      .filter(Boolean),
+    unreadable: list(r.unreadable)
+      .map((p) => text(p, 200))
+      .filter(Boolean),
+  };
+  const empty =
+    !summary.overview && !summary.abnormal.length && !summary.normal.length && !summary.patient.length;
+  return empty ? null : summary;
 }
 
 const OPENAI_SCHEMA = {
@@ -78,8 +174,51 @@ const OPENAI_SCHEMA = {
         required: ['test', 'value', 'unit'],
       },
     },
+    summary: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        patient: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: { label: { type: 'string' }, value: { type: 'string' } },
+            required: ['label', 'value'],
+          },
+        },
+        abnormal: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              test: { type: 'string' },
+              value: { type: 'string' },
+              unit: { type: 'string' },
+              range: { type: 'string' },
+              flag: { type: 'string', enum: ['high', 'low', 'abnormal'] },
+            },
+            required: ['test', 'value', 'unit', 'range', 'flag'],
+          },
+        },
+        normal: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: { category: { type: 'string' }, tests: { type: 'string' } },
+            required: ['category', 'tests'],
+          },
+        },
+        overview: { type: 'string' },
+        reviewPoints: { type: 'array', items: { type: 'string' } },
+        unreadable: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['patient', 'abnormal', 'normal', 'overview', 'reviewPoints', 'unreadable'],
+    },
   },
-  required: ['testDate', 'results'],
+  required: ['testDate', 'results', 'summary'],
 };
 
 const unavailable = (message: string) => new AppError(503, 'SERVICE_UNAVAILABLE', message);
@@ -226,10 +365,10 @@ export async function readBloodReport(file: Express.Multer.File): Promise<ReadRe
   if (!READABLE_TYPES.includes(file.mimetype)) {
     throw AppError.badRequest('Upload the report as a PDF or an image (PNG, JPG, WebP)');
   }
-  const text = provider === 'openai' ? await askOpenAi(file) : await askGemini(file);
-  let parsed: { testDate?: unknown; results?: unknown } = {};
+  const answer = provider === 'openai' ? await askOpenAi(file) : await askGemini(file);
+  let parsed: { testDate?: unknown; results?: unknown; summary?: unknown } = {};
   try {
-    parsed = JSON.parse(text) as typeof parsed;
+    parsed = JSON.parse(answer) as typeof parsed;
   } catch {
     throw AppError.badGateway('The AI answer could not be read. Try a clearer report.');
   }
@@ -251,5 +390,10 @@ export async function readBloodReport(file: Express.Multer.File): Promise<ReadRe
     typeof parsed.testDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.testDate)
       ? parsed.testDate
       : null;
-  return { testDate, results };
+  return {
+    testDate,
+    results,
+    summary: toSummary(parsed.summary),
+    model: provider === 'openai' ? `openai:${env.OPENAI_MODEL}` : `gemini:${env.GEMINI_MODEL}`,
+  };
 }

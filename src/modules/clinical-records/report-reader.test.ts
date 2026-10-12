@@ -55,7 +55,7 @@ describe('reading a blood report with AI', () => {
         ],
       }),
     );
-    expect(await readBloodReport(file('application/pdf'))).toEqual({
+    expect(await readBloodReport(file('application/pdf'))).toMatchObject({
       testDate: '2026-09-20',
       results: [{ test: 'fsh', value: '45.5', unit: 'mIU/mL' }],
     });
@@ -73,7 +73,7 @@ describe('reading a blood report with AI', () => {
           openAiAnswer({ testDate: null, results: [{ test: 'tsh', value: '2.45', unit: 'uIU/mL' }] }),
         ),
       );
-    expect(await readBloodReport(file('application/pdf'))).toEqual({
+    expect(await readBloodReport(file('application/pdf'))).toMatchObject({
       testDate: null,
       results: [{ test: 'tsh', value: '2.45', unit: 'uIU/mL' }],
     });

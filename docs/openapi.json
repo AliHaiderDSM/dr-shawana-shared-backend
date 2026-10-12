@@ -9907,6 +9907,150 @@
           "createdAt"
         ]
       },
+      "LabReportSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "testDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "valuesFound": {
+            "type": "integer"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "patient": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "value"
+                  ]
+                }
+              },
+              "abnormal": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "test": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "range": {
+                      "type": "string"
+                    },
+                    "flag": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "test",
+                    "value",
+                    "unit",
+                    "range",
+                    "flag"
+                  ]
+                }
+              },
+              "normal": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "tests": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "tests"
+                  ]
+                }
+              },
+              "overview": {
+                "type": "string"
+              },
+              "reviewPoints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unreadable": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "patient",
+              "abnormal",
+              "normal",
+              "overview",
+              "reviewPoints",
+              "unreadable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "testDate",
+          "fileName",
+          "valuesFound",
+          "model",
+          "createdAt",
+          "createdBy",
+          "summary"
+        ]
+      },
       "ReadBloodReport": {
         "type": "object",
         "properties": {
@@ -9949,11 +10093,26 @@
                 "unit"
               ]
             }
+          },
+          "summary": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LabReportSummary"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "AI summary of the whole report, saved on the patient"
+              }
+            ]
           }
         },
         "required": [
           "testDate",
-          "results"
+          "results",
+          "summary"
         ]
       },
       "CreatePrescriptionCatalogItem": {
@@ -37419,6 +37578,209 @@
         }
       }
     },
+    "/branch/patients/{id}/report-summaries": {
+      "get": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "AI summaries of the lab reports read for this patient, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabReportSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/report-summaries/{summaryId}": {
+      "delete": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove one AI report summary",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "summaryId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/patients/{id}/blood-work/read-report": {
       "post": {
         "tags": [
@@ -37429,7 +37791,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Read blood work values from an uploaded report (multipart \"file\": PDF or image) with AI. Nothing is saved; the caller reviews and saves.",
+        "summary": "Read blood work values from an uploaded report (multipart \"file\": PDF or image) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.",
         "parameters": [
           {
             "schema": {

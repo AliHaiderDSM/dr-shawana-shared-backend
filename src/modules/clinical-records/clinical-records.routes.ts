@@ -4,6 +4,7 @@ import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/ht
 import { branchIdOf, idOf } from '../../lib/request';
 import { documentsUpload, documentUpload, jsonDataField, requireFile, uploadedFiles } from '../../lib/upload';
 import { readBloodReport } from './report-reader';
+import { labReportSummariesService } from './lab-report-summaries.service';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
@@ -16,6 +17,7 @@ import {
   recordFileParamsSchema,
   recordParamsSchema,
   resultParamsSchema,
+  summaryParamsSchema,
   updateBloodWorkSchema,
   updateMedicalRecordSchema,
 } from './clinical-records.schemas';
@@ -52,7 +54,32 @@ clinicalRecordsRouter.post(
   documentUpload('file'),
   validate({ params: idParamsSchema }),
   async (req, res) => {
-    sendOk(res, await readBloodReport(requireFile(req)));
+    const file = requireFile(req);
+    const read = await readBloodReport(file);
+    const saved = await labReportSummariesService.save(
+      actorFrom(req),
+      branchIdOf(req),
+      idOf(req),
+      file.originalname || null,
+      read,
+    );
+    sendOk(res, { testDate: read.testDate, results: read.results, summary: saved });
+  },
+);
+
+clinicalRecordsRouter.get(`${base}/report-summaries`, ...scoped, canView, byPatient, async (req, res) => {
+  sendOk(res, await labReportSummariesService.list(branchIdOf(req), idOf(req)));
+});
+
+clinicalRecordsRouter.delete(
+  `${base}/report-summaries/:summaryId`,
+  ...scoped,
+  canUpdate,
+  validate({ params: summaryParamsSchema }),
+  async (req, res) => {
+    const { id, summaryId } = validParams(req, summaryParamsSchema);
+    await labReportSummariesService.remove(actorFrom(req), branchIdOf(req), id, summaryId);
+    sendNoContent(res);
   },
 );
 
