@@ -2,7 +2,7 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
-import { approvedRequest } from '../../../tests/helpers/stock-requests';
+import { approvedRequest, confirmReceipts } from '../../../tests/helpers/stock-requests';
 import { AppDataSource } from '../../database/data-source';
 
 const fake = installFakeSupabase();
@@ -126,6 +126,7 @@ describe('Dispatch Department ships every online order from its own stock', () =
         { productId: toner, qty: '60', batch: 'T-1', expiryDate: '2028-01-31' },
       ],
     });
+    await confirmReceipts(app, await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId }));
     serials = (
       await as(superAdmin, 'get', `/branch/inventory/items?productId=${serum}`, warehouseId)
     ).body.data.map((i: { serial: string }) => i.serial);

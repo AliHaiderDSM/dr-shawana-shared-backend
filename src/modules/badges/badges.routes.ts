@@ -6,6 +6,7 @@ import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
+import { pendingReceipts } from '../inventory/store-receipts';
 
 export const badgesRouter = Router();
 
@@ -17,6 +18,7 @@ const countsSchema = registry.register(
     writeOffs: z.number().int(),
     discountRequests: z.number().int(),
     returns: z.number().int(),
+    stockReceipts: z.number().int(),
   }),
 );
 
@@ -69,7 +71,14 @@ badgesRouter.get(
           [],
         ),
       ]);
-      sendOk(res, { stockRequests, incomingStock, writeOffs, discountRequests, returns });
+      sendOk(res, {
+        stockRequests,
+        incomingStock,
+        writeOffs,
+        discountRequests,
+        returns,
+        stockReceipts: await pendingReceipts(null),
+      });
       return;
     }
     const branchId = req.branchId as string;
@@ -96,6 +105,7 @@ badgesRouter.get(
         writeOffs: 0,
         discountRequests: 0,
         returns: 0,
+        stockReceipts: await pendingReceipts(branchId),
       });
       return;
     }
@@ -133,6 +143,6 @@ badgesRouter.get(
         [branchId, req.auth?.role === 'branch_admin'],
       ),
     ]);
-    sendOk(res, { stockRequests, incomingStock, writeOffs, discountRequests, returns });
+    sendOk(res, { stockRequests, incomingStock, writeOffs, discountRequests, returns, stockReceipts: 0 });
   },
 );

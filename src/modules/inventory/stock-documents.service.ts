@@ -14,6 +14,7 @@ import { type SupplierType } from '../suppliers/supplier.entity';
 import { suppliersService } from '../suppliers/suppliers.service';
 import { inventoryItemsService, type TakenItem } from './inventory-items.service';
 import { transfersService } from './transfers.service';
+import { nextSequence } from '../sequences/sequences';
 import { stockRequestsService } from '../stock-requests/stock-requests.service';
 import { productBatchesService } from './product-batches.service';
 import { StockAttachment, type StockDocumentType } from './stock-attachment.entity';
@@ -271,11 +272,12 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     record: T,
     product: { name: string; trackSerials: boolean },
     pieces: { labels?: string; firstSerial?: string; serials?: string[] },
+    pending = false,
   ): Promise<TakenItem[]> {
     const ref = ledgerRef(actor, record);
     if (config.kind === 'stock_in') {
       const stockIn = record as StockIn;
-      await stockLedger.apply(manager, ref, [movementFor(record)]);
+      if (!pending) await stockLedger.apply(manager, ref, [movementFor(record)]);
       const mode = pieces.labels ?? 'none';
       if (mode === 'none' && product.trackSerials) {
         throw AppError.unprocessable(
@@ -299,6 +301,12 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           ...common,
           firstSerial: pieces.firstSerial ?? '',
         });
+      if (pending) {
+        await manager.query(
+          `UPDATE inventory_items SET status = 'quarantined' WHERE source_type = 'stock_in' AND source_id = $1`,
+          [record.id],
+        );
+      }
       return [];
     }
     const serials = pieces.serials ?? [];
@@ -391,11 +399,23 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             config.kind === 'stock_out' && input.toBranchId
               ? await transfersService.assertRoute(em, branchId, input.toBranchId)
               : null;
+          const [here] = (await em.query('SELECT kind::text AS kind, code FROM branches WHERE id = $1', [
+            branchId,
+          ])) as { kind: string; code: string }[];
+          const pendingReceipt = config.kind === 'stock_in' && here?.kind === 'warehouse';
+          if (
+            config.kind === 'stock_out' &&
+            here?.kind === 'warehouse' &&
+            !actor.isSuperAdmin &&
+            actor.role !== 'warehouse_keeper'
+          ) {
+            throw AppError.forbidden('Only the Warehouse Keeper sends stock out of the Super Admin stock');
+          }
+          const grnNo = pendingReceipt
+            ? `${here!.code}-GRN-${String(await nextSequence(em, branchId, 'grn')).padStart(6, '0')}`
+            : null;
           if (config.kind === 'stock_out' && !input.stockRequestId) {
-            const [from] = (await em.query('SELECT kind FROM branches WHERE id = $1', [branchId])) as {
-              kind: string;
-            }[];
-            if (from?.kind === 'warehouse') {
+            if (here?.kind === 'warehouse') {
               throw AppError.unprocessable(
                 'The Super Admin stock goes out only for a branch stock request. Open the request in Stock Requests and use Send stock.',
               );
@@ -422,6 +442,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
                 [config.partyKey]: partyId,
                 date: input.date,
                 note: input.note ?? null,
+                ...(pendingReceipt ? { grnNo, receiptStatus: 'pending' } : {}),
                 ...(route
                   ? {
                       toBranchId: route.id,
@@ -435,7 +456,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
               } as unknown as Partial<T>,
               em,
             );
-            await postPieces(em, actor, record, product, { labels, firstSerial, serials });
+            await postPieces(em, actor, record, product, { labels, firstSerial, serials }, pendingReceipt);
             ids.push(record.id);
           }
           if (route && input.stockRequestId)
@@ -513,7 +534,12 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         delete record.product;
         delete (record as unknown as Record<string, unknown>)[config.partyRelation];
         const saved = await base.save(record, em);
-        if (pieces === 0 && tracked.size === 0 && !transfer) {
+        if (
+          pieces === 0 &&
+          tracked.size === 0 &&
+          !transfer &&
+          (saved as Partial<StockIn>).receiptStatus !== 'pending'
+        ) {
           await stockLedger.replace(em, ledgerRef(actor, saved), [movementFor(saved)]);
         }
         const after = await getDto(branchId, id, em);
@@ -532,7 +558,13 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         assertNotTransferIn(record);
         if (config.kind === 'stock_out') await transfersService.undo(em, actor, record as StockOut);
         if (config.kind === 'stock_in') {
-          const removed = await inventoryItemsService.removeUntouched(em, branchId, 'stock_in', record.id);
+          const removed = await inventoryItemsService.removeUntouched(
+            em,
+            branchId,
+            'stock_in',
+            record.id,
+            (record as StockIn).receiptStatus === 'pending' ? ['quarantined'] : ['in_stock'],
+          );
           const tracked = await inventoryItemsService.trackedProducts(em, branchId, [record.productId]);
           if (removed === 0 && tracked.size > 0) {
             const free = await inventoryItemsService.unlabelled(

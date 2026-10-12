@@ -2,13 +2,14 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
-import { approvedRequest } from '../../../tests/helpers/stock-requests';
+import { approvedRequest, confirmReceipts } from '../../../tests/helpers/stock-requests';
 
 const fake = installFakeSupabase();
 const app = createApp();
 
 describe('Main Warehouse transfers to branches', () => {
   let superAdmin: { id: string };
+  let keeper: { id: string };
   let lahoreAdmin: { id: string };
   let lahoreDesk: { id: string };
   let warehouseId: string;
@@ -47,7 +48,10 @@ describe('Main Warehouse transfers to branches', () => {
   };
 
   const sendOut = async (
-    body: { toBranchId: string; items: ({ productId: string; qty: string } & Record<string, unknown>)[] } & Record<string, unknown>,
+    body: {
+      toBranchId: string;
+      items: ({ productId: string; qty: string } & Record<string, unknown>)[];
+    } & Record<string, unknown>,
   ) =>
     asAdmin('post', '/branch/stock-outs').send({
       ...body,
@@ -105,6 +109,9 @@ describe('Main Warehouse transfers to branches', () => {
       ],
     });
     expect(received.status).toBe(201);
+    expect(Number((await stockOf(serum, warehouseId)) ?? 0)).toBe(0);
+    keeper = await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId });
+    await confirmReceipts(app, keeper);
     serials = (await asAdmin('get', `/branch/inventory/items?productId=${serum}`)).body.data.map(
       (i: { serial: string }) => i.serial,
     );
@@ -351,6 +358,7 @@ describe('Main Warehouse transfers to branches', () => {
       date: '2026-10-04',
       items: [{ productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
     });
+    await confirmReceipts(app, keeper);
     await received(
       await sendOut({
         date: '2026-10-04',

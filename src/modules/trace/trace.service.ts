@@ -11,6 +11,7 @@ export const TRACE_KINDS = [
   'transfer',
   'discount_request',
   'write_off',
+  'store_receipt',
 ] as const;
 export type TraceKind = (typeof TRACE_KINDS)[number];
 
@@ -432,7 +433,73 @@ async function writeOff(number: string): Promise<Found | null> {
   };
 }
 
-const FINDERS = [sale, saleReturn, stockRequest, transfer, discountRequest, writeOff];
+async function storeReceipt(number: string): Promise<Found | null> {
+  const rows = await q<
+    Row & {
+      productName: string;
+      qty: string;
+      receivedQty: string | null;
+      receiptStatus: string;
+      batch: string | null;
+      supplier: string | null;
+      confirmedBy: Person | null;
+      confirmedAt: string | null;
+      receiptNote: string | null;
+      date: string;
+    }
+  >(
+    `SELECT si.id, si.grn_no AS number, ${BRANCH('b')} AS branch, si.created_at AS "createdAt", ${PERSON('u')} AS "createdBy",
+            p.name AS "productName", si.qty::text AS qty, si.received_qty::text AS "receivedQty",
+            si.receipt_status::text AS "receiptStatus", si.batch, sp.name AS supplier, ${PERSON('c')} AS "confirmedBy",
+            si.confirmed_at AS "confirmedAt", si.receipt_note AS "receiptNote", to_char(si.date, 'YYYY-MM-DD') AS date,
+            NULL AS status
+       FROM stock_ins si JOIN branches b ON b.id = si.branch_id
+       JOIN products p ON p.id = si.product_id
+       LEFT JOIN suppliers sp ON sp.id = si.supplier_id
+       LEFT JOIN staff_profiles u ON u.id = si.created_by
+       LEFT JOIN staff_profiles c ON c.id = si.confirmed_by
+      WHERE upper(si.grn_no) = $1 AND si.deleted_at IS NULL
+      ORDER BY p.name`,
+    [number],
+  );
+  const first = rows[0];
+  if (!first) return null;
+  const confirmed = rows.every((r) => r.receiptStatus === 'confirmed');
+  return {
+    kind: 'store_receipt',
+    number: first.number,
+    id: first.id,
+    status: confirmed ? 'confirmed' : 'waiting for the Warehouse Keeper',
+    branch: first.branch,
+    branchIds: [first.branch.id],
+    createdAt: iso(first.createdAt),
+    createdBy: first.createdBy,
+    fields: [
+      { label: 'Stock In date', value: first.date },
+      { label: 'Supplier', value: first.supplier },
+      {
+        label: 'Confirmed',
+        value:
+          confirmed && first.confirmedBy ? `${first.confirmedBy.name} · ${iso(first.confirmedAt)}` : null,
+      },
+    ],
+    items: rows.map((r) => ({
+      name: r.productName,
+      qty: qty(r.qty),
+      detail: [
+        r.batch ? `batch ${r.batch}` : null,
+        r.receivedQty !== null ? `received ${qty(r.receivedQty)}` : 'not checked yet',
+        r.receiptNote,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    })),
+    links: [],
+    auditIds: rows.map((r) => r.id),
+  };
+}
+
+const FINDERS = [sale, saleReturn, stockRequest, transfer, discountRequest, writeOff, storeReceipt];
 
 export const traceService = {
   async find(actor: Actor, branchId: string | null, raw: string) {

@@ -60,10 +60,10 @@ export function assertCanManage(actor: Actor, role: Role) {
 
 function assertRoleFitsBranch(kind: string, role: Role) {
   if (kind === 'warehouse' && !WAREHOUSE_ROLES.includes(role)) {
-    throw AppError.conflict('The Super Admin stock has only Warehouse Keepers. The Super Admin runs it.');
+    throw AppError.conflict('The Super Admin stock has only Warehouse Keepers and Lab Officers. The Super Admin runs it.');
   }
-  if (kind !== 'warehouse' && role === 'warehouse_keeper') {
-    throw AppError.unprocessable('A Warehouse Keeper works only at the Super Admin stock');
+  if (kind !== 'warehouse' && WAREHOUSE_ROLES.includes(role)) {
+    throw AppError.unprocessable('Warehouse Keepers and Lab Officers work only at the Super Admin stock');
   }
   if (kind !== 'dispatch' && role === 'store_keeper') {
     throw AppError.unprocessable('A Store Keeper works only in the Dispatch Department');

@@ -418,15 +418,21 @@ export const inventoryItemsService = {
     )) as (TakenItem & { status: ItemStatus; saleReturnItemId: string | null })[];
   },
 
-  async removeUntouched(manager: EntityManager, branchId: string, source: ItemSource, sourceId: string) {
+  async removeUntouched(
+    manager: EntityManager,
+    branchId: string,
+    source: ItemSource,
+    sourceId: string,
+    untouched: ItemStatus[] = ['in_stock'],
+  ) {
     const rows: { id: string; moved: boolean }[] = await manager.query(
-      `SELECT i.id, (i.status <> 'in_stock' OR EXISTS (
+      `SELECT i.id, (NOT (i.status = ANY($4::inventory_item_status[])) OR EXISTS (
                 SELECT 1 FROM inventory_item_events e
                  WHERE e.item_id = i.id AND e.type NOT IN ('received', 'produced', 'labelled'))) AS moved
          FROM inventory_items i
         WHERE i.branch_id = $1 AND i.source_type = $2 AND i.source_id = $3 AND i.deleted_at IS NULL
           FOR UPDATE OF i`,
-      [branchId, source, sourceId],
+      [branchId, source, sourceId, untouched],
     );
     if (rows.some((r) => r.moved)) {
       throw AppError.conflict('Some of its labelled pieces were already sold, sent out or returned');

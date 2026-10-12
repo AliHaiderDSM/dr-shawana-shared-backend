@@ -22,3 +22,15 @@ export async function approvedRequest(
   if (approved.status !== 200) throw new Error(`Approval failed: ${JSON.stringify(approved.body)}`);
   return asked.body.data.id as string;
 }
+
+export async function confirmReceipts(app: Express, keeper: { id: string }, date?: string) {
+  const waiting = await request(app).get('/api/v1/branch/stock-receipts?status=pending').set(bearer(keeper));
+  if (waiting.status !== 200) throw new Error(`Receipts failed: ${JSON.stringify(waiting.body)}`);
+  for (const receipt of waiting.body.data as { grnNo: string; date: string }[]) {
+    const done = await request(app)
+      .post(`/api/v1/branch/stock-receipts/${receipt.grnNo}/confirm`)
+      .set(bearer(keeper))
+      .send({ date: date ?? receipt.date });
+    if (done.status !== 200) throw new Error(`Confirm failed: ${JSON.stringify(done.body)}`);
+  }
+}

@@ -25,6 +25,7 @@ import './modules/discount-requests/discount-requests.schemas';
 import './modules/stock-requests/stock-requests.schemas';
 import './modules/badges/badges.routes';
 import './modules/trace/trace.routes';
+import './modules/inventory/store-receipts';
 import './modules/returns/returns.docs';
 import './modules/journal/journal.schemas';
 import './modules/expenses/expenses.schemas';

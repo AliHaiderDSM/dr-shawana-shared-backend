@@ -215,6 +215,14 @@ export const stockInSchema = registry.register(
       .uuid()
       .nullable()
       .openapi({ description: 'Set when the stock came from the Super Admin stock' }),
+    grnNo: z.string().nullable().optional(),
+    receiptStatus: z.enum(['pending', 'confirmed']).nullable().optional().openapi({
+      description: 'Super Admin stock: pending until the Warehouse Keeper confirms what arrived',
+    }),
+    receivedQty: z.string().nullable().optional(),
+    receiptNote: z.string().nullable().optional(),
+    confirmedBy: z.uuid().nullable().optional(),
+    confirmedAt: z.string().nullable().optional(),
     manufacturingDate: z.iso.date().nullable(),
     expiryDate: z.iso.date().nullable(),
     unitCost: moneyOutput.nullable(),

@@ -59,4 +59,30 @@ export class StockIn extends BranchScopedEntity {
 
   @Column({ type: 'text', nullable: true })
   note: string | null;
+
+  @Index()
+  @Column({ name: 'grn_no', type: 'varchar', length: 30, nullable: true })
+  grnNo: string | null;
+
+  @Index()
+  @Column({
+    name: 'receipt_status',
+    type: 'enum',
+    enum: ['pending', 'confirmed'],
+    enumName: 'stock_receipt_status',
+    nullable: true,
+  })
+  receiptStatus: 'pending' | 'confirmed' | null;
+
+  @Column({ name: 'received_qty', ...quantityColumn({ nullable: true }) })
+  receivedQty: Decimal | null;
+
+  @Column({ name: 'receipt_note', type: 'text', nullable: true })
+  receiptNote: string | null;
+
+  @Column({ name: 'confirmed_by', type: 'uuid', nullable: true })
+  confirmedBy: string | null;
+
+  @Column({ name: 'confirmed_at', type: 'timestamptz', nullable: true })
+  confirmedAt: Date | null;
 }

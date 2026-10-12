@@ -60,6 +60,17 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       ],
     });
     expect(stocked.status).toBe(201);
+    expect(stocked.body.data[0]).toMatchObject({ grnNo: 'MAINWH-GRN-000001', receiptStatus: 'pending' });
+    expect(Number((await stockOf('Vitamin C Serum', warehouseId)) ?? 0)).toBe(0);
+    expect(
+      (await as(superAdmin, 'post', '/branch/stock-receipts/MAINWH-GRN-000001/confirm', warehouseId).send({}))
+        .status,
+    ).toBe(403);
+    const confirmed = await as(keeper, 'post', '/branch/stock-receipts/MAINWH-GRN-000001/confirm').send({
+      date: '2026-10-01',
+    });
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.data).toMatchObject({ status: 'confirmed', confirmedBy: { id: keeper.id } });
   });
 
   it('runs a request from the branch to the Super Admin, the transfer, and the branch receipt', async () => {
@@ -284,5 +295,36 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     ).toBe(409);
     const ok = await as(superAdmin, 'post', '/branch/staff', warehouseId).send(person('warehouse_keeper', 4));
     expect(ok.status).toBe(201);
+  });
+
+  it('takes Lab Officer stock in only after the Warehouse Keeper confirms it, short lines included', async () => {
+    const lab = await createStaff(fake, { role: 'lab_officer', branchId: warehouseId });
+    expect((await as(lab, 'get', '/branch/sales')).status).toBe(403);
+    const before = Number(await stockOf('Rose Toner', warehouseId));
+    const entry = await as(lab, 'post', '/branch/stock-ins').send({
+      date: '2026-10-05',
+      items: [{ productId: toner, qty: '10', batch: 'T-2', expiryDate: '2028-06-30' }],
+    });
+    expect(entry.status).toBe(201);
+    const grn = entry.body.data[0].grnNo as string;
+    expect(Number(await stockOf('Rose Toner', warehouseId))).toBe(before);
+    expect((await as(keeper, 'get', '/branch/badges')).body.data.stockReceipts).toBe(1);
+    expect((await as(lab, 'post', `/branch/stock-receipts/${grn}/confirm`).send({})).status).toBe(403);
+    const short = await as(keeper, 'post', `/branch/stock-receipts/${grn}/confirm`).send({
+      date: '2026-10-05',
+      lines: [{ id: entry.body.data[0].id, receivedQty: '8', note: '2 broken' }],
+    });
+    expect(short.status).toBe(200);
+    expect(short.body.data).toMatchObject({
+      status: 'confirmed',
+      enteredBy: { id: lab.id },
+      lines: [expect.objectContaining({ qty: '10.000', receivedQty: '8.000', receiptNote: '2 broken' })],
+    });
+    expect(Number(await stockOf('Rose Toner', warehouseId))).toBe(before + 8);
+    const out = await as(lab, 'post', '/branch/stock-outs').send({
+      date: '2026-10-05',
+      items: [{ productId: toner, qty: '1', destination: 'Karachi' }],
+    });
+    expect(out.status).toBe(403);
   });
 });
