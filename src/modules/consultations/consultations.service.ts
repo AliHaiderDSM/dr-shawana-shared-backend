@@ -380,18 +380,42 @@ export const consultationsService = {
   async mrsHistory(viewer: Viewer, patientId: string) {
     const qb = sections
       .query(viewer.branchId)
-      .innerJoin('s.consultation', 'c')
+      .innerJoinAndSelect('s.consultation', 'c')
+      .leftJoinAndSelect('c.appointment', 'appointment')
       .andWhere('c.patientId = :patientId', { patientId })
-      .andWhere("s.sectionKey = 'mrs_scale'");
+      .andWhere("s.sectionKey IN ('mrs_scale', 'additional_symptoms')");
     if (viewer.doctorId) qb.andWhere('c.doctorId = :doctorId', { doctorId: viewer.doctorId });
     const rows = await qb.getMany();
-    return rows
-      .map((r) => ({
+    const visits = new Map<
+      string,
+      {
+        consultationId: string;
+        date: string;
+        scores: ReturnType<typeof mrsScores> | null;
+        symptoms: { key: string; severity: number | null }[];
+        otherSymptoms: string | null;
+      }
+    >();
+    for (const r of rows) {
+      const visit = visits.get(r.consultationId) ?? {
         consultationId: r.consultationId,
-        date: r.data.date as string,
-        scores: mrsScores(r.data),
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+        date: r.consultation?.appointment?.date ?? r.createdAt.toISOString().slice(0, 10),
+        scores: null,
+        symptoms: [],
+        otherSymptoms: null,
+      };
+      if (r.sectionKey === 'mrs_scale') {
+        visit.scores = mrsScores(r.data);
+        if (typeof r.data.date === 'string') visit.date = r.data.date;
+      } else {
+        const ticked = Array.isArray(r.data.symptoms) ? (r.data.symptoms as string[]) : [];
+        const severity = (r.data.severity ?? {}) as Record<string, number>;
+        visit.symptoms = ticked.map((key) => ({ key, severity: severity[key] ?? null }));
+        visit.otherSymptoms = typeof r.data.other === 'string' && r.data.other ? r.data.other : null;
+      }
+      visits.set(r.consultationId, visit);
+    }
+    return [...visits.values()].sort((a, b) => a.date.localeCompare(b.date));
   },
 
   async timelineEntries(branchId: string | null, patientId: string, doctorId: string | null) {

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## MRS and additional symptoms as one visit record (2026-10-12)
+
+- `GET /branch/patients/{id}/mrs-history` now returns one row per visit (consultation): the MRS scores (or null) and the additional symptoms with severity and the other text of the same visit; the date is the MRS date, else the appointment date. Like posSoft, where both live in the same customers_history row of the appointment.
+
 ## GRN print, several reports in one summary (2026-10-12)
 
 - `GET /branch/stock-receipts?grnNo=` returns one receipt (for the printed GRN).

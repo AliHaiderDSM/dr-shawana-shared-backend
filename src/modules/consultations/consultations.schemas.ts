@@ -223,14 +223,23 @@ registry.registerPath({
   ...common,
   method: 'get',
   path: '/branch/patients/{id}/mrs-history',
-  summary: 'MRS scores of the patient over time (this branch)',
+  summary:
+    'Each visit of the patient with its MRS scores and the additional symptoms of the same visit (this branch)',
   request: byId,
   responses: {
     200: {
       description: 'History',
       ...jsonContent(
         dataEnvelope(
-          z.array(z.object({ consultationId: z.uuid(), date: z.iso.date(), scores: mrsScoresSchema })),
+          z.array(
+            z.object({
+              consultationId: z.uuid(),
+              date: z.iso.date().openapi({ description: 'MRS date of the visit, or the appointment date' }),
+              scores: mrsScoresSchema.nullable(),
+              symptoms: z.array(z.object({ key: z.string(), severity: z.number().int().nullable() })),
+              otherSymptoms: z.string().nullable(),
+            }),
+          ),
         ),
       ),
     },

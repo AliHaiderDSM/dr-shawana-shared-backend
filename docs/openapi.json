@@ -36157,7 +36157,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "MRS scores of the patient over time (this branch)",
+        "summary": "Each visit of the patient with its MRS scores and the additional symptoms of the same visit (this branch)",
         "parameters": [
           {
             "schema": {
@@ -36197,10 +36197,14 @@
                           },
                           "date": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "description": "MRS date of the visit, or the appointment date"
                           },
                           "scores": {
-                            "type": "object",
+                            "type": [
+                              "object",
+                              "null"
+                            ],
                             "properties": {
                               "somatic": {
                                 "type": "number"
@@ -36235,12 +36239,41 @@
                               "percentage",
                               "severity"
                             ]
+                          },
+                          "symptoms": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "severity": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "severity"
+                              ]
+                            }
+                          },
+                          "otherSymptoms": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
                           "consultationId",
                           "date",
-                          "scores"
+                          "scores",
+                          "symptoms",
+                          "otherSymptoms"
                         ]
                       }
                     }
