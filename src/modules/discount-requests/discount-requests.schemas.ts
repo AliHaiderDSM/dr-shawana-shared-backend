@@ -49,6 +49,7 @@ export const discountRequestSchema = registry.register(
   'DiscountRequest',
   z.object({
     id: z.uuid(),
+    requestNo: z.string(),
     branch: z.object({ id: z.uuid(), name: z.string(), code: z.string() }),
     requestedBy: person,
     productId: z.uuid().nullable(),

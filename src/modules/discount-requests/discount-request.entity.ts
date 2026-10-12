@@ -9,6 +9,9 @@ export type DiscountRequestStatus = (typeof DISCOUNT_REQUEST_STATUSES)[number];
 
 @Entity('discount_requests')
 export class DiscountRequest extends BranchScopedEntity {
+  @Column({ name: 'request_no', type: 'varchar', length: 30 })
+  requestNo: string;
+
   @Index()
   @Column({ name: 'product_id', type: 'uuid', nullable: true })
   productId: string | null;

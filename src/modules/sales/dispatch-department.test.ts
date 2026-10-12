@@ -45,8 +45,23 @@ describe('Dispatch Department ships every online order from its own stock', () =
     return (res.body.data as { id: string; name: string }[]).find((p) => p.name === name)!.id;
   };
 
-  const transfer = (toBranchId: string, items: object[]) =>
-    as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({ date: '2026-10-02', toBranchId, items });
+  const transfer = async (toBranchId: string, items: object[]) => {
+    const res = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+      date: '2026-10-02',
+      toBranchId,
+      items,
+    });
+    if (res.status === 201) {
+      const done = await as(
+        superAdmin,
+        'post',
+        `/branch/incoming-stock/${res.body.data[0].transferNo}/receive`,
+        toBranchId,
+      ).send({ date: '2026-10-02' });
+      expect(done.status).toBe(200);
+    }
+    return res;
+  };
 
   const online = (who: { id: string }, items: object[], sheet: string) =>
     as(who, 'post', '/branch/sales').send({

@@ -14,6 +14,7 @@ import { type SupplierType } from '../suppliers/supplier.entity';
 import { suppliersService } from '../suppliers/suppliers.service';
 import { inventoryItemsService, type TakenItem } from './inventory-items.service';
 import { transfersService } from './transfers.service';
+import { stockRequestsService } from '../stock-requests/stock-requests.service';
 import { productBatchesService } from './product-batches.service';
 import { StockAttachment, type StockDocumentType } from './stock-attachment.entity';
 import { type StockIn } from './stock-in.entity';
@@ -41,6 +42,7 @@ interface CreateInput {
   supplierId?: string | null;
   dispatcherId?: string | null;
   toBranchId?: string | null;
+  stockRequestId?: string | null;
   items: ({
     productId: string;
     qty: string;
@@ -389,6 +391,13 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             config.kind === 'stock_out' && input.toBranchId
               ? await transfersService.assertRoute(em, branchId, input.toBranchId)
               : null;
+          if (input.stockRequestId && !route) {
+            throw AppError.badRequest('A stock request is answered with a transfer to the branch that asked');
+          }
+          if (route && input.stockRequestId) {
+            await stockRequestsService.assertSendable(em, input.stockRequestId, route.id);
+          }
+          const transferNo = route ? await transfersService.nextTransferNo(em, branchId) : null;
           const ids: string[] = [];
           for (const item of input.items) {
             const { labels, firstSerial, serials, ...fields } = item;
@@ -402,14 +411,24 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
                 [config.partyKey]: partyId,
                 date: input.date,
                 note: input.note ?? null,
-                ...(route ? { toBranchId: route.id, destination: route.name } : {}),
+                ...(route
+                  ? {
+                      toBranchId: route.id,
+                      destination: route.name,
+                      transferNo,
+                      stockRequestId: input.stockRequestId ?? null,
+                      receivedAt: null,
+                      receivedBy: null,
+                    }
+                  : {}),
               } as unknown as Partial<T>,
               em,
             );
-            const taken = await postPieces(em, actor, record, product, { labels, firstSerial, serials });
-            if (route) await transfersService.receive(em, actor, record as StockOut, route, taken);
+            await postPieces(em, actor, record, product, { labels, firstSerial, serials });
             ids.push(record.id);
           }
+          if (route && input.stockRequestId)
+            await stockRequestsService.refresh(em, actor, input.stockRequestId);
           await saveAttachments(em, actor, branchId, ids, uploaded);
           const created = await Promise.all(ids.map((id) => getDto(branchId, id, em)));
           for (const dto of created) {
@@ -527,6 +546,9 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         }
         await stockLedger.reverse(em, ledgerRef(actor, record), `${config.label} removed`);
         await base.softDelete(record, actor.userId, em);
+        if (config.kind === 'stock_out') {
+          await stockRequestsService.refresh(em, actor, (record as StockOut).stockRequestId ?? null);
+        }
         await auditService.record(
           { actor, branchId, action: 'delete', entity: config.kind, entityId: id, before },
           em,

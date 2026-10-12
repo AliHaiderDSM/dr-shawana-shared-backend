@@ -1049,7 +1049,14 @@ export const salesService = {
 
   async onlineCatalog(query: { search?: string; categoryId?: string }) {
     const department = await dispatchDepartment(AppDataSource.manager);
-    if (!department) return { dispatch: null, items: [] };
+    if (!department) return { dispatch: null, categories: [], items: [] };
+    const categories = (await AppDataSource.query(
+      `SELECT c.id, c.name FROM categories c
+        WHERE c.branch_id = $1 AND c.deleted_at IS NULL
+          AND EXISTS (SELECT 1 FROM products p WHERE p.category_id = c.id AND p.deleted_at IS NULL)
+        ORDER BY c.name`,
+      [department.id],
+    )) as { id: string; name: string }[];
     const params: unknown[] = [department.id, today()];
     const where = ['p.branch_id = $1', 'p.deleted_at IS NULL', "p.status = 'active'"];
     if (query.search) {
@@ -1093,6 +1100,7 @@ export const salesService = {
     );
     return {
       dispatch: { id: department.id, name: department.name },
+      categories,
       items: rows.map((r) => ({
         id: r.id,
         name: r.name,

@@ -99,7 +99,11 @@ export const createStockOutSchema = registry.register(
       dispatcherId: optionalUuid,
       toBranchId: optionalUuid.openapi({
         description:
-          'Super Admin stock only: the branch that receives the stock. Its Stock In is created automatically.',
+          'Super Admin stock only: the branch that gets the stock. It reaches the branch when the branch admin receives the transfer.',
+      }),
+      stockRequestId: optionalUuid.openapi({
+        description:
+          'The approved stock request this transfer answers (the branch must be the one that asked)',
       }),
       date: dateInput,
       note: optionalText(1000),
@@ -225,6 +229,10 @@ export const stockOutSchema = registry.register(
     destination: z.string(),
     toBranchId: z.uuid().nullable(),
     toBranch: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    transferNo: z.string().nullable(),
+    stockRequestId: z.uuid().nullable(),
+    receivedAt: z.string().nullable().openapi({ description: 'When the branch admin received the transfer' }),
+    receivedBy: z.uuid().nullable(),
     batches: z
       .array(
         z.object({

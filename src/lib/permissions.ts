@@ -141,7 +141,7 @@ const MATRIX: Record<Role, Grants> = {
     sales: ['view', 'update'],
     deliveryReport: VIEW,
     returns: VIEW,
-    stock: VIEW,
+    stock: ['view', 'update'],
     inventoryReport: VIEW,
     products: VIEW,
   },

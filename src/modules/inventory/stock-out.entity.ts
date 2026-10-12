@@ -46,4 +46,16 @@ export class StockOut extends BranchScopedEntity {
   @ManyToOne(() => Branch, { onDelete: 'RESTRICT', nullable: true })
   @JoinColumn({ name: 'to_branch_id' })
   toBranch?: Branch | null;
+
+  @Column({ name: 'transfer_no', type: 'varchar', length: 30, nullable: true })
+  transferNo: string | null;
+
+  @Column({ name: 'stock_request_id', type: 'uuid', nullable: true })
+  stockRequestId: string | null;
+
+  @Column({ name: 'received_at', type: 'timestamptz', nullable: true })
+  receivedAt: Date | null;
+
+  @Column({ name: 'received_by', type: 'uuid', nullable: true })
+  receivedBy: string | null;
 }

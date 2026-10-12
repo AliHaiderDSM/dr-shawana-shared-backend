@@ -22,6 +22,15 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Stock requests, receipt approval, write-off list, numbers (2026-10-12)
+
+- Migration 1791900000000-StockRequests.
+- Stock requests (`/branch/stock-requests`): a branch or the Dispatch Department asks for Super Admin products (`/catalog`) with qty; number `<CODE>-SR-000001`. The Super Admin approves (optionally less per line) or rejects at `/admin/stock-requests/{id}/approve|reject`, then sends a Stock Out with `stockRequestId` (only to the branch that asked, only when approved).
+- Transfers no longer reach the branch at once: each Stock Out to a branch gets a transfer number `<WAREHOUSE>-TR-000001` and waits. `/branch/incoming-stock` lists them; the branch admin (or dispatcher in the Dispatch Department) receives with `POST /branch/incoming-stock/{transferNo}/receive`, which creates the branch Stock In on the receiving date. Request status follows: approved → sent → received. Deleting an unreceived transfer just returns the stock. Existing transfers are marked received by the migration.
+- Write-offs keep a record with number `<CODE>-WO-000001` and reason; `GET /branch/inventory/write-offs` lists them (all branches for the Super Admin). Dispatchers may write off (stock.update).
+- Discount requests get `<CODE>-DR-000001`.
+- Online catalog also returns the Dispatch Department categories.
+
 ## Discount requests (2026-10-12)
 
 - New module discount-requests (migration 1791800000000-DiscountRequests): a branch asks for a discount on one product or bundle (qty, %, note); the Super Admin approves or rejects with a note (`/admin/discount-requests/{id}/approve|reject`, pending count at `/admin/discount-requests/pending-count`).

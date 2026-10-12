@@ -38,6 +38,38 @@ export const writeOffSchema = registry.register(
   }),
 );
 
+export const writeOffListQuerySchema = z.object({
+  reason: z.enum(WRITE_OFF_REASONS).optional(),
+  from: dateInput.optional(),
+  to: dateInput.optional(),
+  search: z.string().trim().max(100).optional(),
+  branchId: z.uuid().optional(),
+});
+
+export const writeOffRecordSchema = registry.register(
+  'WriteOffRecord',
+  z.object({
+    id: z.uuid(),
+    writeOffNo: z.string(),
+    date: z.iso.date(),
+    reason: z.enum(WRITE_OFF_REASONS),
+    note: z.string().nullable(),
+    qty: z.string(),
+    productId: z.uuid(),
+    productName: z.string(),
+    unit: z.string(),
+    batchId: z.uuid().nullable(),
+    batchNo: z.string().nullable(),
+    expiryDate: z.iso.date().nullable(),
+    branch: z.object({ id: z.uuid(), name: z.string(), code: z.string(), kind: z.string() }),
+    createdBy: z.object({ id: z.uuid(), name: z.string(), role: z.string() }).nullable(),
+    serials: z.array(z.string()),
+    createdAt: z.iso.datetime(),
+  }),
+);
+
+export type WriteOffListQuery = z.output<typeof writeOffListQuerySchema>;
+
 const batchSchema = z.object({
   id: z.uuid(),
   productId: z.uuid(),
@@ -127,6 +159,19 @@ registry.registerPath({
   },
   responses: {
     200: { description: 'Batch after the write-off', ...jsonContent(dataEnvelope(productBatchDetailSchema)) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/inventory/write-offs',
+  summary:
+    'Stock written off as expired, damaged or lost, with its number, batch, labels and who did it. The Super Admin sees every branch without ?branchId=.',
+  request: { query: writeOffListQuerySchema },
+  responses: {
+    200: { description: 'Write-offs', ...jsonContent(dataEnvelope(z.array(writeOffRecordSchema))) },
     ...errorResponses,
   },
 });

@@ -5,7 +5,9 @@ import { Decimal, toMoney, toQuantity } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { auditService } from '../audit/audit.service';
+import { Branch } from '../branches/branch.entity';
 import { Bundle } from '../bundles/bundle.entity';
+import { nextSequence } from '../sequences/sequences';
 import { Product } from '../products/product.entity';
 import { dispatchDepartment } from '../sales/fulfilment';
 import { DiscountRequest } from './discount-request.entity';
@@ -13,6 +15,7 @@ import { type CreateDiscountRequestInput, type DiscountRequestListQuery } from '
 
 interface Row {
   id: string;
+  requestNo: string;
   branchId: string;
   branchName: string;
   branchCode: string;
@@ -38,7 +41,7 @@ interface Row {
 }
 
 const SELECT = `
-  SELECT r.id, r.branch_id AS "branchId", b.name AS "branchName", b.code AS "branchCode",
+  SELECT r.id, r.request_no AS "requestNo", r.branch_id AS "branchId", b.name AS "branchName", b.code AS "branchCode",
          r.created_by AS "requesterId", NULLIF(TRIM(CONCAT(rq.first_name, ' ', rq.last_name)), '') AS "requesterName",
          rq.role::text AS "requesterRole",
          r.product_id AS "productId", r.bundle_id AS "bundleId", COALESCE(p.name, bu.name, 'Item') AS "itemName",
@@ -60,6 +63,7 @@ function toDto(r: Row) {
   const gross = new Decimal(r.qty).times(r.unitPrice);
   return {
     id: r.id,
+    requestNo: r.requestNo,
     branch: { id: r.branchId, name: r.branchName, code: r.branchCode },
     requestedBy: r.requesterId
       ? { id: r.requesterId, name: r.requesterName ?? 'Staff', role: r.requesterRole ?? '' }
@@ -177,10 +181,13 @@ export const discountRequestsService = {
         if (!bundle) throw AppError.badRequest('The bundle was not found in this branch');
         unitPrice = toMoney(bundle.totalPrice);
       }
+      const branch = await repo(Branch, em).findOneByOrFail({ id: branchId });
+      const seq = await nextSequence(em, branchId, 'discount_request');
       const requests = repo(DiscountRequest, em);
       const saved = await requests.save(
         requests.create({
           branchId,
+          requestNo: `${branch.code}-DR-${String(seq).padStart(6, '0')}`,
           productId: input.productId ?? null,
           bundleId: input.bundleId ?? null,
           qty: toQuantity(input.qty),

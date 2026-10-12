@@ -26,6 +26,25 @@ describe('Main Warehouse transfers to branches', () => {
   const asBranch = (method: 'get' | 'post' | 'patch' | 'delete', path: string, who = lahoreAdmin) =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
 
+  const received = async <
+    T extends { status: number; body: { data: { transferNo: string; toBranchId: string; date: string }[] } },
+  >(
+    res: T,
+  ) => {
+    if (res.status === 201) {
+      const first = res.body.data[0]!;
+      const done = await asAdmin(
+        'post',
+        `/branch/incoming-stock/${first.transferNo}/receive`,
+        first.toBranchId,
+      ).send({
+        date: first.date,
+      });
+      expect(done.status).toBe(200);
+    }
+    return res;
+  };
+
   const stockOf = async (productId: string, branchId: string) => {
     const res = await asAdmin('get', '/branch/inventory/stock?pageSize=100', branchId);
     return res.body.data.find((r: { productId: string }) => r.productId === productId)?.quantity as string;
@@ -127,10 +146,38 @@ describe('Main Warehouse transfers to branches', () => {
     expect(res.body.data[0]).toMatchObject({
       destination: 'Lahore',
       toBranch: { id: lahoreId, name: 'Lahore' },
+      receivedAt: null,
     });
+    const transferNo = res.body.data[0].transferNo as string;
+    expect(transferNo).toBe('MAINWH-TR-000001');
+    expect(res.body.data[1].transferNo).toBe(transferNo);
 
     expect(await stockOf(serum, warehouseId)).toBe('6.000');
     expect(await stockOf(toner, warehouseId)).toBe('70.000');
+    expect(await stockOf(lahoreToner, lahoreId)).toBe('0.000');
+    const waiting = (await asBranch('get', '/branch/incoming-stock?status=waiting')).body.data;
+    expect(waiting).toEqual([
+      expect.objectContaining({
+        transferNo,
+        received: false,
+        items: expect.arrayContaining([expect.objectContaining({ qty: '4.000', labels: 4 })]),
+      }),
+    ]);
+    expect(
+      (await asBranch('post', `/branch/incoming-stock/${transferNo}/receive`, lahoreDesk).send({})).status,
+    ).toBe(403);
+    expect(
+      (await asBranch('post', `/branch/incoming-stock/${transferNo}/receive`).send({ date: '2026-10-01' }))
+        .status,
+    ).toBe(400);
+    const got = await asBranch('post', `/branch/incoming-stock/${transferNo}/receive`).send({
+      date: '2026-10-02',
+    });
+    expect(got.status).toBe(200);
+    expect(got.body.data).toMatchObject({ transferNo, received: true, receivedBy: { id: lahoreAdmin.id } });
+    expect((await asBranch('post', `/branch/incoming-stock/${transferNo}/receive`).send({})).status).toBe(
+      409,
+    );
 
     const lahoreProducts = (await asBranch('get', '/branch/products?pageSize=100')).body.data as {
       id: string;
@@ -230,11 +277,13 @@ describe('Main Warehouse transfers to branches', () => {
     expect(sale.status).toBe(201);
     expect(sale.body.data.invoiceNo).toMatch(/^LHR-/);
 
-    const again = await asAdmin('post', '/branch/stock-outs').send({
-      date: '2026-10-03',
-      toBranchId: lahoreId,
-      items: [{ productId: serum, qty: '2', serials: serials.slice(4, 6) }],
-    });
+    const again = await received(
+      await asAdmin('post', '/branch/stock-outs').send({
+        date: '2026-10-03',
+        toBranchId: lahoreId,
+        items: [{ productId: serum, qty: '2', serials: serials.slice(4, 6) }],
+      }),
+    );
     expect(again.status).toBe(201);
     const products = (await asBranch('get', '/branch/products?search=Vitamin')).body.data;
     expect(products).toHaveLength(1);
@@ -293,11 +342,13 @@ describe('Main Warehouse transfers to branches', () => {
       date: '2026-10-04',
       items: [{ productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
     });
-    await asAdmin('post', '/branch/stock-outs').send({
-      date: '2026-10-04',
-      toBranchId: lahoreId,
-      items: [{ productId: toner, qty: '75' }],
-    });
+    await received(
+      await asAdmin('post', '/branch/stock-outs').send({
+        date: '2026-10-04',
+        toBranchId: lahoreId,
+        items: [{ productId: toner, qty: '75' }],
+      }),
+    );
 
     const all = await request(app).get('/api/v1/branch/inventory/expiry-alerts').set(bearer(superAdmin));
     expect(all.status).toBe(200);

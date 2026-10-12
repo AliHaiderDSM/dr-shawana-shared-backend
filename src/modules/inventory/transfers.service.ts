@@ -6,6 +6,7 @@ import { AppError } from '../../lib/errors';
 import { type TakenItem } from './inventory-items.service';
 import { productBatchesService } from './product-batches.service';
 import { StockIn } from './stock-in.entity';
+import { nextSequence } from '../sequences/sequences';
 import { stockLedger } from './stock-ledger';
 import { type StockOut } from './stock-out.entity';
 
@@ -229,8 +230,16 @@ export const transfersService = {
     return received;
   },
 
+  async nextTransferNo(manager: EntityManager, branchId: string) {
+    const [branch] = (await manager.query('SELECT code FROM branches WHERE id = $1', [branchId])) as {
+      code: string;
+    }[];
+    const seq = await nextSequence(manager, branchId, 'transfer');
+    return `${branch?.code ?? 'SA'}-TR-${String(seq).padStart(6, '0')}`;
+  },
+
   async undo(manager: EntityManager, actor: Actor, stockOut: StockOut) {
-    if (!stockOut.toBranchId) return;
+    if (!stockOut.toBranchId || !stockOut.receivedAt) return;
     const received = await stockIns
       .query(stockOut.toBranchId, manager)
       .andWhere('si.transferOutId = :id', { id: stockOut.id })

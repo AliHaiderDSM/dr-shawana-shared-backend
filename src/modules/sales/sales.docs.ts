@@ -381,6 +381,7 @@ registry.registerPath({
         dataEnvelope(
           z.object({
             dispatch: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+            categories: z.array(z.object({ id: z.uuid(), name: z.string() })),
             items: z.array(
               z.object({
                 id: z.uuid(),

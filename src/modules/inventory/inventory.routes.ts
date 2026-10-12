@@ -23,7 +23,12 @@ import {
 } from './inventory-items.schemas';
 import { inventoryItemsService } from './inventory-items.service';
 import { inventoryService } from './inventory.service';
-import { batchListQuerySchema, batchParamsSchema, writeOffSchema } from './product-batches.schemas';
+import {
+  batchListQuerySchema,
+  batchParamsSchema,
+  writeOffListQuerySchema,
+  writeOffSchema,
+} from './product-batches.schemas';
 import { productBatchesService } from './product-batches.service';
 
 export const inventoryRouter = Router();
@@ -33,7 +38,8 @@ const canViewStock = requirePermission('stock.view', 'inventoryReport.view');
 
 inventoryRouter.use(path, authenticate, (req, res, next) =>
   branchScope({
-    allowAllForSuperAdmin: req.path === '/expiry-alerts' || req.path.startsWith('/items/serial/'),
+    allowAllForSuperAdmin:
+      req.path === '/expiry-alerts' || req.path === '/write-offs' || req.path.startsWith('/items/serial/'),
   })(req, res, next),
 );
 
@@ -108,6 +114,18 @@ inventoryRouter.get(
   async (req: Request, res: Response) => {
     const { batchId } = validParams(req, batchParamsSchema);
     sendOk(res, await productBatchesService.get(branchIdOf(req), batchId));
+  },
+);
+
+inventoryRouter.get(
+  `${path}/write-offs`,
+  canViewStock,
+  validate({ query: writeOffListQuerySchema }),
+  async (req: Request, res: Response) => {
+    sendOk(
+      res,
+      await productBatchesService.writeOffs(req.branchId ?? null, validQuery(req, writeOffListQuerySchema)),
+    );
   },
 );
 

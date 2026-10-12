@@ -491,6 +491,7 @@ describe('POS sales', () => {
     });
     expect(asked.status).toBe(201);
     expect(asked.body.data).toMatchObject({
+      requestNo: 'LHR-DR-000001',
       status: 'pending',
       discountAmount: '500.00',
       requestedBy: { id: frontDesk.id, role: 'front_desk' },

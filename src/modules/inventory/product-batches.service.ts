@@ -3,14 +3,16 @@ import Decimal from 'decimal.js';
 import { type EntityManager } from 'typeorm';
 import { AppDataSource } from '../../database/data-source';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
-import { withTransaction } from '../../database/transaction';
+import { repo, withTransaction } from '../../database/transaction';
 import { toMoney, toQuantity, type DecimalInput } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { escapeLike, pageMeta } from '../../lib/pagination';
 import { today } from '../../lib/validation';
 import { auditService } from '../audit/audit.service';
-import { type BatchListQuery, type WriteOffInput } from './product-batches.schemas';
+import { type BatchListQuery, type WriteOffInput, type WriteOffListQuery } from './product-batches.schemas';
+import { StockWriteOff } from './stock-write-off.entity';
+import { nextSequence } from '../sequences/sequences';
 import { ProductBatch } from './product-batch.entity';
 import { inventoryItemsService } from './inventory-items.service';
 import { stockLedger } from './stock-ledger';
@@ -227,13 +229,74 @@ export const productBatchesService = {
     };
   },
 
+  async writeOffs(branchId: string | null, query: WriteOffListQuery) {
+    const params: unknown[] = [];
+    const where = ['w.deleted_at IS NULL'];
+    const add = (sql: string, value: unknown) => {
+      params.push(value);
+      where.push(sql.replace('?', () => `$${params.length}`));
+    };
+    if (branchId) add('w.branch_id = ?', branchId);
+    if (query.reason) add('w.reason = ?', query.reason);
+    if (query.from) add('w.date >= ?', query.from);
+    if (query.to) add('w.date <= ?', query.to);
+    if (query.search) {
+      params.push(`%${escapeLike(query.search)}%`);
+      where.push(
+        `(p.name ILIKE $${params.length} OR w.write_off_no ILIKE $${params.length} OR b.batch_no ILIKE $${params.length})`,
+      );
+    }
+    const rows: (Record<string, unknown> & { qty: string })[] = await AppDataSource.query(
+      `SELECT w.id, w.write_off_no AS "writeOffNo", to_char(w.date, 'YYYY-MM-DD') AS date, w.reason, w.note,
+              w.qty::text AS qty, w.product_id AS "productId", p.name AS "productName", p.unit,
+              w.batch_id AS "batchId", b.batch_no AS "batchNo", to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate",
+              json_build_object('id', br.id, 'name', br.name, 'code', br.code, 'kind', br.kind) AS branch,
+              CASE WHEN s.id IS NULL THEN NULL ELSE json_build_object(
+                'id', s.id, 'name', TRIM(CONCAT(s.first_name, ' ', s.last_name)), 'role', s.role) END AS "createdBy",
+              COALESCE((SELECT array_agg(i.serial ORDER BY i.serial) FROM inventory_item_events e
+                          JOIN inventory_items i ON i.id = e.item_id WHERE e.reference_id = w.id), '{}') AS serials,
+              w.created_at AS "createdAt"
+         FROM stock_write_offs w
+         JOIN branches br ON br.id = w.branch_id
+         JOIN products p ON p.id = w.product_id
+         LEFT JOIN product_batches b ON b.id = w.batch_id
+         LEFT JOIN staff_profiles s ON s.id = w.created_by
+        WHERE ${where.join(' AND ')}
+        ORDER BY w.date DESC, w.created_at DESC
+        LIMIT 500`,
+      params,
+    );
+    return rows.map((r) => ({ ...r, qty: toQuantity(r.qty) }));
+  },
+
   async writeOff(actor: Actor, branchId: string, id: string, input: WriteOffInput) {
     return withTransaction(async (em) => {
       const batch = await batches.findById(branchId, id, em);
       if (!batch) throw AppError.notFound('Batch');
       const referenceId = randomUUID();
       const date = input.date ?? today();
-      const note = [`Write-off (${input.reason}) of batch ${batch.batchNo}`, input.note]
+      const [branch] = (await em.query('SELECT code FROM branches WHERE id = $1', [branchId])) as {
+        code: string;
+      }[];
+      const seq = await nextSequence(em, branchId, 'write_off');
+      const writeOffNo = `${branch?.code ?? 'WO'}-WO-${String(seq).padStart(6, '0')}`;
+      const writeOffs = repo(StockWriteOff, em);
+      await writeOffs.save(
+        writeOffs.create({
+          id: referenceId,
+          branchId,
+          writeOffNo,
+          productId: batch.productId,
+          batchId: batch.id,
+          qty: new Decimal(input.qty),
+          reason: input.reason,
+          note: input.note ?? null,
+          date,
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
+        }),
+      );
+      const note = [`${writeOffNo}: write-off (${input.reason}) of batch ${batch.batchNo}`, input.note]
         .filter(Boolean)
         .join(': ');
       const ref = { branchId, referenceType: WRITE_OFF_REFERENCE, referenceId, actorId: actor.userId };
@@ -287,7 +350,7 @@ export const productBatchesService = {
           action: 'write_off',
           entity: 'product_batch',
           entityId: id,
-          after: { referenceId, qty: input.qty, reason: input.reason, note: input.note ?? null },
+          after: { referenceId, writeOffNo, qty: input.qty, reason: input.reason, note: input.note ?? null },
         },
         em,
       );
