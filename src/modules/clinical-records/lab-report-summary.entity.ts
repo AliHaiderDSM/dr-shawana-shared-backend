@@ -8,6 +8,7 @@ export interface ReportSummary {
   overview: string;
   reviewPoints: string[];
   unreadable: string[];
+  documents?: { name: string; date: string | null; detail: string }[];
 }
 
 @Entity('lab_report_summaries')

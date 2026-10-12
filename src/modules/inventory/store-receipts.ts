@@ -23,6 +23,7 @@ import { stockLedger } from './stock-ledger';
 
 const listQuerySchema = z.object({
   status: z.enum(['pending', 'confirmed']).optional(),
+  grnNo: z.string().trim().max(30).optional(),
   branchId: z.uuid().optional(),
 });
 const grnParamsSchema = z.object({ grnNo: z.string().trim().min(3).max(30) });
@@ -281,7 +282,8 @@ storeReceiptsRouter.get(
   requirePermission('stock.view'),
   validate({ query: listQuerySchema }),
   async (req, res) => {
-    sendOk(res, await list(branchIdOf(req), validQuery(req, listQuerySchema).status));
+    const query = validQuery(req, listQuerySchema);
+    sendOk(res, await list(branchIdOf(req), query.status, query.grnNo?.toUpperCase()));
   },
 );
 

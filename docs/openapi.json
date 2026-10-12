@@ -10075,6 +10075,33 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "documents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "date": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "date",
+                    "detail"
+                  ]
+                },
+                "description": "What each uploaded document holds"
               }
             },
             "required": [
@@ -10132,12 +10159,21 @@
                 },
                 "unit": {
                   "type": "string"
+                },
+                "testDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "description": "Date of the document the value came from"
                 }
               },
               "required": [
                 "test",
                 "value",
-                "unit"
+                "unit",
+                "testDate"
               ]
             }
           },
@@ -38063,7 +38099,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Read blood work values from an uploaded report (multipart \"file\": PDF or image) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.",
+        "summary": "Read blood work values from an uploaded report (multipart \"file\" or up to 5 \"files\": PDFs or images) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.",
         "parameters": [
           {
             "schema": {
@@ -45185,7 +45221,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Stock In entries of the Super Admin stock by GRN number. A new entry waits until the Warehouse Keeper counts and confirms it; only then it is stock.",
+        "summary": "Stock In entries of the Super Admin stock by GRN number. A Lab Officer entry waits until the Warehouse Keeper counts and confirms it; a Super Admin entry is stock at once.",
         "parameters": [
           {
             "schema": {
@@ -45197,6 +45233,15 @@
             },
             "required": false,
             "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 30
+            },
+            "required": false,
+            "name": "grnNo",
             "in": "query"
           },
           {

@@ -85,12 +85,12 @@ describe('reading a blood report with AI', () => {
       input: { content: { type: string }[] }[];
       text: { format: { type: string; strict: boolean } };
     };
-    expect(pdfBody.input[0]!.content[0]!.type).toBe('input_file');
+    expect(pdfBody.input[0]!.content[1]!.type).toBe('input_file');
     expect(pdfBody.text.format).toMatchObject({ type: 'json_schema', strict: true });
     const imageBody = JSON.parse(String((fetchMock.mock.calls[1]![1] as RequestInit).body)) as {
       input: { content: { type: string }[] }[];
     };
-    expect(imageBody.input[0]!.content[0]!.type).toBe('input_image');
+    expect(imageBody.input[0]!.content[1]!.type).toBe('input_image');
   });
 
   it('rejects other file types and explains provider errors', async () => {

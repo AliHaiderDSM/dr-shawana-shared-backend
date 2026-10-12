@@ -43,7 +43,12 @@ Also write "summary": a concise, professional clinical summary of the WHOLE repo
 - "overview": 2 to 4 sentences of clinical overview. Keep lab findings and interpretation apart; no diagnosis that the report does not support, no treatment or prescription.
 - "reviewPoints": short follow-up considerations for the doctor.
 - "unreadable": values or names that are unclear and need checking. Never guess an unclear value.
-Use the lab's reference ranges only. Do not repeat information. Write in English.`;
+Use the lab's reference ranges only. Do not repeat information. Write in English.
+
+The upload can hold several documents (numbered "Document 1", "Document 2"...). Write ONE summary for all of them together.
+- Each item of "results" has "document": the number of the document it was read from. When the same test is on several documents with different dates, return each.
+- "documents": one entry per document, in order: its "document" number, its "testDate" (YYYY-MM-DD or null), a short "title" (lab and kind of report) and "detail": one or two sentences on what this document holds and its main findings.
+- In "abnormal" and "normal", say which document a finding comes from when there are several (for example "(Doc 2)").`;
 
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -57,6 +62,7 @@ const RESPONSE_SCHEMA = {
           test: { type: 'STRING', enum: [...BLOOD_TESTS] },
           value: { type: 'STRING' },
           unit: { type: 'STRING' },
+          document: { type: 'INTEGER' },
         },
         required: ['test', 'value'],
       },
@@ -100,13 +106,26 @@ const RESPONSE_SCHEMA = {
       },
       required: ['patient', 'abnormal', 'normal', 'overview', 'reviewPoints', 'unreadable'],
     },
+    documents: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          document: { type: 'INTEGER' },
+          testDate: { type: 'STRING', nullable: true },
+          title: { type: 'STRING' },
+          detail: { type: 'STRING' },
+        },
+        required: ['document', 'title', 'detail'],
+      },
+    },
   },
-  required: ['results', 'summary'],
+  required: ['results', 'summary', 'documents'],
 };
 
 export interface ReadReport {
   testDate: string | null;
-  results: { test: BloodTest; value: string; unit: string }[];
+  results: { test: BloodTest; value: string; unit: string; testDate: string | null }[];
   summary: ReportSummary | null;
   model: string;
 }
@@ -150,6 +169,7 @@ function toSummary(raw: unknown): ReportSummary | null {
     unreadable: list(r.unreadable)
       .map((p) => text(p, 200))
       .filter(Boolean),
+    documents: [],
   };
   const empty =
     !summary.overview && !summary.abnormal.length && !summary.normal.length && !summary.patient.length;
@@ -170,8 +190,9 @@ const OPENAI_SCHEMA = {
           test: { type: 'string', enum: [...BLOOD_TESTS] },
           value: { type: 'string' },
           unit: { type: 'string' },
+          document: { type: 'integer' },
         },
-        required: ['test', 'value', 'unit'],
+        required: ['test', 'value', 'unit', 'document'],
       },
     },
     summary: {
@@ -217,8 +238,22 @@ const OPENAI_SCHEMA = {
       },
       required: ['patient', 'abnormal', 'normal', 'overview', 'reviewPoints', 'unreadable'],
     },
+    documents: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          document: { type: 'integer' },
+          testDate: { type: ['string', 'null'] },
+          title: { type: 'string' },
+          detail: { type: 'string' },
+        },
+        required: ['document', 'testDate', 'title', 'detail'],
+      },
+    },
   },
-  required: ['testDate', 'results', 'summary'],
+  required: ['testDate', 'results', 'summary', 'documents'],
 };
 
 const unavailable = (message: string) => new AppError(503, 'SERVICE_UNAVAILABLE', message);
@@ -253,24 +288,30 @@ async function post(url: string, headers: Record<string, string>, payload: unkno
   });
 }
 
-async function askOpenAi(file: Express.Multer.File): Promise<string> {
+const docName = (file: Express.Multer.File, index: number) => file.originalname || `Document ${index + 1}`;
+
+async function askOpenAi(files: Express.Multer.File[]): Promise<string> {
   const key = env.OPENAI_API_KEY;
   if (!key) throw unavailable('Reading reports with AI is not set up. Add OPENAI_API_KEY on the server.');
-  const data = file.buffer.toString('base64');
-  const attachment =
-    file.mimetype === 'application/pdf'
-      ? {
-          type: 'input_file',
-          filename: file.originalname || 'report.pdf',
-          file_data: `data:application/pdf;base64,${data}`,
-        }
-      : { type: 'input_image', image_url: `data:${file.mimetype};base64,${data}`, detail: 'high' };
+  const attachments = files.flatMap((file, index) => {
+    const data = file.buffer.toString('base64');
+    return [
+      { type: 'input_text', text: `Document ${index + 1}: ${docName(file, index)}` },
+      file.mimetype === 'application/pdf'
+        ? {
+            type: 'input_file',
+            filename: file.originalname || 'report.pdf',
+            file_data: `data:application/pdf;base64,${data}`,
+          }
+        : { type: 'input_image', image_url: `data:${file.mimetype};base64,${data}`, detail: 'high' },
+    ];
+  });
   const response = await post(
     'https://api.openai.com/v1/responses',
     { Authorization: `Bearer ${key}` },
     {
       model: env.OPENAI_MODEL,
-      input: [{ role: 'user', content: [attachment, { type: 'input_text', text: PROMPT }] }],
+      input: [{ role: 'user', content: [...attachments, { type: 'input_text', text: PROMPT }] }],
       reasoning: { effort: 'low' },
       text: { format: { type: 'json_schema', name: 'blood_report', strict: true, schema: OPENAI_SCHEMA } },
     },
@@ -296,7 +337,7 @@ async function askOpenAi(file: Express.Multer.File): Promise<string> {
     .join('');
 }
 
-async function askGemini(file: Express.Multer.File): Promise<string> {
+async function askGemini(file: Express.Multer.File[]): Promise<string> {
   const primary = env.GEMINI_MODEL;
   const fallback = env.GEMINI_FALLBACK_MODEL;
   if (!fallback || fallback === primary) return askGeminiModel(file, primary, 110_000);
@@ -312,7 +353,11 @@ async function askGemini(file: Express.Multer.File): Promise<string> {
   }
 }
 
-async function askGeminiModel(file: Express.Multer.File, model: string, timeoutMs: number): Promise<string> {
+async function askGeminiModel(
+  files: Express.Multer.File[],
+  model: string,
+  timeoutMs: number,
+): Promise<string> {
   const key = env.GEMINI_API_KEY;
   if (!key) throw unavailable('Reading reports with AI is not set up. Add GEMINI_API_KEY on the server.');
   const send = () =>
@@ -324,7 +369,10 @@ async function askGeminiModel(file: Express.Multer.File, model: string, timeoutM
           {
             role: 'user',
             parts: [
-              { inline_data: { mime_type: file.mimetype, data: file.buffer.toString('base64') } },
+              ...files.flatMap((file, index) => [
+                { text: `Document ${index + 1}: ${docName(file, index)}` },
+                { inline_data: { mime_type: file.mimetype, data: file.buffer.toString('base64') } },
+              ]),
               { text: PROMPT },
             ],
           },
@@ -355,45 +403,76 @@ async function askGeminiModel(file: Express.Multer.File, model: string, timeoutM
   return body?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
 }
 
-export async function readBloodReport(file: Express.Multer.File): Promise<ReadReport> {
+export async function readBloodReport(
+  input: Express.Multer.File | Express.Multer.File[],
+): Promise<ReadReport> {
+  const files = Array.isArray(input) ? input : [input];
+  if (files.length === 0) throw AppError.badRequest('Upload at least one report');
   const provider = env.AI_PROVIDER ?? (env.OPENAI_API_KEY ? 'openai' : 'gemini');
   if (provider === 'openai' ? !env.OPENAI_API_KEY : !env.GEMINI_API_KEY) {
     throw unavailable(
       `Reading reports with AI is not set up. Add ${provider === 'openai' ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'} on the server.`,
     );
   }
-  if (!READABLE_TYPES.includes(file.mimetype)) {
-    throw AppError.badRequest('Upload the report as a PDF or an image (PNG, JPG, WebP)');
+  if (files.some((file) => !READABLE_TYPES.includes(file.mimetype))) {
+    throw AppError.badRequest('Upload the reports as PDFs or images (PNG, JPG, WebP)');
   }
-  const answer = provider === 'openai' ? await askOpenAi(file) : await askGemini(file);
-  let parsed: { testDate?: unknown; results?: unknown; summary?: unknown } = {};
+  const answer = provider === 'openai' ? await askOpenAi(files) : await askGemini(files);
+  let parsed: { testDate?: unknown; results?: unknown; summary?: unknown; documents?: unknown } = {};
   try {
     parsed = JSON.parse(answer) as typeof parsed;
   } catch {
     throw AppError.badGateway('The AI answer could not be read. Try a clearer report.');
   }
+  const isDate = (value: unknown): value is string =>
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const documents = (Array.isArray(parsed.documents) ? parsed.documents : [])
+    .map((d) => (d ?? {}) as { document?: unknown; testDate?: unknown; title?: unknown; detail?: unknown })
+    .map((d) => {
+      const index = Number(d.document) - 1;
+      const file = files[index];
+      return {
+        index,
+        name: file ? docName(file, index) : text(d.title, 120) || 'Document',
+        date: isDate(d.testDate) ? d.testDate : null,
+        title: text(d.title, 160),
+        detail: text(d.detail, 800),
+      };
+    })
+    .filter((d) => d.detail || d.title);
+  const dates = documents
+    .map((d) => d.date)
+    .filter((d): d is string => Boolean(d))
+    .sort();
+  const testDate = isDate(parsed.testDate) ? parsed.testDate : (dates.at(-1) ?? null);
   const seen = new Set<string>();
   const results = (Array.isArray(parsed.results) ? parsed.results : [])
-    .map((r) => r as { test?: unknown; value?: unknown; unit?: unknown })
+    .map((r) => r as { test?: unknown; value?: unknown; unit?: unknown; document?: unknown })
     .flatMap((r) => {
       const test = BLOOD_TESTS.find((t) => t === r.test);
       const raw = String(r.value ?? '');
       const number = /[<>]/.test(raw) ? NaN : Number(raw.replace(/[^\d.]/g, ''));
-      if (!test || seen.has(test) || !Number.isFinite(number) || number <= 0 || number >= 1e8) return [];
+      const date = documents.find((d) => d.index === Number(r.document) - 1)?.date ?? testDate;
+      const key = `${test}@${date}`;
+      if (!test || seen.has(key) || !Number.isFinite(number) || number <= 0 || number >= 1e8) return [];
       const value = String(Math.round(number * 1000) / 1000);
-      seen.add(test);
+      seen.add(key);
       const unit =
         typeof r.unit === 'string' && r.unit.trim() ? r.unit.trim().slice(0, 20) : BLOOD_TEST_UNITS[test];
-      return [{ test, value, unit }];
+      return [{ test, value, unit, testDate: date }];
     });
-  const testDate =
-    typeof parsed.testDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.testDate)
-      ? parsed.testDate
-      : null;
+  const summary = toSummary(parsed.summary);
+  if (summary) {
+    summary.documents = documents.map((d) => ({
+      name: d.name,
+      date: d.date,
+      detail: [d.title, d.detail].filter(Boolean).join(': '),
+    }));
+  }
   return {
     testDate,
     results,
-    summary: toSummary(parsed.summary),
+    summary,
     model: provider === 'openai' ? `openai:${env.OPENAI_MODEL}` : `gemini:${env.GEMINI_MODEL}`,
   };
 }

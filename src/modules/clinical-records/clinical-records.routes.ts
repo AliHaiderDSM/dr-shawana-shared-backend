@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import { actorFrom } from '../../lib/actor';
+import { AppError } from '../../lib/errors';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
-import { documentsUpload, documentUpload, jsonDataField, requireFile, uploadedFiles } from '../../lib/upload';
+import {
+  documentsUpload,
+  jsonDataField,
+  uploadedFiles,
+  documentFieldsUpload,
+  filesOf,
+} from '../../lib/upload';
 import { readBloodReport } from './report-reader';
 import { labReportSummariesService } from './lab-report-summaries.service';
 import { authenticate } from '../../middleware/auth';
@@ -51,16 +58,23 @@ clinicalRecordsRouter.post(
   `${base}/blood-work/read-report`,
   ...scoped,
   canCreate,
-  documentUpload('file'),
+  documentFieldsUpload([
+    { name: 'file', maxCount: 1 },
+    { name: 'files', maxCount: 5 },
+  ]),
   validate({ params: idParamsSchema }),
   async (req, res) => {
-    const file = requireFile(req);
-    const read = await readBloodReport(file);
+    const files = [...filesOf(req, 'file'), ...filesOf(req, 'files')];
+    if (files.length === 0) throw AppError.badRequest('Upload at least one report');
+    const read = await readBloodReport(files);
     const saved = await labReportSummariesService.save(
       actorFrom(req),
       branchIdOf(req),
       idOf(req),
-      file.originalname || null,
+      files
+        .map((file) => file.originalname)
+        .filter(Boolean)
+        .join(', ') || null,
       read,
     );
     sendOk(res, { testDate: read.testDate, results: read.results, summary: saved });

@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## GRN print, several reports in one summary (2026-10-12)
+
+- `GET /branch/stock-receipts?grnNo=` returns one receipt (for the printed GRN).
+- read-report takes up to 5 files ("files", or the old single "file") in one AI call. Each value carries the date of its document; the saved summary is one for all files and lists every document with its date and what it holds.
+
 ## Lab Officer and store receipts (2026-10-12)
 
 - Migration 1792400000000-StoreReceipts: staff role lab_officer (Super Admin stock only, with the Warehouse Keeper); Stock In rows get grn_no, receipt_status, received_qty, receipt_note, confirmed_by/at.

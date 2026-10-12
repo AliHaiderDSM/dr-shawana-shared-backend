@@ -295,6 +295,10 @@ export const reportSummarySchema = registry.register(
       overview: z.string(),
       reviewPoints: z.array(z.string()),
       unreadable: z.array(z.string()),
+      documents: z
+        .array(z.object({ name: z.string(), date: z.iso.date().nullable(), detail: z.string() }))
+        .optional()
+        .openapi({ description: 'What each uploaded document holds' }),
     }),
   }),
 );
@@ -303,7 +307,17 @@ export const readReportSchema = registry.register(
   'ReadBloodReport',
   z.object({
     testDate: z.iso.date().nullable(),
-    results: z.array(z.object({ test: z.enum(BLOOD_TESTS), value: z.string(), unit: z.string() })),
+    results: z.array(
+      z.object({
+        test: z.enum(BLOOD_TESTS),
+        value: z.string(),
+        unit: z.string(),
+        testDate: z.iso
+          .date()
+          .nullable()
+          .openapi({ description: 'Date of the document the value came from' }),
+      }),
+    ),
     summary: reportSummarySchema
       .nullable()
       .openapi({ description: 'AI summary of the whole report, saved on the patient' }),
@@ -336,7 +350,7 @@ registry.registerPath({
   method: 'post',
   path: '/branch/patients/{id}/blood-work/read-report',
   summary:
-    'Read blood work values from an uploaded report (multipart "file": PDF or image) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.',
+    'Read blood work values from an uploaded report (multipart "file" or up to 5 "files": PDFs or images) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.',
   request: { params: idParamsSchema, query: branchQuerySchema },
   responses: {
     200: { description: 'Values found', ...jsonContent(dataEnvelope(readReportSchema)) },
