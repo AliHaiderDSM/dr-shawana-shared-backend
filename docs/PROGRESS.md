@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## AI report reading fix (2026-10-12)
+
+- gemini-3.8-flash (and 3.7, flash-latest) hang on image + JSON schema requests; gemini-3.5-flash answers in about 3 s. Default GEMINI_MODEL is now gemini-3.5-flash, with GEMINI_FALLBACK_MODEL (default gemini-3.5-flash) tried when the main model times out (40 s) or fails on Google's side.
+- 503 "high demand" and 500 are retried twice (after 2 s and 5 s); clearer messages for busy and timeout.
+
 ## Warehouse Keeper (2026-10-12)
 
 - Migration 1792200000000-WarehouseKeeper adds the staff role warehouse_keeper. It lives only at the Super Admin stock (the only role allowed there); Store Keeper lives only in the Dispatch Department.

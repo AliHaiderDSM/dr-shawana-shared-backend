@@ -95,18 +95,22 @@ function failed(provider: string, model: string, status: number, reason: string,
           ? `The AI model "${model}" is not available. Change the model setting on the server.`
           : status === 400 || status === 403
             ? `The AI service refused the request: ${reason}`
-            : 'The AI service could not read this report.',
+            : status === 503
+              ? 'The AI service (Google) is very busy right now. Try again in a minute.'
+              : status >= 500
+                ? 'The AI service had a problem on its side. Try again in a minute.'
+                : 'The AI service could not read this report.',
   );
 }
 
-async function post(url: string, headers: Record<string, string>, payload: unknown) {
+async function post(url: string, headers: Record<string, string>, payload: unknown, timeoutMs = 110_000) {
   return fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(110_000),
+    signal: AbortSignal.timeout(timeoutMs),
   }).catch(() => {
-    throw AppError.badGateway('Could not reach the AI service. Try again.');
+    throw AppError.badGateway('The AI service did not answer in time. Try again.');
   });
 }
 
@@ -154,40 +158,57 @@ async function askOpenAi(file: Express.Multer.File): Promise<string> {
 }
 
 async function askGemini(file: Express.Multer.File): Promise<string> {
+  const primary = env.GEMINI_MODEL;
+  const fallback = env.GEMINI_FALLBACK_MODEL;
+  if (!fallback || fallback === primary) return askGeminiModel(file, primary, 110_000);
+  try {
+    return await askGeminiModel(file, primary, 40_000);
+  } catch (err) {
+    const status = err instanceof AppError ? err.status : 0;
+    const retry = !(err instanceof AppError) || status === 502 || status === 503 || status === 504;
+    const refused = err instanceof AppError && /refused|busy/.test(err.message);
+    if (!retry || refused) throw err;
+    logger.warn({ primary, fallback }, 'AI model did not answer, trying the fallback model');
+    return askGeminiModel(file, fallback, 60_000);
+  }
+}
+
+async function askGeminiModel(file: Express.Multer.File, model: string, timeoutMs: number): Promise<string> {
   const key = env.GEMINI_API_KEY;
   if (!key) throw unavailable('Reading reports with AI is not set up. Add GEMINI_API_KEY on the server.');
-  const response = await post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${env.GEMINI_MODEL}:generateContent`,
-    { 'x-goog-api-key': key },
-    {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inline_data: { mime_type: file.mimetype, data: file.buffer.toString('base64') } },
-            { text: PROMPT },
-          ],
+  const send = () =>
+    post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      { 'x-goog-api-key': key },
+      {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { inline_data: { mime_type: file.mimetype, data: file.buffer.toString('base64') } },
+              { text: PROMPT },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0,
+          thinkingConfig: model.startsWith('gemini-2') ? { thinkingBudget: 0 } : { thinkingLevel: 'low' },
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
         },
-      ],
-      generationConfig: {
-        temperature: 0,
-        thinkingConfig: env.GEMINI_MODEL.startsWith('gemini-2')
-          ? { thinkingBudget: 0 }
-          : { thinkingLevel: 'low' },
-        responseMimeType: 'application/json',
-        responseSchema: RESPONSE_SCHEMA,
       },
-    },
-  );
+      timeoutMs,
+    );
+  let response = await send();
+  for (const wait of [2_000, 5_000]) {
+    if (response.status !== 503 && response.status !== 500) break;
+    logger.warn({ model, status: response.status }, 'AI service busy, trying again');
+    await new Promise((resolve) => setTimeout(resolve, wait));
+    response = await send();
+  }
   if (!response.ok) {
     const detail = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
-    failed(
-      'gemini',
-      env.GEMINI_MODEL,
-      response.status,
-      detail?.error?.message ?? response.statusText,
-      'GEMINI_API_KEY',
-    );
+    failed('gemini', model, response.status, detail?.error?.message ?? response.statusText, 'GEMINI_API_KEY');
   }
   const body = (await response.json().catch(() => null)) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
