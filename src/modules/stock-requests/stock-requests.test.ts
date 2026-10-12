@@ -127,6 +127,14 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       items: [{ productId: serum, qty: '5' }],
     });
     expect(wrongBranch.status).toBe(400);
+    const overApproved = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+      date: '2026-10-02',
+      toBranchId: lahoreId,
+      stockRequestId: requestId,
+      items: [{ productId: toner, qty: '7' }],
+    });
+    expect(overApproved.status).toBe(422);
+    expect(overApproved.body.error.message).toContain('only 6');
     const sent = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
       date: '2026-10-02',
       toBranchId: lahoreId,
@@ -177,9 +185,36 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       note: 'Broken in transit',
     });
     expect(off.status).toBe(200);
+    expect(await stockOf('Rose Toner', lahoreId)).toBe('6.000');
+    const pending = (await as(lahoreAdmin, 'get', '/branch/inventory/write-offs?status=pending')).body.data;
+    expect(pending).toEqual([expect.objectContaining({ writeOffNo: 'LHR-WO-000001', status: 'pending' })]);
+    expect((await as(superAdmin, 'get', '/admin/write-offs/pending-count')).body.data).toEqual({
+      pending: 1,
+    });
+    expect(
+      (await as(lahoreAdmin, 'post', `/admin/write-offs/${pending[0].id}/approve`).send({})).status,
+    ).toBe(403);
+    const approved = await as(superAdmin, 'post', `/admin/write-offs/${pending[0].id}/approve`).send({
+      note: 'Checked photos',
+    });
+    expect(approved.status).toBe(200);
+    expect(approved.body.data).toMatchObject({ status: 'approved', decisionNote: 'Checked photos' });
     expect(await stockOf('Rose Toner', lahoreId)).toBe('4.000');
-    const list = await as(lahoreAdmin, 'get', '/branch/inventory/write-offs');
-    expect(list.body.data).toEqual([
+    const list = await as(lahoreAdmin, 'post', '/branch/inventory/write-offs').send({
+      items: [{ batchId: batches[0]!.id, qty: '1', reason: 'expired' }],
+    });
+    expect(list.status).toBe(201);
+    const rejected = await as(superAdmin, 'post', `/admin/write-offs/${list.body.data[0].id}/reject`).send(
+      {},
+    );
+    expect(rejected.body.data.status).toBe('rejected');
+    expect(await stockOf('Rose Toner', lahoreId)).toBe('4.000');
+    const tooMuch = await as(lahoreAdmin, 'post', '/branch/inventory/write-offs').send({
+      items: [{ batchId: batches[0]!.id, qty: '5', reason: 'lost' }],
+    });
+    expect(tooMuch.status).toBe(422);
+    const all = await as(lahoreAdmin, 'get', '/branch/inventory/write-offs?status=approved');
+    expect(all.body.data).toEqual([
       expect.objectContaining({
         writeOffNo: 'LHR-WO-000001',
         reason: 'damaged',
@@ -191,5 +226,6 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     ]);
     const everywhere = await as(superAdmin, 'get', '/branch/inventory/write-offs?reason=damaged');
     expect(everywhere.body.data).toHaveLength(1);
+    expect(list.body.data[0].writeOffNo).toBe('LHR-WO-000002');
   });
 });

@@ -8,6 +8,9 @@ import { ProductBatch } from './product-batch.entity';
 export const WRITE_OFF_REASON_VALUES = ['expired', 'damaged', 'lost', 'adjustment'] as const;
 export type WriteOffReason = (typeof WRITE_OFF_REASON_VALUES)[number];
 
+export const WRITE_OFF_STATUSES = ['pending', 'approved', 'rejected'] as const;
+export type WriteOffStatus = (typeof WRITE_OFF_STATUSES)[number];
+
 @Entity('stock_write_offs')
 export class StockWriteOff extends BranchScopedEntity {
   @Column({ name: 'write_off_no', type: 'varchar', length: 30 })
@@ -38,4 +41,19 @@ export class StockWriteOff extends BranchScopedEntity {
 
   @Column({ type: 'date' })
   date: string;
+
+  @Column({ type: 'enum', enum: WRITE_OFF_STATUSES, enumName: 'write_off_status', default: 'pending' })
+  status: WriteOffStatus;
+
+  @Column({ type: 'text', array: true, default: () => "'{}'" })
+  serials: string[];
+
+  @Column({ name: 'decided_by', type: 'uuid', nullable: true })
+  decidedBy: string | null;
+
+  @Column({ name: 'decided_at', type: 'timestamptz', nullable: true })
+  decidedAt: Date | null;
+
+  @Column({ name: 'decision_note', type: 'varchar', length: 500, nullable: true })
+  decisionNote: string | null;
 }

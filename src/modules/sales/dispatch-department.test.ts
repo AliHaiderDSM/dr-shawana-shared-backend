@@ -345,4 +345,19 @@ describe('Dispatch Department ships every online order from its own stock', () =
     expect((await stock(serumRow.id, dispatchId))!.quantity).toBe('3.000');
     expect((await as(isbDesk, 'get', '/branch/sales/online-catalog', undefined)).status).toBe(200);
   });
+
+  it('keeps only the dispatch roles in the Dispatch Department', async () => {
+    const person = (role: string, n: number) => ({
+      firstName: 'Ali',
+      lastName: 'Khan',
+      email: `dsp${n}@dsm.pk`,
+      username: `dsp${n}`,
+      password: 'Password123',
+      role,
+    });
+    const desk = await as(superAdmin, 'post', '/branch/staff', dispatchId).send(person('front_desk', 1));
+    expect(desk.status).toBe(422);
+    const keeper = await as(superAdmin, 'post', '/branch/staff', dispatchId).send(person('store_keeper', 2));
+    expect(keeper.status).toBe(201);
+  });
 });

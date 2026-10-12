@@ -3,7 +3,7 @@ import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { canManageRole, type Role } from '../../lib/permissions';
+import { canManageRole, DISPATCH_ROLES, type Role } from '../../lib/permissions';
 import { auditService } from '../audit/audit.service';
 import { branchesRepository } from '../branches/branches.repository';
 import { type StaffProfile, type StaffStatus } from './staff-profile.entity';
@@ -35,6 +35,14 @@ export function toStaffDto(profile: StaffProfile) {
     phone: profile.phone,
     gender: profile.gender,
     designation: profile.designation,
+    branch: profile.branch
+      ? {
+          id: profile.branch.id,
+          name: profile.branch.name,
+          code: profile.branch.code,
+          kind: profile.branch.kind,
+        }
+      : null,
     avatarPath: profile.avatarPath,
     status: profile.status,
     mustChangePassword: profile.mustChangePassword,
@@ -47,6 +55,14 @@ export function toStaffDto(profile: StaffProfile) {
 export function assertCanManage(actor: Actor, role: Role) {
   if (!canManageRole(actor.role, role)) {
     throw AppError.forbidden(`You cannot manage staff with the ${role} role`);
+  }
+}
+
+function assertRoleFitsBranch(kind: string, role: Role) {
+  if (kind === 'dispatch' && !DISPATCH_ROLES.includes(role)) {
+    throw AppError.unprocessable(
+      'The Dispatch Department has only these roles: Branch Admin, Store Keeper, Delivery Print and Dispatcher',
+    );
   }
 }
 
@@ -135,11 +151,12 @@ export const staffService = {
     if (branch.kind === 'warehouse') {
       throw AppError.conflict('The Super Admin stock has no staff. The Super Admin runs it.');
     }
+    assertRoleFitsBranch(branch.kind, input.role);
     return toStaffDto(await this.createAccount(actor, branchId, input));
   },
 
-  async list(branchId: string, query: StaffListQuery) {
-    await ensureBranchExists(branchId);
+  async list(branchId: string | null, query: StaffListQuery) {
+    if (branchId) await ensureBranchExists(branchId);
     const { items, meta } = await staffRepository.listInBranch(branchId, query);
     return { items: items.map(toStaffDto), meta };
   },
@@ -153,7 +170,11 @@ export const staffService = {
       const profile = await getInBranch(branchId, id, em);
       assertNotSelf(actor, profile);
       assertCanManage(actor, profile.role);
-      if (input.role) assertCanManage(actor, input.role);
+      if (input.role) {
+        assertCanManage(actor, input.role);
+        const branch = await ensureBranchExists(branchId, em);
+        assertRoleFitsBranch(branch.kind, input.role);
+      }
 
       const email = input.email ?? profile.email;
       const username = input.username ?? profile.username;

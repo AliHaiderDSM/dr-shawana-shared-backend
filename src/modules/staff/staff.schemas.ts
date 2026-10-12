@@ -78,6 +78,10 @@ export const staffSchema = registry.register(
     phone: z.string().nullable(),
     gender: z.enum(GENDERS).nullable(),
     designation: z.string().nullable(),
+    branch: z
+      .object({ id: z.uuid(), name: z.string(), code: z.string(), kind: z.string() })
+      .nullable()
+      .optional(),
     avatarPath: z.string().nullable(),
     status: z.enum(STAFF_STATUSES),
     mustChangePassword: z.boolean(),

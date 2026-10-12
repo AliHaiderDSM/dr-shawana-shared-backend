@@ -16,7 +16,10 @@ const idOf = (req: Request) => validParams(req, idParamsSchema).id;
 
 export const staffController = {
   async list(req: Request, res: Response) {
-    const { items, meta } = await staffService.list(branchOf(req), validQuery(req, staffListQuerySchema));
+    const { items, meta } = await staffService.list(
+      req.branchId ?? null,
+      validQuery(req, staffListQuerySchema),
+    );
     sendOk(res, items, meta);
   },
 

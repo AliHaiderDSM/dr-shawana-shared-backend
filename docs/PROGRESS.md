@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Write-off approval, staff overview, dispatch roles, request caps (2026-10-12)
+
+- Migration 1792000000000-WriteOffApproval: write-offs have status pending/approved/rejected, the scanned labels, and who decided.
+- A write-off by anyone but the Super Admin waits: `POST /branch/inventory/write-offs` (a list, one line per batch) or the batch write-off create it as pending; scanned labels become quarantined so they cannot be sold or dispatched. `/admin/write-offs/{id}/approve` takes the stock out then; reject puts the labels back. Pending unlabelled quantities count against the batch so a batch cannot be over-reported. Pending count at `/admin/write-offs/pending-count`.
+- Staff list: the Super Admin gets every branch without ?branchId= (with the branch on each row); creating still needs a branch.
+- Dispatch Department staff: only branch_admin, store_keeper, delivery_print and dispatcher (422 otherwise).
+- A Stock Out answering a request cannot send more than approved minus already sent, per product.
+
 ## Stock requests, receipt approval, write-off list, numbers (2026-10-12)
 
 - Migration 1791900000000-StockRequests.

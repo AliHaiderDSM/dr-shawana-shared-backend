@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from 'express';
 import { actorFrom } from '../../lib/actor';
-import { sendCreated, sendOk } from '../../lib/http';
+import { idParamsSchema, sendCreated, sendOk } from '../../lib/http';
 import { branchIdOf } from '../../lib/request';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
+import { requireRole } from '../../middleware/requireRole';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import {
   expiryAlertsQuerySchema,
@@ -26,6 +27,8 @@ import { inventoryService } from './inventory.service';
 import {
   batchListQuerySchema,
   batchParamsSchema,
+  decideWriteOffSchema,
+  reportWriteOffsSchema,
   writeOffListQuerySchema,
   writeOffSchema,
 } from './product-batches.schemas';
@@ -128,6 +131,51 @@ inventoryRouter.get(
     );
   },
 );
+
+inventoryRouter.post(
+  `${path}/write-offs`,
+  requirePermission('stock.update'),
+  validate({ body: reportWriteOffsSchema }),
+  async (req: Request, res: Response) => {
+    sendCreated(
+      res,
+      await productBatchesService.reportWriteOffs(
+        actorFrom(req),
+        branchIdOf(req),
+        validBody(req, reportWriteOffsSchema).items,
+      ),
+    );
+  },
+);
+
+inventoryRouter.get(
+  '/admin/write-offs/pending-count',
+  authenticate,
+  requireRole(),
+  async (_req: Request, res: Response) => {
+    sendOk(res, await productBatchesService.pendingWriteOffs());
+  },
+);
+
+for (const action of ['approve', 'reject'] as const) {
+  inventoryRouter.post(
+    `/admin/write-offs/:id/${action}`,
+    authenticate,
+    requireRole(),
+    validate({ params: idParamsSchema, body: decideWriteOffSchema }),
+    async (req: Request, res: Response) => {
+      sendOk(
+        res,
+        await productBatchesService.decideWriteOff(
+          actorFrom(req),
+          validParams(req, idParamsSchema).id,
+          action === 'approve',
+          validBody(req, decideWriteOffSchema).note,
+        ),
+      );
+    },
+  );
+}
 
 inventoryRouter.post(
   `${path}/batches/:batchId/write-off`,

@@ -209,8 +209,13 @@ describe('branch staff', () => {
   });
 
   describe('super admin', () => {
-    it('must choose a branch', async () => {
-      expect((await request(app).get('/api/v1/branch/staff').set(bearer(superAdmin))).status).toBe(400);
+    it('lists staff of every branch without a branch, and must choose one to add staff', async () => {
+      const all = await request(app).get('/api/v1/branch/staff?sort=-createdAt').set(bearer(superAdmin));
+      expect(all.status).toBe(200);
+      expect(all.body.data.every((s: { branch: { id: string } | null }) => s.branch !== null)).toBe(true);
+      expect((await request(app).post('/api/v1/branch/staff').set(bearer(superAdmin)).send({})).status).toBe(
+        400,
+      );
     });
 
     it('manages staff of any branch, including branch admins', async () => {

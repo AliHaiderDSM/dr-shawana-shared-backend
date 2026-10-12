@@ -284,6 +284,37 @@ export const stockRequestsService = {
     return request;
   },
 
+  async assertWithinApproval(
+    manager: EntityManager,
+    requestId: string,
+    lines: { productId: string; qty: string }[],
+  ) {
+    const rows = (await manager.query(
+      `SELECT it.product_id AS "productId", p.name, COALESCE(it.approved_qty, 0)::text AS approved,
+              COALESCE((SELECT SUM(o.qty) FROM stock_outs o WHERE o.stock_request_id = it.request_id
+                         AND o.product_id = it.product_id AND o.deleted_at IS NULL), 0)::text AS sent
+         FROM stock_request_items it JOIN products p ON p.id = it.product_id
+        WHERE it.request_id = $1`,
+      [requestId],
+    )) as { productId: string; name: string; approved: string; sent: string }[];
+    const wanted = new Map<string, Decimal>();
+    for (const line of lines) {
+      wanted.set(line.productId, (wanted.get(line.productId) ?? new Decimal(0)).plus(line.qty));
+    }
+    for (const [productId, qty] of wanted) {
+      const row = rows.find((r) => r.productId === productId);
+      if (!row)
+        throw AppError.unprocessable('A product on this Stock Out is not on the request', { productId });
+      const left = Decimal.max(new Decimal(row.approved).minus(row.sent), 0);
+      if (qty.gt(left)) {
+        throw AppError.unprocessable(
+          `${row.name}: only ${toQuantity(left).toString()} more can be sent on this request (approved ${toQuantity(row.approved).toString()}, sent ${toQuantity(row.sent).toString()})`,
+          { productId, left: toQuantity(left).toString() },
+        );
+      }
+    }
+  },
+
   async refresh(manager: EntityManager, actor: Actor, requestId: string | null) {
     if (!requestId) return;
     const [row] = (await manager.query(

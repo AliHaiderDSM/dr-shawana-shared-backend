@@ -1,5 +1,13 @@
+import { WRITE_OFF_STATUSES } from './stock-write-off.entity';
 import { z } from 'zod';
-import { branchQuerySchema, dataEnvelope, errorResponses, jsonContent, pageEnvelope } from '../../lib/http';
+import {
+  branchQuerySchema,
+  dataEnvelope,
+  errorResponses,
+  idParamsSchema,
+  jsonContent,
+  pageEnvelope,
+} from '../../lib/http';
 import { registry } from '../../lib/openapi';
 import { serialsInput } from './inventory-items.schemas';
 import { securedDocs } from '../../lib/openapi-crud';
@@ -40,6 +48,7 @@ export const writeOffSchema = registry.register(
 
 export const writeOffListQuerySchema = z.object({
   reason: z.enum(WRITE_OFF_REASONS).optional(),
+  status: z.enum(WRITE_OFF_STATUSES).optional(),
   from: dateInput.optional(),
   to: dateInput.optional(),
   search: z.string().trim().max(100).optional(),
@@ -50,6 +59,10 @@ export const writeOffRecordSchema = registry.register(
   'WriteOffRecord',
   z.object({
     id: z.uuid(),
+    status: z.enum(WRITE_OFF_STATUSES),
+    decidedBy: z.object({ id: z.uuid(), name: z.string(), role: z.string() }).nullable(),
+    decidedAt: z.string().nullable(),
+    decisionNote: z.string().nullable(),
     writeOffNo: z.string(),
     date: z.iso.date(),
     reason: z.enum(WRITE_OFF_REASONS),
@@ -66,6 +79,30 @@ export const writeOffRecordSchema = registry.register(
     serials: z.array(z.string()),
     createdAt: z.iso.datetime(),
   }),
+);
+
+export const reportWriteOffsSchema = registry.register(
+  'ReportWriteOffs',
+  z.object({
+    items: z
+      .array(
+        z.object({
+          batchId: z.uuid(),
+          qty: quantityInput.refine((v) => Number(v) > 0, 'Quantity must be more than zero'),
+          reason: z.enum(WRITE_OFF_REASONS),
+          date: dateInput.optional(),
+          note: optionalText(500),
+          serials: serialsInput.optional(),
+        }),
+      )
+      .min(1, 'Add at least one product')
+      .max(100),
+  }),
+);
+
+export const decideWriteOffSchema = registry.register(
+  'DecideWriteOff',
+  z.object({ note: optionalText(500) }),
 );
 
 export type WriteOffListQuery = z.output<typeof writeOffListQuerySchema>;
@@ -175,3 +212,48 @@ registry.registerPath({
     ...errorResponses,
   },
 });
+
+registry.registerPath({
+  ...common,
+  method: 'post',
+  path: '/branch/inventory/write-offs',
+  summary:
+    'Report expired, damaged or lost stock (one line per batch). It waits for the Super Admin; labelled pieces are held meanwhile. A report by the Super Admin applies at once.',
+  request: {
+    query: branchQuerySchema,
+    body: { content: { 'application/json': { schema: reportWriteOffsSchema } } },
+  },
+  responses: {
+    201: { description: 'Reported', ...jsonContent(dataEnvelope(z.array(writeOffRecordSchema))) },
+    ...errorResponses,
+  },
+});
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/admin/write-offs/pending-count',
+  summary: 'Write-offs waiting for the Super Admin',
+  responses: {
+    200: { description: 'Count', ...jsonContent(dataEnvelope(z.object({ pending: z.number().int() }))) },
+    ...errorResponses,
+  },
+});
+for (const action of ['approve', 'reject'] as const) {
+  registry.registerPath({
+    ...common,
+    method: 'post',
+    path: `/admin/write-offs/{id}/${action}`,
+    summary:
+      action === 'approve'
+        ? 'Super Admin approves: the stock leaves the inventory now'
+        : 'Super Admin rejects: held labels go back to stock',
+    request: {
+      params: idParamsSchema,
+      body: { content: { 'application/json': { schema: decideWriteOffSchema } } },
+    },
+    responses: {
+      200: { description: 'Write-off', ...jsonContent(dataEnvelope(writeOffRecordSchema.nullable())) },
+      ...errorResponses,
+    },
+  });
+}

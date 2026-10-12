@@ -14,10 +14,10 @@ export const staffRepository = {
     return repo(StaffProfile, manager).findOne({ where: { id, branchId } });
   },
 
-  listInBranch(branchId: string, query: StaffListQuery, manager?: EntityManager) {
-    const qb = repo(StaffProfile, manager)
-      .createQueryBuilder('s')
-      .where('s.branchId = :branchId', { branchId });
+  listInBranch(branchId: string | null, query: StaffListQuery, manager?: EntityManager) {
+    const qb = repo(StaffProfile, manager).createQueryBuilder('s').leftJoinAndSelect('s.branch', 'branch');
+    if (branchId) qb.where('s.branchId = :branchId', { branchId });
+    else qb.where('s.branchId IS NOT NULL');
     if (query.role) qb.andWhere('s.role = :role', { role: query.role });
     if (query.status) qb.andWhere('s.status = :status', { status: query.status });
     return paginate(qb, query, {

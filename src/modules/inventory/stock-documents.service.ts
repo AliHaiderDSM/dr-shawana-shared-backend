@@ -396,6 +396,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           }
           if (route && input.stockRequestId) {
             await stockRequestsService.assertSendable(em, input.stockRequestId, route.id);
+            await stockRequestsService.assertWithinApproval(em, input.stockRequestId, input.items);
           }
           const transferNo = route ? await transfersService.nextTransferNo(em, branchId) : null;
           const ids: string[] = [];

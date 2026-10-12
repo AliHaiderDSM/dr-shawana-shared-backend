@@ -206,8 +206,18 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
       },
     );
     expect(writeOff.status).toBe(200);
-    expect(writeOff.body.data.quantity).toBe('0.000');
-    expect(writeOff.body.data.movements.at(-1)).toMatchObject({ type: 'adjustment', qty: '-5.000' });
+    expect(writeOff.body.data.quantity).toBe('5.000');
+    const waiting = (await api('get', '/branch/inventory/write-offs?status=pending')).body.data;
+    expect(waiting).toHaveLength(1);
+    const owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    const approved = await request(app)
+      .post(`/api/v1/admin/write-offs/${waiting[0].id}/approve`)
+      .set(bearer(owner))
+      .send({});
+    expect(approved.status).toBe(200);
+    const after = await api('get', `/branch/inventory/batches/${expired.body.data[0].id}`);
+    expect(after.body.data.quantity).toBe('0.000');
+    expect(after.body.data.movements.at(-1)).toMatchObject({ type: 'adjustment', qty: '-5.000' });
     expect(
       (
         await api('post', `/branch/inventory/batches/${expired.body.data[0].id}/write-off`, frontDesk).send({

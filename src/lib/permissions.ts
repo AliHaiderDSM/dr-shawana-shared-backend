@@ -16,6 +16,13 @@ export type BranchRole = Exclude<Role, 'super_admin'>;
 
 export const BRANCH_ROLES = ROLES.filter((r): r is BranchRole => r !== 'super_admin');
 
+export const DISPATCH_ROLES: readonly Role[] = [
+  'branch_admin',
+  'store_keeper',
+  'delivery_print',
+  'dispatcher',
+];
+
 export const ROLES_CREATABLE_BY_BRANCH_ADMIN = BRANCH_ROLES.filter((r) => r !== 'branch_admin');
 
 export const PLATFORM_MODULES = ['branches', 'company'] as const;

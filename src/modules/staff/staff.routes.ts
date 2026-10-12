@@ -16,7 +16,9 @@ export const staffRouter = Router();
 
 const byId = validate({ params: idParamsSchema });
 
-staffRouter.use('/branch/staff', authenticate, branchScope());
+staffRouter.use('/branch/staff', authenticate, (req, res, next) =>
+  branchScope({ allowAllForSuperAdmin: req.method === 'GET' && req.path === '/' })(req, res, next),
+);
 
 staffRouter.get(
   '/branch/staff',
