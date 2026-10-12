@@ -78,6 +78,17 @@ export const stockRequestSchema = registry.register(
     decidedBy: person,
     receivedBy: person,
     transferNos: z.array(z.string()),
+    transfers: z.array(
+      z.object({
+        transferNo: z.string(),
+        sentAt: z.string(),
+        qty: z.string(),
+        received: z.boolean(),
+        receivedAt: z.string().nullable(),
+        sentBy: z.string().nullable(),
+        receivedBy: z.string().nullable(),
+      }),
+    ),
     items: z.array(
       z.object({
         id: z.uuid(),

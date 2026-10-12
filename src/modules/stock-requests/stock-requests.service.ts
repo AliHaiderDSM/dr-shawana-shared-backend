@@ -19,6 +19,16 @@ import {
   type StockRequestListQuery,
 } from './stock-requests.schemas';
 
+export async function viewScope(branchId: string | null) {
+  if (!branchId) return null;
+  const [row] = (await AppDataSource.query('SELECT kind::text AS kind FROM branches WHERE id = $1', [
+    branchId,
+  ])) as {
+    kind: string;
+  }[];
+  return row?.kind === 'warehouse' ? null : branchId;
+}
+
 async function warehouseId(manager: EntityManager) {
   const [row] = (await manager.query(
     `SELECT id FROM branches WHERE kind::text = 'warehouse' AND deleted_at IS NULL LIMIT 1`,
@@ -51,7 +61,17 @@ const SELECT = `
                     FROM stock_request_items it JOIN products p ON p.id = it.product_id
                    WHERE it.request_id = r.id), '[]') AS items,
          COALESCE((SELECT array_agg(DISTINCT o.transfer_no) FROM stock_outs o
-                    WHERE o.stock_request_id = r.id AND o.deleted_at IS NULL AND o.transfer_no IS NOT NULL), '{}') AS "transferNos"
+                    WHERE o.stock_request_id = r.id AND o.deleted_at IS NULL AND o.transfer_no IS NOT NULL), '{}') AS "transferNos",
+         COALESCE((SELECT json_agg(t ORDER BY t."sentAt") FROM (
+                    SELECT o.transfer_no AS "transferNo", MIN(o.created_at) AS "sentAt", SUM(o.qty)::text AS qty,
+                           bool_and(o.received_at IS NOT NULL) AS received, MAX(o.received_at) AS "receivedAt",
+                           (SELECT TRIM(CONCAT(x.first_name, ' ', x.last_name)) FROM staff_profiles x
+                             WHERE x.id = (array_agg(o.created_by))[1]) AS "sentBy",
+                           (SELECT TRIM(CONCAT(x.first_name, ' ', x.last_name)) FROM staff_profiles x
+                             WHERE x.id = (array_agg(o.received_by) FILTER (WHERE o.received_by IS NOT NULL))[1]) AS "receivedBy"
+                      FROM stock_outs o
+                     WHERE o.stock_request_id = r.id AND o.deleted_at IS NULL AND o.transfer_no IS NOT NULL
+                     GROUP BY o.transfer_no) t), '[]') AS transfers
     FROM stock_requests r
     JOIN branches b ON b.id = r.branch_id
     LEFT JOIN staff_profiles rq ON rq.id = r.created_by
@@ -152,7 +172,8 @@ export const stockRequestsService = {
     return rows.map((r) => ({ ...r, available: toQuantity(r.available) }));
   },
 
-  async list(branchId: string | null, query: StockRequestListQuery) {
+  async list(viewer: string | null, query: StockRequestListQuery) {
+    const branchId = await viewScope(viewer);
     const params: unknown[] = [];
     let where = '';
     if (branchId) {
@@ -179,7 +200,7 @@ export const stockRequestsService = {
     return { pending: row?.pending ?? 0, toSend: row?.toSend ?? 0 };
   },
 
-  get: (branchId: string | null, id: string) => findOne(id, branchId),
+  get: async (viewer: string | null, id: string) => findOne(id, await viewScope(viewer)),
 
   async create(actor: Actor, branchId: string, input: CreateStockRequestInput) {
     return withTransaction(async (em) => {
@@ -340,7 +361,8 @@ export const stockRequestsService = {
     await record(manager, actor, request, status, before);
   },
 
-  async incoming(branchId: string | null, query: IncomingStockQuery) {
+  async incoming(viewer: string | null, query: IncomingStockQuery) {
+    const branchId = await viewScope(viewer);
     const params: unknown[] = [];
     const where = ['o.deleted_at IS NULL', 'o.to_branch_id IS NOT NULL', 'o.transfer_no IS NOT NULL'];
     if (branchId) {

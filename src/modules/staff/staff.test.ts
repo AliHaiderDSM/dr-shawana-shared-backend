@@ -48,7 +48,6 @@ describe('branch staff', () => {
         'front_desk',
         'team_manager',
         'pharmacy',
-        'store_keeper',
         'delivery_print',
       ]) {
         const res = await request(app)
@@ -58,6 +57,11 @@ describe('branch staff', () => {
         expect(res.status).toBe(201);
         expect(res.body.data).toMatchObject({ role, branchId: lahoreId, mustChangePassword: true });
       }
+      const keeper = await request(app)
+        .post('/api/v1/branch/staff')
+        .set(bearer(lahoreAdmin))
+        .send(staffBody('store_keeper'));
+      expect(keeper.status).toBe(422);
     });
 
     it('cannot create branch_admin or super_admin', async () => {

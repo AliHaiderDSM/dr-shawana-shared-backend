@@ -111,7 +111,8 @@
               "pharmacy",
               "store_keeper",
               "delivery_print",
-              "dispatcher"
+              "dispatcher",
+              "warehouse_keeper"
             ]
           },
           "password": {
@@ -250,7 +251,8 @@
               "pharmacy",
               "store_keeper",
               "delivery_print",
-              "dispatcher"
+              "dispatcher",
+              "warehouse_keeper"
             ]
           }
         }
@@ -294,7 +296,8 @@
               "pharmacy",
               "store_keeper",
               "delivery_print",
-              "dispatcher"
+              "dispatcher",
+              "warehouse_keeper"
             ]
           },
           "firstName": {
@@ -519,7 +522,8 @@
               "pharmacy",
               "store_keeper",
               "delivery_print",
-              "dispatcher"
+              "dispatcher",
+              "warehouse_keeper"
             ]
           },
           "branch": {
@@ -13841,6 +13845,53 @@
               "type": "string"
             }
           },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "transferNo": {
+                  "type": "string"
+                },
+                "sentAt": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "received": {
+                  "type": "boolean"
+                },
+                "receivedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sentBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "receivedBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "transferNo",
+                "sentAt",
+                "qty",
+                "received",
+                "receivedAt",
+                "sentBy",
+                "receivedBy"
+              ]
+            }
+          },
           "items": {
             "type": "array",
             "items": {
@@ -13920,6 +13971,7 @@
           "decidedBy",
           "receivedBy",
           "transferNos",
+          "transfers",
           "items"
         ]
       },
@@ -15068,7 +15120,8 @@
                 "pharmacy",
                 "store_keeper",
                 "delivery_print",
-                "dispatcher"
+                "dispatcher",
+                "warehouse_keeper"
               ]
             },
             "required": false,

@@ -73,6 +73,32 @@ badgesRouter.get(
       return;
     }
     const branchId = req.branchId as string;
+    const [viewer] = (await AppDataSource.query('SELECT kind::text AS kind FROM branches WHERE id = $1', [
+      branchId,
+    ])) as {
+      kind: string;
+    }[];
+    if (viewer?.kind === 'warehouse') {
+      const [toSend, onTheWay] = await Promise.all([
+        one(
+          `SELECT COUNT(*)::int AS n FROM stock_requests WHERE status = 'approved' AND deleted_at IS NULL`,
+          [],
+        ),
+        one(
+          `SELECT COUNT(DISTINCT transfer_no)::int AS n FROM stock_outs
+            WHERE transfer_no IS NOT NULL AND received_at IS NULL AND deleted_at IS NULL`,
+          [],
+        ),
+      ]);
+      sendOk(res, {
+        stockRequests: toSend,
+        incomingStock: onTheWay,
+        writeOffs: 0,
+        discountRequests: 0,
+        returns: 0,
+      });
+      return;
+    }
     const [stockRequests, incomingStock, writeOffs, discountRequests, returns] = await Promise.all([
       one(
         `SELECT COUNT(*)::int AS n FROM stock_requests

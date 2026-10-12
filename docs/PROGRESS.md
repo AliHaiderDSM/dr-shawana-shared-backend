@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Warehouse Keeper (2026-10-12)
+
+- Migration 1792200000000-WarehouseKeeper adds the staff role warehouse_keeper. It lives only at the Super Admin stock (the only role allowed there); Store Keeper lives only in the Dispatch Department.
+- Grants: stock view/create, inventory report, products and suppliers view. The keeper sees every stock request and transfer (the warehouse view has no branch filter), sends approved requests with Stock Out, cannot approve or reject. Badges for the keeper: approved requests to send, transfers not received.
+- Stock request detail lists each transfer with who sent it, when, how much, and who received it.
+
 ## Trace by number, seller approves returns, stock out only on request (2026-10-12)
 
 - `GET /branch/trace/{number}`: any invoice, return, stock request, transfer, discount request or write-off number (any case) with its details, items, linked numbers and the audit steps (who, when). Branches only see records of their branch (or shipped by the Dispatch Department).

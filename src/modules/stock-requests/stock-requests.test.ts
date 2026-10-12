@@ -10,6 +10,7 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
   let superAdmin: { id: string };
   let lahoreAdmin: { id: string };
   let lahoreDesk: { id: string };
+  let keeper: { id: string };
   let warehouseId: string;
   let lahoreId: string;
   let otherId: string;
@@ -33,6 +34,7 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
     lahoreAdmin = await createStaff(fake, { role: 'branch_admin', branchId: lahoreId });
     lahoreDesk = await createStaff(fake, { role: 'front_desk', branchId: lahoreId });
+    keeper = await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId });
     const categoryId = (
       await as(superAdmin, 'post', '/branch/categories', warehouseId).send({ name: 'Skin' })
     ).body.data.id;
@@ -135,7 +137,11 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     });
     expect(overApproved.status).toBe(422);
     expect(overApproved.body.error.message).toContain('only 6');
-    const sent = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+    const keeperList = (await as(keeper, 'get', '/branch/stock-requests?status=approved')).body.data;
+    expect(keeperList.map((r: { requestNo: string }) => r.requestNo)).toEqual(['LHR-SR-000001']);
+    expect((await as(keeper, 'get', '/branch/badges')).body.data.stockRequests).toBe(1);
+    expect((await as(keeper, 'post', `/admin/stock-requests/${requestId}/reject`).send({})).status).toBe(403);
+    const sent = await as(keeper, 'post', '/branch/stock-outs').send({
       date: '2026-10-02',
       toBranchId: lahoreId,
       stockRequestId: requestId,
@@ -148,6 +154,10 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     const transferNo = sent.body.data[0].transferNo as string;
     expect(transferNo).toBe('MAINWH-TR-000001');
     const onTheWay = (await as(lahoreAdmin, 'get', `/branch/stock-requests/${requestId}`)).body.data;
+    expect(onTheWay.transfers).toEqual([
+      expect.objectContaining({ transferNo: 'MAINWH-TR-000001', received: false }),
+    ]);
+    expect((await as(keeper, 'get', `/branch/trace/${transferNo}`)).status).toBe(200);
     expect(onTheWay).toMatchObject({ status: 'sent', transferNos: [transferNo] });
     expect(await stockOf('Vitamin C Serum', warehouseId)).toBe('15.000');
     expect(await stockOf('Vitamin C Serum', lahoreId)).toBeUndefined();
@@ -252,5 +262,27 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     const everywhere = await as(superAdmin, 'get', '/branch/inventory/write-offs?reason=damaged');
     expect(everywhere.body.data).toHaveLength(1);
     expect(list.body.data[0].writeOffNo).toBe('LHR-WO-000002');
+  });
+
+  it('puts Warehouse Keepers only at the Super Admin stock and Store Keepers only in the Dispatch Department', async () => {
+    const person = (role: string, n: number) => ({
+      firstName: 'Naseer',
+      lastName: 'Ahmad',
+      email: `keeper${n}@dsm.pk`,
+      username: `keeper${n}`,
+      password: 'Password123',
+      role,
+    });
+    expect(
+      (await as(superAdmin, 'post', '/branch/staff', lahoreId).send(person('warehouse_keeper', 1))).status,
+    ).toBe(422);
+    expect(
+      (await as(superAdmin, 'post', '/branch/staff', lahoreId).send(person('store_keeper', 2))).status,
+    ).toBe(422);
+    expect(
+      (await as(superAdmin, 'post', '/branch/staff', warehouseId).send(person('front_desk', 3))).status,
+    ).toBe(409);
+    const ok = await as(superAdmin, 'post', '/branch/staff', warehouseId).send(person('warehouse_keeper', 4));
+    expect(ok.status).toBe(201);
   });
 });

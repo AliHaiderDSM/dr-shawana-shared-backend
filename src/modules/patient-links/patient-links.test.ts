@@ -122,7 +122,13 @@ describe('patient history links', () => {
       }),
     ).toString('base64url');
     expect((await api(`/public/patient-history/${forged}.${signature}`)).status).toBe(404);
-    expect((await api(`/public/patient-history/${body}.x${signature.slice(1)}`)).status).toBe(404);
+    expect(
+      (
+        await api(
+          `/public/patient-history/${body}.${signature.startsWith('x') ? 'y' : 'x'}${signature.slice(1)}`,
+        )
+      ).status,
+    ).toBe(404);
     expect((await api(`/public/patient-history/not-a-token-at-all`)).status).toBe(404);
     expect(
       (await api(`/public/patient-history/${token}/files/00000000-0000-4000-8000-000000000000`)).status,

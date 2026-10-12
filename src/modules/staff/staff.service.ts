@@ -3,7 +3,7 @@ import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { canManageRole, DISPATCH_ROLES, type Role } from '../../lib/permissions';
+import { canManageRole, DISPATCH_ROLES, WAREHOUSE_ROLES, type Role } from '../../lib/permissions';
 import { auditService } from '../audit/audit.service';
 import { branchesRepository } from '../branches/branches.repository';
 import { type StaffProfile, type StaffStatus } from './staff-profile.entity';
@@ -59,6 +59,15 @@ export function assertCanManage(actor: Actor, role: Role) {
 }
 
 function assertRoleFitsBranch(kind: string, role: Role) {
+  if (kind === 'warehouse' && !WAREHOUSE_ROLES.includes(role)) {
+    throw AppError.conflict('The Super Admin stock has only Warehouse Keepers. The Super Admin runs it.');
+  }
+  if (kind !== 'warehouse' && role === 'warehouse_keeper') {
+    throw AppError.unprocessable('A Warehouse Keeper works only at the Super Admin stock');
+  }
+  if (kind !== 'dispatch' && role === 'store_keeper') {
+    throw AppError.unprocessable('A Store Keeper works only in the Dispatch Department');
+  }
   if (kind === 'dispatch' && !DISPATCH_ROLES.includes(role)) {
     throw AppError.unprocessable(
       'The Dispatch Department has only these roles: Branch Admin, Store Keeper, Delivery Print and Dispatcher',
@@ -148,9 +157,6 @@ export const staffService = {
   async create(actor: Actor, branchId: string, input: NewStaffAccount) {
     assertCanManage(actor, input.role);
     const branch = await ensureBranchExists(branchId);
-    if (branch.kind === 'warehouse') {
-      throw AppError.conflict('The Super Admin stock has no staff. The Super Admin runs it.');
-    }
     assertRoleFitsBranch(branch.kind, input.role);
     return toStaffDto(await this.createAccount(actor, branchId, input));
   },

@@ -2,6 +2,7 @@ import { AppDataSource } from '../../database/data-source';
 import { toMoney, toQuantity } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
+import { viewScope } from '../stock-requests/stock-requests.service';
 
 export const TRACE_KINDS = [
   'sale',
@@ -442,7 +443,11 @@ export const traceService = {
       if (found) break;
     }
     if (!found) throw AppError.notFound(`Nothing has the number ${raw.trim()}`);
-    if (!actor.isSuperAdmin && (!branchId || !found.branchIds.includes(branchId))) {
+    const warehouseView =
+      (found.kind === 'stock_request' || found.kind === 'transfer') &&
+      branchId !== null &&
+      (await viewScope(branchId)) === null;
+    if (!actor.isSuperAdmin && !warehouseView && (!branchId || !found.branchIds.includes(branchId))) {
       throw AppError.notFound(`Nothing has the number ${raw.trim()}`);
     }
     const timeline = await q<{ at: string; action: string; entity: string; by: Person | null }>(

@@ -9,6 +9,7 @@ export const ROLES = [
   'store_keeper',
   'delivery_print',
   'dispatcher',
+  'warehouse_keeper',
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -23,7 +24,11 @@ export const DISPATCH_ROLES: readonly Role[] = [
   'dispatcher',
 ];
 
-export const ROLES_CREATABLE_BY_BRANCH_ADMIN = BRANCH_ROLES.filter((r) => r !== 'branch_admin');
+export const WAREHOUSE_ROLES: readonly Role[] = ['warehouse_keeper'];
+
+export const ROLES_CREATABLE_BY_BRANCH_ADMIN = BRANCH_ROLES.filter(
+  (r) => r !== 'branch_admin' && r !== 'warehouse_keeper',
+);
 
 export const PLATFORM_MODULES = ['branches', 'company'] as const;
 
@@ -151,6 +156,12 @@ const MATRIX: Record<Role, Grants> = {
     stock: ['view', 'update'],
     inventoryReport: VIEW,
     products: VIEW,
+  },
+  warehouse_keeper: {
+    stock: VIEW_CREATE,
+    inventoryReport: VIEW,
+    products: VIEW,
+    suppliers: VIEW,
   },
 };
 
