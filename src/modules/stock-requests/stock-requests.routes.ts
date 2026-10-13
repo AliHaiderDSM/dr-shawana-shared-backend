@@ -138,7 +138,7 @@ stockRequestsRouter.post(
   '/branch/incoming-stock/:transferNo/receive',
   authenticate,
   branchScope(),
-  requireRole('branch_admin', 'dispatcher'),
+  requireRole('branch_admin'),
   validate({ params: transferParamsSchema, body: receiveStockSchema }),
   async (req, res) => {
     sendOk(

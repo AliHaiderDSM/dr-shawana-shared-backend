@@ -154,7 +154,7 @@ const MATRIX: Record<Role, Grants> = {
     sales: ['view', 'update'],
     deliveryReport: VIEW,
     returns: ['view', 'update'],
-    stock: ['view', 'update'],
+    stock: VIEW,
     inventoryReport: VIEW,
     products: VIEW,
   },
@@ -196,3 +196,6 @@ export function canManageRole(actorRole: Role, targetRole: Role): boolean {
   if (actorRole === 'branch_admin') return (ROLES_CREATABLE_BY_BRANCH_ADMIN as Role[]).includes(targetRole);
   return false;
 }
+
+export const canReportWriteOffs = (role: Role) =>
+  role === 'dispatcher' || hasPermission(role, 'stock.update');

@@ -407,7 +407,6 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           if (
             config.kind === 'stock_out' &&
             here?.kind === 'warehouse' &&
-            !actor.isSuperAdmin &&
             actor.role !== 'warehouse_keeper'
           ) {
             throw AppError.forbidden('Only the Warehouse Keeper sends stock out of the Super Admin stock');

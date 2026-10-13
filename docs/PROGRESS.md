@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Dispatcher limits and stock out report (2026-10-13)
+- Stock out of the Super Admin stock: Warehouse Keeper only (the Super Admin no longer sends; 403 "Only the Warehouse Keeper sends stock out"). Tests send through a keeper.
+- Dispatcher, like Store Keeper, can be created only in the Dispatch Department (422 elsewhere). Existing dispatchers in other branches are not changed by this.
+
+- Dispatcher: `stock` is view only (no Stock In, no editing stock documents, no stock requests). Write-off reports stay open to the dispatcher through `canReportWriteOffs`. Receiving incoming stock is the branch admin only (Super Admin still allowed).
+- `GET /branch/inventory/stock-out-report`: one line per transfer (transfer and request numbers, from/to, products, quantity, scanned labels per item, sent by, received by and when); filters from, to, toBranchId, status received / on_the_way. Super Admin sees all; a branch sees what it sent or received.
+- Tests: dispatcher limits and the report in `dispatch-department.test.ts`. Full suite 252 passing.
+
 ## Patient mobile app API (2026-10-13)
 
 - Migration `1792700000000-PatientApp`: `patient_accounts` (scrypt password hash, lockout), `patient_activation_codes` (sha256 of a 6-digit code, 24 h, one use, 5 tries), `patient_sessions` (hashed refresh tokens, 60 days, rotated), `patient_requests` + `patient_request_events` (statuses submitted, in_review, in_progress, resolved, closed; number `CODE-PR-000001`), `medical_records.uploaded_by_patient`. RLS on every new table.

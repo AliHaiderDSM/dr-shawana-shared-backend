@@ -95,7 +95,7 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       (i) => i.productName === 'Rose Toner',
     )!;
 
-    const early = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+    const early = await as(keeper, 'post', '/branch/stock-outs').send({
       date: '2026-10-02',
       toBranchId: lahoreId,
       stockRequestId: requestId,
@@ -125,14 +125,22 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       ]),
     );
 
-    const wrongBranch = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+    const bySuperAdmin = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+      date: '2026-10-02',
+      toBranchId: lahoreId,
+      stockRequestId: requestId,
+      items: [{ productId: serum, qty: '5' }],
+    });
+    expect(bySuperAdmin.status).toBe(403);
+    expect(bySuperAdmin.body.error.message).toContain('Warehouse Keeper');
+    const wrongBranch = await as(keeper, 'post', '/branch/stock-outs').send({
       date: '2026-10-02',
       toBranchId: otherId,
       stockRequestId: requestId,
       items: [{ productId: serum, qty: '5' }],
     });
     expect(wrongBranch.status).toBe(400);
-    const overApproved = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+    const overApproved = await as(keeper, 'post', '/branch/stock-outs').send({
       date: '2026-10-02',
       toBranchId: lahoreId,
       stockRequestId: requestId,

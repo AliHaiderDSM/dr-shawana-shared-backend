@@ -13,6 +13,7 @@ import { stockRequestsRouter } from './modules/stock-requests/stock-requests.rou
 import { badgesRouter } from './modules/badges/badges.routes';
 import { traceRouter } from './modules/trace/trace.routes';
 import { storeReceiptsRouter } from './modules/inventory/store-receipts';
+import { stockOutReportRouter } from './modules/inventory/stock-out-report';
 import { doctorsRouter } from './modules/doctors/doctors.routes';
 import { expensesRouter } from './modules/expenses/expenses.routes';
 import { healthRouter } from './modules/health/health.routes';
@@ -48,6 +49,7 @@ apiRouter.use(accountsRouter);
 apiRouter.use(stockDocumentsRouter);
 apiRouter.use(stockRequestsRouter);
 apiRouter.use(storeReceiptsRouter);
+apiRouter.use(stockOutReportRouter);
 apiRouter.use(inventoryRouter);
 apiRouter.use(manufacturingRouter);
 apiRouter.use(patientsRouter);

@@ -17,6 +17,7 @@ describe('Dispatch Department ships every online order from its own stock', () =
   let lahoreAdmin: { id: string };
   let isbDesk: { id: string };
   let dispatcher: { id: string };
+  let keeper: { id: string };
   let warehouseId: string;
   let lahoreId: string;
   let isbId: string;
@@ -47,7 +48,7 @@ describe('Dispatch Department ships every online order from its own stock', () =
   };
 
   const transfer = async (toBranchId: string, items: object[]) => {
-    const res = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
+    const res = await as(keeper, 'post', '/branch/stock-outs').send({
       date: '2026-10-02',
       toBranchId,
       items,
@@ -126,7 +127,8 @@ describe('Dispatch Department ships every online order from its own stock', () =
         { productId: toner, qty: '60', batch: 'T-1', expiryDate: '2028-01-31' },
       ],
     });
-    await confirmReceipts(app, await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId }));
+    keeper = await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId });
+    await confirmReceipts(app, keeper);
     serials = (
       await as(superAdmin, 'get', `/branch/inventory/items?productId=${serum}`, warehouseId)
     ).body.data.map((i: { serial: string }) => i.serial);
@@ -238,6 +240,44 @@ describe('Dispatch Department ships every online order from its own stock', () =
       const notStocked = await online(lahoreDesk, [{ productId: local.data.id, qty: '1' }], lahoreCash);
       expect(notStocked.status).toBe(422);
     }
+  });
+
+  it('keeps the dispatcher to dispatch work and reports every transfer with its labels', async () => {
+    const someId = '00000000-0000-4000-8000-000000000000';
+    expect((await as(dispatcher, 'post', '/branch/stock-ins').send({})).status).toBe(403);
+    expect((await as(dispatcher, 'patch', `/branch/stock-ins/${someId}`).send({})).status).toBe(403);
+    expect((await as(dispatcher, 'patch', `/branch/stock-outs/${someId}`).send({})).status).toBe(403);
+    expect((await as(dispatcher, 'post', '/branch/stock-requests').send({ items: [] })).status).toBe(403);
+    expect(
+      (await as(dispatcher, 'post', '/branch/incoming-stock/DSP-TR-000001/receive').send({})).status,
+    ).toBe(403);
+    expect((await as(dispatcher, 'post', '/branch/inventory/write-offs').send({ items: [] })).status).toBe(
+      400,
+    );
+
+    const all = await as(superAdmin, 'get', '/branch/inventory/stock-out-report');
+    expect(all.status).toBe(200);
+    const sent = (all.body.data as { to: { id: string } | null }[]).find((t) => t.to?.id === dispatchId);
+    expect(sent).toMatchObject({
+      transferNo: expect.stringMatching(/-TR-/),
+      requestNo: expect.stringMatching(/-SR-/),
+      products: 2,
+      qty: '25.000',
+      serials: 5,
+      sentBy: { name: expect.any(String) },
+      receivedAt: expect.any(String),
+    });
+
+    const seenByDispatch = await as(dispatcher, 'get', '/branch/inventory/stock-out-report');
+    expect(seenByDispatch.body.data.map((t: { to: { id: string } }) => t.to.id)).toContain(dispatchId);
+    const onTheWay = await as(
+      superAdmin,
+      'get',
+      `/branch/inventory/stock-out-report?status=on_the_way&toBranchId=${dispatchId}`,
+    );
+    expect(onTheWay.body.data).toEqual([]);
+    const lahore = await as(lahoreAdmin, 'get', '/branch/inventory/stock-out-report');
+    expect(lahore.body.data.map((t: { to: { id: string } }) => t.to.id)).not.toContain(dispatchId);
   });
 
   it('lets the dispatcher see every branch order, scan its stock and print from the department', async () => {
@@ -373,5 +413,14 @@ describe('Dispatch Department ships every online order from its own stock', () =
     expect(desk.status).toBe(422);
     const keeper = await as(superAdmin, 'post', '/branch/staff', dispatchId).send(person('store_keeper', 2));
     expect(keeper.status).toBe(201);
+    const branchDispatcher = await as(superAdmin, 'post', '/branch/staff', lahoreId).send(
+      person('dispatcher', 3),
+    );
+    expect(branchDispatcher.status).toBe(422);
+    expect(branchDispatcher.body.error.message).toContain('Dispatch Department');
+    const branchKeeper = await as(superAdmin, 'post', '/branch/staff', lahoreId).send(
+      person('store_keeper', 4),
+    );
+    expect(branchKeeper.status).toBe(422);
   });
 });

@@ -25,6 +25,8 @@ describe('Main Warehouse transfers to branches', () => {
     request(app)
       [method](`/api/v1${path}${path.includes('?') ? '&' : '?'}branchId=${branchId}`)
       .set(bearer(superAdmin));
+  const asKeeper = (method: 'get' | 'post' | 'patch' | 'delete', path: string) =>
+    request(app)[method](`/api/v1${path}`).set(bearer(keeper));
   const asBranch = (method: 'get' | 'post' | 'patch' | 'delete', path: string, who = lahoreAdmin) =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
 
@@ -53,7 +55,7 @@ describe('Main Warehouse transfers to branches', () => {
       items: ({ productId: string; qty: string } & Record<string, unknown>)[];
     } & Record<string, unknown>,
   ) =>
-    asAdmin('post', '/branch/stock-outs').send({
+    asKeeper('post', '/branch/stock-outs').send({
       ...body,
       stockRequestId: await approvedRequest(app, superAdmin, body.toBranchId, body.items),
     });
@@ -484,24 +486,24 @@ describe('Main Warehouse transfers to branches', () => {
       items: [{ productId: lahoreToner, qty: '1', destination: 'Karachi Office' }],
     });
     expect(dispatch.status).toBe(409);
-    const toWarehouse = await asAdmin('post', '/branch/stock-outs').send({
+    const toWarehouse = await asKeeper('post', '/branch/stock-outs').send({
       date: '2026-10-04',
       toBranchId: warehouseId,
       items: [{ productId: toner, qty: '1' }],
     });
     expect(toWarehouse.status).toBe(400);
-    const plain = await asAdmin('post', '/branch/stock-outs').send({
+    const plain = await asKeeper('post', '/branch/stock-outs').send({
       date: '2026-10-04',
       items: [{ productId: toner, qty: '1' }],
     });
     expect(plain.status).toBe(400);
-    const outside = await asAdmin('post', '/branch/stock-outs').send({
+    const outside = await asKeeper('post', '/branch/stock-outs').send({
       date: '2026-10-04',
       items: [{ productId: toner, qty: '1', destination: 'Karachi Office' }],
     });
     expect(outside.status).toBe(422);
     expect(outside.body.error.message).toContain('stock request');
-    const direct = await asAdmin('post', '/branch/stock-outs').send({
+    const direct = await asKeeper('post', '/branch/stock-outs').send({
       date: '2026-10-04',
       toBranchId: lahoreId,
       items: [{ productId: toner, qty: '1' }],

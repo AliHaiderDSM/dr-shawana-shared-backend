@@ -1,6 +1,8 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { actorFrom } from '../../lib/actor';
+import { AppError } from '../../lib/errors';
 import { idParamsSchema, sendCreated, sendOk } from '../../lib/http';
+import { canReportWriteOffs } from '../../lib/permissions';
 import { branchIdOf } from '../../lib/request';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
@@ -38,6 +40,8 @@ export const inventoryRouter = Router();
 
 const path = '/branch/inventory';
 const canViewStock = requirePermission('stock.view', 'inventoryReport.view');
+const writeOffReporter: RequestHandler = (req, _res, next) =>
+  req.auth && canReportWriteOffs(req.auth.role) ? next() : next(AppError.forbidden());
 
 inventoryRouter.use(path, authenticate, (req, res, next) =>
   branchScope({
@@ -134,7 +138,7 @@ inventoryRouter.get(
 
 inventoryRouter.post(
   `${path}/write-offs`,
-  requirePermission('stock.update'),
+  writeOffReporter,
   validate({ body: reportWriteOffsSchema }),
   async (req: Request, res: Response) => {
     sendCreated(
@@ -179,7 +183,7 @@ for (const action of ['approve', 'reject'] as const) {
 
 inventoryRouter.post(
   `${path}/batches/:batchId/write-off`,
-  requirePermission('stock.update'),
+  writeOffReporter,
   validate({ params: batchParamsSchema, body: writeOffSchema }),
   async (req: Request, res: Response) => {
     const { batchId } = validParams(req, batchParamsSchema);

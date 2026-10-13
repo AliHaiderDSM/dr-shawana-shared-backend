@@ -15270,6 +15270,144 @@
           "timeline"
         ]
       },
+      "StockOutTransfer": {
+        "type": "object",
+        "properties": {
+          "transferNo": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "sentAt": {
+            "type": "string"
+          },
+          "from": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "code"
+            ]
+          },
+          "to": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "code"
+            ]
+          },
+          "requestNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sentBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "role"
+            ]
+          },
+          "receivedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receivedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "products": {
+            "type": "integer"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "serials": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "product": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "serials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "product",
+                "qty",
+                "serials"
+              ]
+            }
+          }
+        },
+        "required": [
+          "transferNo",
+          "date",
+          "sentAt",
+          "from",
+          "to",
+          "requestNo",
+          "sentBy",
+          "receivedAt",
+          "receivedBy",
+          "products",
+          "qty",
+          "serials",
+          "items"
+        ]
+      },
       "CreateJournalEntry": {
         "type": "object",
         "properties": {
@@ -48278,6 +48416,144 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/Trace"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/inventory/stock-out-report": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "One line per transfer sent from stock: transfer and request numbers, destination, products with the scanned labels, who sent it and who received it. The Super Admin sees every branch without ?branchId=; a branch sees what it sent or got.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "toBranchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "received",
+                "on_the_way"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transfers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StockOutTransfer"
+                      }
                     }
                   },
                   "required": [
