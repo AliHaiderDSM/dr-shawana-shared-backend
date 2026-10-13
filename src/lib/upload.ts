@@ -25,6 +25,9 @@ export const documentsUpload = (field: string, maxCount = 5): RequestHandler =>
 export const documentFieldsUpload = (fields: { name: string; maxCount: number }[]): RequestHandler =>
   upload(DOCUMENT_TYPES, 10 * MB).fields(fields);
 
+export const reportFieldsUpload = (fields: { name: string; maxCount: number }[]): RequestHandler =>
+  upload([...DOCUMENT_TYPES, 'image/heic', 'image/heif'], 10 * MB).fields(fields);
+
 export const documentUpload = (field: string): RequestHandler =>
   upload(DOCUMENT_TYPES, 10 * MB).single(field);
 

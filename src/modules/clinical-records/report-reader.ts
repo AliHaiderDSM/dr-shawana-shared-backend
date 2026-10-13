@@ -417,6 +417,14 @@ export async function readBloodReport(
   if (files.some((file) => !READABLE_TYPES.includes(file.mimetype))) {
     throw AppError.badRequest('Upload the reports as PDFs or images (PNG, JPG, WebP)');
   }
+  if (
+    provider === 'openai' &&
+    files.some((file) => file.mimetype === 'image/heic' || file.mimetype === 'image/heif')
+  ) {
+    throw AppError.badRequest(
+      'HEIC photos cannot be read right now. Save the photo as JPG and upload again.',
+    );
+  }
   const answer = provider === 'openai' ? await askOpenAi(files) : await askGemini(files);
   let parsed: { testDate?: unknown; results?: unknown; summary?: unknown; documents?: unknown } = {};
   try {

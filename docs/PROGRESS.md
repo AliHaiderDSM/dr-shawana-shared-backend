@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Report uploads take HEIC (2026-10-13)
+
+- read-report uses `reportFieldsUpload`: PDF, JPG, PNG, WebP and HEIC/HEIF, 10 MB per file, 5 files. HEIC goes to Gemini as is; with OpenAI it is refused with a clear message (OpenAI does not read HEIC).
+
 ## MRS and additional symptoms as one visit record (2026-10-12)
 
 - `GET /branch/patients/{id}/mrs-history` now returns one row per visit (consultation): the MRS scores (or null) and the additional symptoms with severity and the other text of the same visit; the date is the MRS date, else the appointment date. Like posSoft, where both live in the same customers_history row of the appointment.

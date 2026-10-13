@@ -3,13 +3,7 @@ import { actorFrom } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
-import {
-  documentsUpload,
-  jsonDataField,
-  uploadedFiles,
-  documentFieldsUpload,
-  filesOf,
-} from '../../lib/upload';
+import { documentsUpload, jsonDataField, uploadedFiles, reportFieldsUpload, filesOf } from '../../lib/upload';
 import { readBloodReport } from './report-reader';
 import { labReportSummariesService } from './lab-report-summaries.service';
 import { authenticate } from '../../middleware/auth';
@@ -58,7 +52,7 @@ clinicalRecordsRouter.post(
   `${base}/blood-work/read-report`,
   ...scoped,
   canCreate,
-  documentFieldsUpload([
+  reportFieldsUpload([
     { name: 'file', maxCount: 1 },
     { name: 'files', maxCount: 5 },
   ]),
