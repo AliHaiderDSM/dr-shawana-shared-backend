@@ -60,6 +60,7 @@ const toRecordDto = (r: MedicalRecord) => ({
   type: r.type,
   date: r.date,
   note: r.note,
+  uploadedByPatient: r.uploadedByPatient,
   files: (r.files ?? []).map(toFileDto),
   createdBy: r.createdBy,
   createdAt: r.createdAt,
@@ -325,6 +326,58 @@ export const medicalRecordsService = {
           em,
         );
         return dto;
+      }),
+    );
+  },
+
+  async createFromPatient(
+    branchId: string,
+    patientId: string,
+    title: string | null,
+    files: Express.Multer.File[],
+  ) {
+    const uploaded = await uploadMedicalFiles(branchId, files);
+    return withUploads(uploaded, () =>
+      withTransaction(async (em) => {
+        const recordRepo = repo(MedicalRecord, em);
+        const record = await recordRepo.save(
+          recordRepo.create({
+            branchId,
+            patientId,
+            appointmentId: null,
+            type: 'medical_record',
+            date: today(),
+            note: title,
+            uploadedByPatient: true,
+            createdBy: null,
+          }),
+        );
+        const fileRepo = repo(MedicalRecordFile, em);
+        for (const file of uploaded) {
+          await fileRepo.save(
+            fileRepo.create({
+              branchId,
+              medicalRecordId: record.id,
+              filePath: file.path,
+              originalName: file.originalName,
+              contentType: file.contentType,
+              sizeBytes: file.sizeBytes,
+              createdBy: null,
+            }),
+          );
+        }
+        await auditService.record(
+          {
+            actor: null,
+            branchId,
+            action: 'create',
+            entity: 'medical_record',
+            entityId: record.id,
+            after: { patientId, uploadedByPatient: true, files: uploaded.length },
+          },
+          em,
+        );
+        return record;
       }),
     );
   },

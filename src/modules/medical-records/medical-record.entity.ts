@@ -44,6 +44,9 @@ export class MedicalRecord extends BranchScopedEntity {
   @Column({ type: 'text', nullable: true })
   note: string | null;
 
+  @Column({ name: 'uploaded_by_patient', type: 'boolean', default: false })
+  uploadedByPatient: boolean;
+
   @OneToMany(() => MedicalRecordFile, (file) => file.medicalRecord)
   files?: MedicalRecordFile[];
 }

@@ -150,6 +150,7 @@ const medicalRecordSchema = registry.register(
     type: z.enum(MEDICAL_RECORD_TYPES),
     date: z.iso.date(),
     note: z.string().nullable(),
+    uploadedByPatient: z.boolean(),
     files: z.array(fileSchema),
     createdBy: z.uuid().nullable(),
     createdAt: z.iso.datetime(),

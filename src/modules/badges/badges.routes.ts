@@ -7,6 +7,7 @@ import { securedDocs } from '../../lib/openapi-crud';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { pendingReceipts } from '../inventory/store-receipts';
+import { patientRequestsService } from '../patient-app/patient-requests.service';
 
 export const badgesRouter = Router();
 
@@ -19,6 +20,7 @@ const countsSchema = registry.register(
     discountRequests: z.number().int(),
     returns: z.number().int(),
     stockReceipts: z.number().int(),
+    patientRequests: z.number().int(),
   }),
 );
 
@@ -78,6 +80,7 @@ badgesRouter.get(
         discountRequests,
         returns,
         stockReceipts: await pendingReceipts(null),
+        patientRequests: await patientRequestsService.openCount(null),
       });
       return;
     }
@@ -106,6 +109,7 @@ badgesRouter.get(
         discountRequests: 0,
         returns: 0,
         stockReceipts: await pendingReceipts(branchId),
+        patientRequests: 0,
       });
       return;
     }
@@ -143,6 +147,14 @@ badgesRouter.get(
         [branchId, req.auth?.role === 'branch_admin'],
       ),
     ]);
-    sendOk(res, { stockRequests, incomingStock, writeOffs, discountRequests, returns, stockReceipts: 0 });
+    sendOk(res, {
+      stockRequests,
+      incomingStock,
+      writeOffs,
+      discountRequests,
+      returns,
+      stockReceipts: 0,
+      patientRequests: await patientRequestsService.openCount(branchId),
+    });
   },
 );

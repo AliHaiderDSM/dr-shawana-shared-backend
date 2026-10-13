@@ -12,6 +12,7 @@ declare global {
     interface Request {
       id: string;
       auth?: AuthContext;
+      patient?: { patientId: string; sessionId: string };
       branchId?: string | null;
       valid: { body?: unknown; query?: unknown; params?: unknown };
     }
