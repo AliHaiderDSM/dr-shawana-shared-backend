@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { actorFrom } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
+import { withUploads } from '../../lib/file-uploads';
+import { logger } from '../../lib/logger';
 import { branchIdOf, idOf } from '../../lib/request';
 import { documentsUpload, jsonDataField, uploadedFiles, reportFieldsUpload, filesOf } from '../../lib/upload';
 import { readBloodReport } from './report-reader';
@@ -15,9 +17,11 @@ import {
   addBloodWorkSchema,
   createMedicalRecordSchema,
   medicalRecordListQuerySchema,
+  readReportBodySchema,
   recordFileParamsSchema,
   recordParamsSchema,
   resultParamsSchema,
+  summaryFileParamsSchema,
   summaryParamsSchema,
   updateBloodWorkSchema,
   updateMedicalRecordSchema,
@@ -25,6 +29,9 @@ import {
 import { bhrtService, bloodWorkService, medicalRecordsService } from './clinical-records.service';
 
 export const clinicalRecordsRouter = Router();
+
+const MAX_READ_FILES = 5;
+const MAX_READ_BYTES = 15 * 1024 * 1024;
 
 const base = '/branch/patients/:id';
 const scoped = [authenticate, branchScope()];
@@ -56,28 +63,61 @@ clinicalRecordsRouter.post(
     { name: 'file', maxCount: 1 },
     { name: 'files', maxCount: 5 },
   ]),
-  validate({ params: idParamsSchema }),
+  validate({ params: idParamsSchema, body: readReportBodySchema }),
   async (req, res) => {
-    const files = [...filesOf(req, 'file'), ...filesOf(req, 'files')];
-    if (files.length === 0) throw AppError.badRequest('Upload at least one report');
+    const { recordFileIds } = validBody(req, readReportBodySchema);
+    const uploaded = [...filesOf(req, 'file'), ...filesOf(req, 'files')];
+    if (uploaded.length + recordFileIds.length === 0) throw AppError.badRequest('Choose at least one report');
+    if (uploaded.length + recordFileIds.length > MAX_READ_FILES) {
+      throw AppError.badRequest(`Choose up to ${MAX_READ_FILES} reports at a time`);
+    }
+    const actor = actorFrom(req);
+    const branchId = branchIdOf(req);
+    const patientId = idOf(req);
+    const saved = await medicalRecordsService.filesForReading(branchId, patientId, recordFileIds);
+    const files = [...saved.map((s) => s.file), ...uploaded];
+    if (files.reduce((sum, file) => sum + file.size, 0) > MAX_READ_BYTES) {
+      throw AppError.badRequest('These reports are too large to read together. Choose fewer files.');
+    }
     const read = await readBloodReport(files);
-    const saved = await labReportSummariesService.save(
-      actorFrom(req),
-      branchIdOf(req),
-      idOf(req),
-      files
-        .map((file) => file.originalname)
-        .filter(Boolean)
-        .join(', ') || null,
-      read,
+    const stored = read.summary
+      ? await medicalRecordsService.storeReadUploads(branchId, uploaded).catch((err: unknown) => {
+          logger.error({ err }, 'Could not keep the uploaded reports');
+          return null;
+        })
+      : null;
+    const refs = [
+      ...saved.map((s) => s.ref),
+      ...(stored?.refs ??
+        uploaded.map((file) => ({
+          name: file.originalname,
+          contentType: file.mimetype,
+          sizeBytes: file.size,
+          recordFileId: null,
+          path: null,
+        }))),
+    ];
+    const summary = await withUploads(stored?.uploaded ?? [], () =>
+      labReportSummariesService.save(actor, branchId, patientId, refs, read),
     );
-    sendOk(res, { testDate: read.testDate, results: read.results, summary: saved });
+    sendOk(res, { testDate: read.testDate, results: read.results, summary });
   },
 );
 
 clinicalRecordsRouter.get(`${base}/report-summaries`, ...scoped, canView, byPatient, async (req, res) => {
   sendOk(res, await labReportSummariesService.list(branchIdOf(req), idOf(req)));
 });
+
+clinicalRecordsRouter.get(
+  `${base}/report-summaries/:summaryId/files/:index/url`,
+  ...scoped,
+  canView,
+  validate({ params: summaryFileParamsSchema }),
+  async (req, res) => {
+    const { id, summaryId, index } = validParams(req, summaryFileParamsSchema);
+    sendOk(res, await labReportSummariesService.fileUrl(branchIdOf(req), id, summaryId, index));
+  },
+);
 
 clinicalRecordsRouter.delete(
   `${base}/report-summaries/:summaryId`,

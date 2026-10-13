@@ -5,7 +5,7 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
 import { withoutInternals } from '../../lib/http';
-import { BUCKETS } from '../../lib/storage';
+import { BUCKETS, downloadFile } from '../../lib/storage';
 import { today } from '../../lib/validation';
 import { appointments } from '../appointments/appointment-access';
 import { auditService } from '../audit/audit.service';
@@ -15,6 +15,7 @@ import { MedicalRecord, type MedicalRecordType } from '../medical-records/medica
 import { type BhrtStatus, Patient } from '../patients/patient.entity';
 import { patientsService } from '../patients/patients.service';
 import { BhrtStatusLog, type BhrtLogStatus } from './bhrt-status-log.entity';
+import { type SummaryFile } from './lab-report-summary.entity';
 import { BLOOD_TESTS, BloodWorkResult } from './blood-work-result.entity';
 import {
   BLOOD_TEST_UNITS,
@@ -116,6 +117,8 @@ async function saveFiles(
     );
   }
 }
+
+const READABLE_RECORD_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 export const uploadMedicalFiles = (branchId: string, files: Express.Multer.File[]) =>
   uploadMany(BUCKETS.medicalRecords, `${branchId}/medical-records`, files);
@@ -403,6 +406,61 @@ export const medicalRecordsService = {
         em,
       );
     });
+  },
+
+  async filesForReading(branchId: string, patientId: string, fileIds: string[]) {
+    if (fileIds.length === 0) return [];
+    const rows = await repo(MedicalRecordFile)
+      .createQueryBuilder('f')
+      .innerJoin('f.medicalRecord', 'mr')
+      .where('f.id IN (:...fileIds)', { fileIds })
+      .andWhere('f.branchId = :branchId', { branchId })
+      .andWhere('mr.patientId = :patientId', { patientId })
+      .getMany();
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const read: { file: Express.Multer.File; ref: SummaryFile }[] = [];
+    for (const id of fileIds) {
+      const row = byId.get(id);
+      if (!row) throw AppError.notFound('Medical record file');
+      if (!READABLE_RECORD_TYPES.includes(row.contentType)) {
+        throw AppError.badRequest(`${row.originalName} is not a PDF or a photo, so it cannot be read`);
+      }
+      const buffer = await downloadFile(BUCKETS.medicalRecords, row.filePath);
+      read.push({
+        file: {
+          fieldname: 'recordFile',
+          originalname: row.originalName,
+          encoding: '7bit',
+          mimetype: row.contentType,
+          size: buffer.length,
+          buffer,
+        } as Express.Multer.File,
+        ref: {
+          name: row.originalName,
+          contentType: row.contentType,
+          sizeBytes: buffer.length,
+          recordFileId: row.id,
+          path: null,
+        },
+      });
+    }
+    return read;
+  },
+
+  async storeReadUploads(branchId: string, files: Express.Multer.File[]) {
+    const storable = files.filter((file) => READABLE_RECORD_TYPES.includes(file.mimetype));
+    const uploaded = await uploadMany(BUCKETS.medicalRecords, `${branchId}/lab-reports`, storable);
+    const refs: SummaryFile[] = files.map((file) => {
+      const stored = uploaded[storable.indexOf(file)];
+      return {
+        name: file.originalname,
+        contentType: file.mimetype,
+        sizeBytes: file.size,
+        recordFileId: null,
+        path: stored?.path ?? null,
+      };
+    });
+    return { uploaded, refs };
   },
 
   async timeline(branchId: string | null, patientId: string) {

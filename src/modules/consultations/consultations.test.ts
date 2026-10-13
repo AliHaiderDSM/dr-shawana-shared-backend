@@ -2,6 +2,7 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { env } from '../../config/env';
 import { AppDataSource } from '../../database/data-source';
 import { AuditLog } from '../audit/audit-log.entity';
 
@@ -443,6 +444,134 @@ describe('consultations and clinical records', () => {
       expect(
         (await api('get', `/branch/patients/${patientId}/medical-records`, islamabadAdmin)).body.data,
       ).toEqual([]);
+    });
+
+    it('reads saved record files with AI and keeps uploaded reports with the summary', async () => {
+      const saved = {
+        provider: env.AI_PROVIDER,
+        gemini: env.GEMINI_API_KEY,
+        fallback: env.GEMINI_FALLBACK_MODEL,
+      };
+      env.AI_PROVIDER = 'gemini';
+      env.GEMINI_API_KEY = 'test-key';
+      env.GEMINI_FALLBACK_MODEL = env.GEMINI_MODEL;
+      const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        text: JSON.stringify({
+                          testDate: '2026-09-15',
+                          results: [{ test: 'fsh', value: '40', unit: 'mIU/mL', document: 1 }],
+                          summary: {
+                            patient: [],
+                            abnormal: [],
+                            normal: [{ category: 'Hormones', tests: 'FSH' }],
+                            overview: 'Normal.',
+                            reviewPoints: [],
+                            unreadable: [],
+                          },
+                          documents: [],
+                        }),
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      try {
+        const record = await request(app)
+          .post(`/api/v1/branch/patients/${patientId}/medical-records`)
+          .set(bearer(frontDesk))
+          .field('data', JSON.stringify({ type: 'medical_record', date: '2026-09-15' }))
+          .attach('files', Buffer.from('%PDF-1.4 fsh'), {
+            filename: 'fsh.pdf',
+            contentType: 'application/pdf',
+          });
+        const fileId = record.body.data.files[0].id;
+
+        const read = await request(app)
+          .post(`/api/v1/branch/patients/${patientId}/blood-work/read-report`)
+          .set(bearer(frontDesk))
+          .field('recordFileIds', fileId)
+          .attach('files', Buffer.from('jpg'), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+        expect(read.status).toBe(200);
+        expect(read.body.data.results).toEqual([
+          { test: 'fsh', value: '40', unit: 'mIU/mL', testDate: '2026-09-15' },
+        ]);
+        expect(read.body.data.summary.fileName).toBe('fsh.pdf, photo.jpg');
+        const summary = read.body.data.summary;
+        expect(summary.files).toEqual([
+          {
+            index: 0,
+            name: 'fsh.pdf',
+            contentType: 'application/pdf',
+            sizeBytes: 12,
+            recordFileId: fileId,
+            stored: false,
+          },
+          {
+            index: 1,
+            name: 'photo.jpg',
+            contentType: 'image/jpeg',
+            sizeBytes: 3,
+            recordFileId: null,
+            stored: true,
+          },
+        ]);
+        const link = await request(app)
+          .get(`/api/v1/branch/patients/${patientId}/report-summaries/${summary.id}/files/1/url`)
+          .set(bearer(frontDesk));
+        expect(link.status).toBe(200);
+        expect(link.body.data.url).toContain('/lab-reports/');
+        expect(
+          (
+            await request(app)
+              .get(`/api/v1/branch/patients/${patientId}/report-summaries/${summary.id}/files/0/url`)
+              .set(bearer(frontDesk))
+          ).status,
+        ).toBe(404);
+        const records = await api('get', `/branch/patients/${patientId}/medical-records`, frontDesk);
+        expect(records.body.data).toHaveLength(1);
+        const sent = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+        const parts = sent.contents[0].parts;
+        expect(parts[0].text).toBe('Document 1: fsh.pdf');
+        expect(parts[1].inline_data).toEqual({
+          mime_type: 'application/pdf',
+          data: Buffer.from('%PDF-1.4 fsh').toString('base64'),
+        });
+
+        const savedOnly = await request(app)
+          .post(`/api/v1/branch/patients/${patientId}/blood-work/read-report`)
+          .set(bearer(frontDesk))
+          .send({ recordFileIds: [fileId] });
+        expect(savedOnly.status).toBe(200);
+        expect(savedOnly.body.data.summary.files).toHaveLength(1);
+
+        const otherBranch = await request(app)
+          .post(`/api/v1/branch/patients/${patientId}/blood-work/read-report`)
+          .set(bearer(islamabadAdmin))
+          .send({ recordFileIds: [fileId] });
+        expect(otherBranch.status).toBe(404);
+
+        const nothing = await request(app)
+          .post(`/api/v1/branch/patients/${patientId}/blood-work/read-report`)
+          .set(bearer(frontDesk))
+          .send({});
+        expect(nothing.status).toBe(400);
+      } finally {
+        env.AI_PROVIDER = saved.provider;
+        env.GEMINI_API_KEY = saved.gemini;
+        env.GEMINI_FALLBACK_MODEL = saved.fallback;
+        fetchMock.mockRestore();
+      }
     });
 
     it('builds the patient timeline for a branch, and for every branch for super admin', async () => {

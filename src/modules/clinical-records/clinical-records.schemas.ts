@@ -269,6 +269,9 @@ registry.registerPath({
 });
 
 export const summaryParamsSchema = z.object({ id: z.uuid(), summaryId: z.uuid() });
+export const summaryFileParamsSchema = summaryParamsSchema.extend({
+  index: z.coerce.number().int().min(0).max(9),
+});
 
 export const reportSummarySchema = registry.register(
   'LabReportSummary',
@@ -276,6 +279,21 @@ export const reportSummarySchema = registry.register(
     id: z.uuid(),
     testDate: z.iso.date().nullable(),
     fileName: z.string().nullable(),
+    files: z
+      .array(
+        z.object({
+          index: z.number().int(),
+          name: z.string(),
+          contentType: z.string(),
+          sizeBytes: z.number().int(),
+          recordFileId: z.uuid().nullable(),
+          stored: z.boolean(),
+        }),
+      )
+      .openapi({
+        description:
+          'Reports read for this summary. A saved record file opens by recordFileId; an uploaded one through the summary file link when stored.',
+      }),
     valuesFound: z.number().int(),
     model: z.string().nullable(),
     createdAt: z.string(),
@@ -324,6 +342,23 @@ export const readReportSchema = registry.register(
   }),
 );
 
+export const readReportBodySchema = z.object({
+  recordFileIds: z
+    .preprocess(
+      (value) =>
+        value === undefined || value === ''
+          ? []
+          : Array.isArray(value)
+            ? value
+            : String(value)
+                .split(',')
+                .map((v) => v.trim())
+                .filter(Boolean),
+      z.array(z.uuid()).max(5),
+    )
+    .openapi({ description: 'Saved medical record files to read with the uploaded ones' }),
+});
+
 registry.registerPath({
   ...securedDocs('Clinical records'),
   method: 'get',
@@ -332,6 +367,21 @@ registry.registerPath({
   request: { params: idParamsSchema, query: branchQuerySchema },
   responses: {
     200: { description: 'Summaries', ...jsonContent(dataEnvelope(z.array(reportSummarySchema))) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...securedDocs('Clinical records'),
+  method: 'get',
+  path: '/branch/patients/{id}/report-summaries/{summaryId}/files/{index}/url',
+  summary: 'Short-lived link to a report uploaded with an AI summary',
+  request: { params: summaryFileParamsSchema, query: branchQuerySchema },
+  responses: {
+    200: {
+      description: 'Signed URL',
+      ...jsonContent(dataEnvelope(z.object({ url: z.string(), expiresIn: z.number() }))),
+    },
     ...errorResponses,
   },
 });
@@ -350,7 +400,7 @@ registry.registerPath({
   method: 'post',
   path: '/branch/patients/{id}/blood-work/read-report',
   summary:
-    'Read blood work values from an uploaded report (multipart "file" or up to 5 "files": PDFs or images) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.',
+    'Read blood work values with AI from up to 5 reports: uploaded ones (multipart "files": PDFs or images) and saved medical record files ("recordFileIds"). One clinical summary of all of them is saved on the patient with the uploaded files kept beside it. The values are not saved (the caller saves them).',
   request: { params: idParamsSchema, query: branchQuerySchema },
   responses: {
     200: { description: 'Values found', ...jsonContent(dataEnvelope(readReportSchema)) },

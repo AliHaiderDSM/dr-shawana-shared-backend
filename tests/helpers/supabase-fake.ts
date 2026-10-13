@@ -18,7 +18,7 @@ export class FakeSupabase {
   readonly users = new Map<string, FakeUser>();
   private readonly refreshTokens = new Map<string, string>();
   failNextCreate = false;
-  readonly objects = new Map<string, { contentType: string; size: number }>();
+  readonly objects = new Map<string, { contentType: string; size: number; body: Buffer }>();
   readonly missingBuckets = new Set<string>();
   readonly createdBuckets: { name: string; options: { public: boolean } }[] = [];
 
@@ -27,8 +27,14 @@ export class FakeSupabase {
     return {
       upload: async (path: string, body: Buffer, options: { contentType: string }) => {
         if (this.missingBuckets.has(name)) return { data: null, error: { message: 'Bucket not found' } };
-        this.objects.set(key(path), { contentType: options.contentType, size: body.length });
+        this.objects.set(key(path), { contentType: options.contentType, size: body.length, body });
         return { data: { path }, error: null };
+      },
+      download: async (path: string) => {
+        const object = this.objects.get(key(path));
+        return object
+          ? { data: new Blob([object.body], { type: object.contentType }), error: null }
+          : { data: null, error: { message: 'Object not found' } };
       },
       remove: async (paths: string[]) => {
         for (const path of paths) this.objects.delete(key(path));

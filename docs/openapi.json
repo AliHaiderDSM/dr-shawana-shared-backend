@@ -9974,6 +9974,45 @@
               "null"
             ]
           },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                },
+                "recordFileId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "stored": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "index",
+                "name",
+                "contentType",
+                "sizeBytes",
+                "recordFileId",
+                "stored"
+              ]
+            },
+            "description": "Reports read for this summary. A saved record file opens by recordFileId; an uploaded one through the summary file link when stored."
+          },
           "valuesFound": {
             "type": "integer"
           },
@@ -10118,6 +10157,7 @@
           "id",
           "testDate",
           "fileName",
+          "files",
           "valuesFound",
           "model",
           "createdAt",
@@ -38025,6 +38065,143 @@
         }
       }
     },
+    "/branch/patients/{id}/report-summaries/{summaryId}/files/{index}/url": {
+      "get": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Short-lived link to a report uploaded with an AI summary",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "summaryId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9
+            },
+            "required": false,
+            "name": "index",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "expiresIn": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresIn"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/patients/{id}/report-summaries/{summaryId}": {
       "delete": {
         "tags": [
@@ -38132,7 +38309,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Read blood work values from an uploaded report (multipart \"file\" or up to 5 \"files\": PDFs or images) with AI, and write a clinical summary of the whole report. The values are not saved (the caller saves them); the summary is saved on the patient.",
+        "summary": "Read blood work values with AI from up to 5 reports: uploaded ones (multipart \"files\": PDFs or images) and saved medical record files (\"recordFileIds\"). One clinical summary of all of them is saved on the patient with the uploaded files kept beside it. The values are not saved (the caller saves them).",
         "parameters": [
           {
             "schema": {

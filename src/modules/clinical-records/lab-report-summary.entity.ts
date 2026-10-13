@@ -11,6 +11,14 @@ export interface ReportSummary {
   documents?: { name: string; date: string | null; detail: string }[];
 }
 
+export interface SummaryFile {
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  recordFileId: string | null;
+  path: string | null;
+}
+
 @Entity('lab_report_summaries')
 @Index(['patientId', 'createdAt'])
 export class LabReportSummary extends BranchScopedEntity {
@@ -28,6 +36,9 @@ export class LabReportSummary extends BranchScopedEntity {
 
   @Column({ type: 'jsonb' })
   summary: ReportSummary;
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  files: SummaryFile[];
 
   @Column({ type: 'varchar', length: 80, nullable: true })
   model: string | null;

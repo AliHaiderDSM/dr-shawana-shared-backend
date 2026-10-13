@@ -76,6 +76,12 @@ export async function createSignedUrl(bucket: BucketName, objectPath: string, ex
   return { url: data.signedUrl, expiresIn: expiresInSeconds };
 }
 
+export async function downloadFile(bucket: BucketName, objectPath: string): Promise<Buffer> {
+  const { data, error } = await getSupabaseAdmin().storage.from(bucket).download(objectPath);
+  if (error || !data) throw AppError.badGateway('Could not open a saved file. Try again.');
+  return Buffer.from(await data.arrayBuffer());
+}
+
 export async function removeFiles(bucket: BucketName, paths: string[]): Promise<void> {
   if (paths.length === 0) return;
   const { error } = await getSupabaseAdmin().storage.from(bucket).remove(paths);

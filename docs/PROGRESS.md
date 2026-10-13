@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Read saved records with AI (2026-10-13)
+
+- `POST /branch/patients/:id/blood-work/read-report` takes `recordFileIds` (saved medical record files of this patient in this branch) next to uploaded `files`; up to 5 in total, 15 MB read together. Saved files are fetched from storage on the server.
+- Files uploaded from the device are not added to medical records. After a good read they are stored under `{branchId}/lab-reports/` in the medical-records bucket and listed on the summary (`files`: name, type, size, `recordFileId` for saved record files, `stored` for uploads). `GET /branch/patients/:id/report-summaries/:summaryId/files/:index/url` opens an uploaded one.
+- Migration `1792600000000-LabReportSummaryFiles`: `lab_report_summaries.files jsonb NOT NULL DEFAULT '[]'` (old summaries get an empty list and keep showing `fileName`).
+
 ## Report uploads take HEIC (2026-10-13)
 
 - read-report uses `reportFieldsUpload`: PDF, JPG, PNG, WebP and HEIC/HEIF, 10 MB per file, 5 files. HEIC goes to Gemini as is; with OpenAI it is refused with a clear message (OpenAI does not read HEIC).

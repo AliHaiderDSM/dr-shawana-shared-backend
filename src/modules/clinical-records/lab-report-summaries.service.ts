@@ -4,7 +4,8 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { auditService } from '../audit/audit.service';
 import { patientsService } from '../patients/patients.service';
-import { LabReportSummary } from './lab-report-summary.entity';
+import { createSignedUrl, BUCKETS } from '../../lib/storage';
+import { LabReportSummary, type SummaryFile } from './lab-report-summary.entity';
 import { type ReadReport } from './report-reader';
 
 const summaries = branchScopedRepository(LabReportSummary, 'ls');
@@ -21,6 +22,14 @@ async function toDtos(rows: LabReportSummary[]) {
     id: r.id,
     testDate: r.testDate,
     fileName: r.fileName,
+    files: (r.files ?? []).map((f, index) => ({
+      index,
+      name: f.name,
+      contentType: f.contentType,
+      sizeBytes: f.sizeBytes,
+      recordFileId: f.recordFileId,
+      stored: Boolean(f.path),
+    })),
     valuesFound: r.valuesFound,
     summary: r.summary,
     model: r.model,
@@ -30,12 +39,18 @@ async function toDtos(rows: LabReportSummary[]) {
 }
 
 export const labReportSummariesService = {
-  async save(actor: Actor, branchId: string, patientId: string, fileName: string | null, read: ReadReport) {
+  async save(actor: Actor, branchId: string, patientId: string, files: SummaryFile[], read: ReadReport) {
     if (!read.summary) return null;
+    const fileName =
+      files
+        .map((f) => f.name)
+        .filter(Boolean)
+        .join(', ') || null;
     const saved = await summaries.create(branchId, actor.userId, {
       patientId,
       testDate: read.testDate,
       fileName: fileName ? fileName.slice(0, 255) : null,
+      files,
       valuesFound: read.results.length,
       summary: read.summary,
       model: read.model.slice(0, 80),
@@ -60,6 +75,16 @@ export const labReportSummariesService = {
       .take(50)
       .getMany();
     return toDtos(rows);
+  },
+
+  async fileUrl(branchId: string, patientId: string, id: string, index: number) {
+    const row = await summaries
+      .query(branchId)
+      .andWhere('ls.id = :id AND ls.patientId = :patientId', { id, patientId })
+      .getOne();
+    const path = row?.files?.[index]?.path;
+    if (!path) throw AppError.notFound('Report file');
+    return createSignedUrl(BUCKETS.medicalRecords, path);
   },
 
   async remove(actor: Actor, branchId: string, patientId: string, id: string) {
