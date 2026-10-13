@@ -2,6 +2,7 @@ import { AppDataSource } from '../../database/data-source';
 import { repo } from '../../database/transaction';
 import { AppError } from '../../lib/errors';
 import { BUCKETS, createSignedUrl } from '../../lib/storage';
+import { today } from '../../lib/validation';
 import { medicalRecordsService } from '../clinical-records/clinical-records.service';
 import { companyService } from '../company/company.service';
 import { MedicalRecordFile } from '../medical-records/medical-record-file.entity';
@@ -39,10 +40,9 @@ const APPOINTMENT_SELECT = `
     LEFT JOIN consultations c ON c.appointment_id = a.id AND c.deleted_at IS NULL
    WHERE a.deleted_at IS NULL AND a.patient_id = $1`;
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
 
 function isUpcoming(row: { date: string; status: string }) {
-  return row.status === 'booked' && row.date >= todayIso();
+  return row.status === 'booked' && row.date >= today();
 }
 
 function toAppointment(row: AppointmentRow) {

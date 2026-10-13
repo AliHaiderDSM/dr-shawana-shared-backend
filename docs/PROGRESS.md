@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient mobile app API (2026-10-13)
+
+- Migration `1792700000000-PatientApp`: `patient_accounts` (scrypt password hash, lockout), `patient_activation_codes` (sha256 of a 6-digit code, 24 h, one use, 5 tries), `patient_sessions` (hashed refresh tokens, 60 days, rotated), `patient_requests` + `patient_request_events` (statuses submitted, in_review, in_progress, resolved, closed; number `CODE-PR-000001`), `medical_records.uploaded_by_patient`. RLS on every new table.
+- Module `modules/patient-app`. Patient routes under `/patient/*` use their own signed access token (15 min) checked against a live session; staff tokens are refused there and patient tokens on staff routes. Every patient route takes the patient from the token. Routes: auth (activate, login, refresh, logout, change-password), me, overview, appointments, history, prescriptions, documents (list, upload into medical records, 2-minute file link), requests. Requests go to the branch of the latest appointment.
+- Staff routes: `/branch/patients/:id/app-access` (status, `/code`, `/disable`, permission `patients.update` to change), `/branch/patient-requests` (list, one, PATCH status and reply). `patientRequests` added to `/branch/badges`.
+- Tests: `patient-app.test.ts` (8). Full suite 251 passing.
+
 ## Read saved records with AI (2026-10-13)
 
 - `POST /branch/patients/:id/blood-work/read-report` takes `recordFileIds` (saved medical record files of this patient in this branch) next to uploaded `files`; up to 5 in total, 15 MB read together. Saved files are fetched from storage on the server.
