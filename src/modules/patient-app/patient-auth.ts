@@ -122,6 +122,7 @@ export const patientAuth = {
         `UPDATE patient_sessions SET revoked_at = now() WHERE patient_id = $1 AND revoked_at IS NULL`,
         [patientId],
       );
+      await em.query(`DELETE FROM patient_push_tokens WHERE patient_id = $1`, [patientId]);
     });
   },
 
@@ -176,6 +177,7 @@ export const patientAuth = {
 
   async logout(sessionId: string) {
     await AppDataSource.query(`UPDATE patient_sessions SET revoked_at = now() WHERE id = $1`, [sessionId]);
+    await AppDataSource.query(`DELETE FROM patient_push_tokens WHERE session_id = $1`, [sessionId]);
   },
 };
 

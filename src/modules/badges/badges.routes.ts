@@ -7,6 +7,7 @@ import { securedDocs } from '../../lib/openapi-crud';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { pendingReceipts } from '../inventory/store-receipts';
+import { doctorChat } from '../chat/chat.service';
 import { patientRequestsService } from '../patient-app/patient-requests.service';
 
 export const badgesRouter = Router();
@@ -21,6 +22,7 @@ const countsSchema = registry.register(
     returns: z.number().int(),
     stockReceipts: z.number().int(),
     patientRequests: z.number().int(),
+    patientMessages: z.number().int(),
   }),
 );
 
@@ -74,6 +76,7 @@ badgesRouter.get(
         ),
       ]);
       sendOk(res, {
+        patientMessages: req.auth?.role === 'doctor' ? await doctorChat.unread(req.auth.userId) : 0,
         stockRequests,
         incomingStock,
         writeOffs,
@@ -103,6 +106,7 @@ badgesRouter.get(
         ),
       ]);
       sendOk(res, {
+        patientMessages: req.auth?.role === 'doctor' ? await doctorChat.unread(req.auth.userId) : 0,
         stockRequests: toSend,
         incomingStock: onTheWay,
         writeOffs: 0,
@@ -148,6 +152,7 @@ badgesRouter.get(
       ),
     ]);
     sendOk(res, {
+      patientMessages: req.auth?.role === 'doctor' ? await doctorChat.unread(req.auth.userId) : 0,
       stockRequests,
       incomingStock,
       writeOffs,

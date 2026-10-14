@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient and doctor chat (2026-10-14)
+
+- Migration `1792800000000-PatientChat`: `chat_conversations` (one per patient and doctor, last message, unread for each side), `chat_messages` (text and/or one PDF or photo in the medical-records bucket under chat/), `patient_push_tokens`. RLS on.
+- Patient (`/patient/chats`, `/patient/chats/unread`, `/patient/chats/:doctorId/messages` GET/POST, `.../:messageId/file`, `/patient/push-token`): any doctor the patient had an appointment with; others are 404.
+- Doctor only (`/branch/chats`, `/branch/chats/:conversationId/messages` GET/POST, `.../file`): other roles get 403, other doctors 404. A doctor reply sends an Expo push (text: "You have a new message from your doctor", no medical content). `patientMessages` added to `/branch/badges` for doctors. Logout and turning off app access delete push tokens.
+- Tests: `chat.test.ts` (5). Full suite 257 passing.
+
 ## Catalog for the Super Admin, inventory report booked/total, sale amounts (2026-10-14)
 
 - Catalog (categories, products incl. purchase entries and images, bundles, suppliers) is managed by the Super Admin only: branch admin and accountant keep view. Lab Officer keeps adding suppliers. Tests create catalog through the Super Admin with ?branchId=.
