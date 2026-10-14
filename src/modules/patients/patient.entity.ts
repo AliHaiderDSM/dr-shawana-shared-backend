@@ -39,6 +39,9 @@ export class Patient extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   address: string | null;
 
+  @Column({ name: 'app_updated_at', type: 'timestamptz', nullable: true })
+  appUpdatedAt: Date | null;
+
   @Index()
   @Column({
     name: 'bhrt_status',

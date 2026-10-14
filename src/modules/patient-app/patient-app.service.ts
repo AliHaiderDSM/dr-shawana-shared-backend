@@ -8,6 +8,7 @@ import { companyService } from '../company/company.service';
 import { MedicalRecordFile } from '../medical-records/medical-record-file.entity';
 import { Patient } from '../patients/patient.entity';
 import { Prescription } from '../prescriptions/prescription.entity';
+import { auditService } from '../audit/audit.service';
 import { patientRequestsService } from './patient-requests.service';
 
 interface AppointmentRow {
@@ -156,6 +157,40 @@ export const patientAppService = {
       country: patient.country,
       clinic: company ? { name: company.name, phone: company.phone, address: company.address } : null,
     };
+  },
+
+  async updateMe(
+    patientId: string,
+    input: {
+      name?: string;
+      city?: string;
+      country?: string | null;
+      age?: number | null;
+      dateOfBirth?: string | null;
+    },
+  ) {
+    const patients = repo(Patient);
+    const patient = await patients.findOne({ where: { id: patientId } });
+    if (!patient) throw AppError.unauthorized();
+    const before = {
+      name: patient.name,
+      city: patient.city,
+      country: patient.country,
+      age: patient.age,
+      dateOfBirth: patient.dateOfBirth,
+    };
+    const changes = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+    await patients.update({ id: patientId }, { ...changes, appUpdatedAt: new Date() });
+    await auditService.record({
+      actor: null,
+      branchId: patient.createdInBranchId,
+      action: 'update_from_app',
+      entity: 'patient',
+      entityId: patientId,
+      before,
+      after: changes,
+    });
+    return this.me(patientId);
   },
 
   async overview(patientId: string) {

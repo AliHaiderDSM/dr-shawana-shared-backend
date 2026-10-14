@@ -80,6 +80,10 @@ export const patientSchema = registry.register(
     dateOfBirth: z.iso.date().nullable(),
     country: z.string().nullable(),
     address: z.string().nullable(),
+    appUpdatedAt: z.iso
+      .datetime()
+      .nullable()
+      .openapi({ description: 'Last time the patient edited the profile in the mobile app' }),
     bhrtStatus: z.enum(BHRT_STATUSES),
     createdInBranchId: z.uuid().nullable(),
     createdBy: z.uuid().nullable(),

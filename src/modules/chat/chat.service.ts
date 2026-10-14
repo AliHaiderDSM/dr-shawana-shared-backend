@@ -217,6 +217,17 @@ export const patientChat = {
     return fileUrl(conversation.id, messageId);
   },
 
+  async files(patientId: string, doctorId: string) {
+    if (!(await patientHasDoctor(patientId, doctorId))) throw AppError.notFound('Doctor');
+    const rows = (await AppDataSource.query(
+      `${MESSAGE_SELECT} JOIN chat_conversations c ON c.id = m.conversation_id
+        WHERE c.patient_id = $1 AND c.doctor_id = $2 AND m.file_path IS NOT NULL
+        ORDER BY m.created_at DESC LIMIT 200`,
+      [patientId, doctorId],
+    )) as MessageRow[];
+    return rows.map(toMessage);
+  },
+
   async savePushToken(patientId: string, sessionId: string, token: string, platform: string | null) {
     await AppDataSource.query(
       `INSERT INTO patient_push_tokens (patient_id, session_id, token, platform) VALUES ($1, $2, $3, $4)

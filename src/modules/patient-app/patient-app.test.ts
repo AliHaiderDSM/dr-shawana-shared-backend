@@ -125,6 +125,22 @@ describe('patient app', () => {
     expect((await asPatient('get', `/branch/patients/${patientId}`)).status).toBe(401);
   });
 
+  it('lets the patient edit the profile and marks it as changed in the app', async () => {
+    expect((await asPatient('patch', '/patient/me').send({})).status).toBe(400);
+    const edited = await asPatient('patch', '/patient/me').send({
+      name: 'Ayesha Khan',
+      city: 'Karachi',
+      age: 46,
+      phone: '03009999999',
+    });
+    expect(edited.status).toBe(200);
+    expect(edited.body.data).toMatchObject({ name: 'Ayesha Khan', city: 'Karachi', age: 46 });
+    const seen = (await staff('get', `/branch/patients/${patientId}`, frontDesk)).body.data;
+    expect(seen).toMatchObject({ name: 'Ayesha Khan', city: 'Karachi', appUpdatedAt: expect.any(String) });
+    expect(seen.phone).not.toContain('9999999');
+    await asPatient('patch', '/patient/me').send({ name: 'Ayesha', city: 'Lahore' });
+  });
+
   it('shows only the patient own data', async () => {
     const me = await asPatient('get', '/patient/me');
     expect(me.body.data).toMatchObject({ id: patientId, name: 'Ayesha', phone: expect.any(String) });

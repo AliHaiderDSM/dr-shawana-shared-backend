@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient profile edits and chat files (2026-10-14)
+
+- Migration `1792900000000-PatientAppProfile`: `patients.app_updated_at`. `PATCH /patient/me` lets the patient change name, city, country, age and date of birth (not the phone); it stamps `app_updated_at` and writes an audit entry (`update_from_app`).
+- `GET /patient/chats/:doctorId/files`: only the files shared in that chat.
+- Full suite 258 passing.
+
 ## Patient and doctor chat (2026-10-14)
 
 - Migration `1792800000000-PatientChat`: `chat_conversations` (one per patient and doctor, last message, unread for each side), `chat_messages` (text and/or one PDF or photo in the medical-records bucket under chat/), `patient_push_tokens`. RLS on.

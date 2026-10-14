@@ -95,6 +95,11 @@ describe('patient and doctor chat', () => {
       .attach('file', Buffer.from('%PDF-1.4'), { filename: 'tsh.pdf', contentType: 'application/pdf' });
     expect(withFile.status).toBe(201);
     expect(withFile.body.data.file).toEqual({ name: 'tsh.pdf', type: 'application/pdf', size: 8 });
+    const files = await patient('get', `/patient/chats/${doctorId}/files`);
+    expect(files.body.data).toEqual([
+      expect.objectContaining({ id: withFile.body.data.id, sender: 'patient' }),
+    ]);
+    expect((await patient('get', `/patient/chats/${otherDoctorId}/files`)).status).toBe(404);
     const url = await patient('get', `/patient/chats/${doctorId}/messages/${withFile.body.data.id}/file`);
     expect(url.status).toBe(200);
   });

@@ -30,6 +30,19 @@ export const patientRefreshSchema = registry.register(
   z.object({ refreshToken: z.string().min(20).max(200) }),
 );
 
+export const updatePatientProfileSchema = registry.register(
+  'UpdatePatientProfile',
+  z
+    .object({
+      name: z.string().trim().min(1, 'Enter your name').max(150).optional(),
+      city: z.string().trim().min(1, 'Enter your city').max(100).optional(),
+      country: z.string().trim().max(100).nullable().optional(),
+      age: z.number().int().min(1).max(120).nullable().optional(),
+      dateOfBirth: z.iso.date().nullable().optional(),
+    })
+    .refine((v) => Object.values(v).some((x) => x !== undefined), 'Change at least one field'),
+);
+
 export const createPatientRequestSchema = registry.register(
   'CreatePatientRequest',
   z.object({
@@ -139,6 +152,15 @@ registry.registerPath({
   path: '/patient/auth/logout',
   summary: 'End this device session',
   responses: { 204: { description: 'Logged out' }, ...errorResponses },
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'patch',
+  path: '/patient/me',
+  summary:
+    'The patient edits name, city, country, age or date of birth (not the phone). Marks the patient as updated from the app.',
+  request: jsonBody(updatePatientProfileSchema),
+  responses: ok('Profile'),
 });
 for (const [path, summary] of [
   ['/patient/me', 'Own profile and clinic contact'],

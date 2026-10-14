@@ -18,6 +18,7 @@ import {
   patientLoginSchema,
   patientRefreshSchema,
   patientRequestListQuerySchema,
+  updatePatientProfileSchema,
   updatePatientRequestSchema,
   uploadDocumentFieldsSchema,
 } from './patient-app.schemas';
@@ -71,6 +72,10 @@ patientAppRouter.use('/patient', (req, res, next) => {
 
 patientAppRouter.get('/patient/me', async (req, res) => {
   sendOk(res, await patientAppService.me(patientId(req)));
+});
+
+patientAppRouter.patch('/patient/me', validate({ body: updatePatientProfileSchema }), async (req, res) => {
+  sendOk(res, await patientAppService.updateMe(patientId(req), validBody(req, updatePatientProfileSchema)));
 });
 
 patientAppRouter.get('/patient/overview', async (req, res) => {

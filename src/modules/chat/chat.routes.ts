@@ -96,6 +96,14 @@ registry.registerPath({
 });
 registry.registerPath({
   ...patientDocs,
+  method: 'get',
+  path: '/patient/chats/{doctorId}/files',
+  summary: 'Files shared with one doctor, newest first (both sides)',
+  request: { params: doctorParams },
+  responses: ok('Files', z.array(message)),
+});
+registry.registerPath({
+  ...patientDocs,
   method: 'post',
   path: '/patient/push-token',
   summary: 'Save the Expo push token of this phone for message notifications',
@@ -189,6 +197,16 @@ chatRouter.post(
         req.file,
       ),
     );
+  },
+);
+
+chatRouter.get(
+  '/patient/chats/:doctorId/files',
+  authenticatePatient,
+  validate({ params: doctorParams }),
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    sendOk(res, await patientChat.files(patientOf(req).patientId, validParams(req, doctorParams).doctorId));
   },
 );
 
