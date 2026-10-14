@@ -1,6 +1,7 @@
 import multer from 'multer';
 import { type Request, type RequestHandler } from 'express';
 import { AppError } from './errors';
+import { AUDIO_TYPES } from './storage';
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const DOCUMENT_TYPES = [...IMAGE_TYPES, 'application/pdf'];
@@ -27,6 +28,9 @@ export const documentFieldsUpload = (fields: { name: string; maxCount: number }[
 
 export const reportFieldsUpload = (fields: { name: string; maxCount: number }[]): RequestHandler =>
   upload([...DOCUMENT_TYPES, 'image/heic', 'image/heif'], 10 * MB).fields(fields);
+
+export const patientChatUpload = (field: string): RequestHandler =>
+  upload([...IMAGE_TYPES, ...AUDIO_TYPES], 10 * MB).single(field);
 
 export const documentUpload = (field: string): RequestHandler =>
   upload(DOCUMENT_TYPES, 10 * MB).single(field);

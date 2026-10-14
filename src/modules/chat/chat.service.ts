@@ -85,9 +85,13 @@ async function doctorConversation(staffId: string, conversationId: string) {
   return row;
 }
 
-function preview(body: string | null, fileName: string | null) {
+const isVoice = (type: string | null | undefined) => Boolean(type?.startsWith('audio/'));
+const VOICE_PREFIX = 'voice/';
+
+function preview(body: string | null, fileName: string | null, fileType: string | null) {
   const text = body?.trim();
   if (text) return text.slice(0, 200);
+  if (isVoice(fileType)) return 'Voice message';
   return `📎 ${fileName ?? 'File'}`.slice(0, 200);
 }
 
@@ -100,7 +104,11 @@ async function send(
 ) {
   const text = body?.trim() || null;
   if (!text && !file) throw AppError.badRequest('Write a message or attach a file');
-  const uploaded = file ? await uploadMany(BUCKETS.medicalRecords, `chat/${conversationId}`, [file]) : [];
+  const uploaded = !file
+    ? []
+    : isVoice(file.mimetype)
+      ? await uploadMany(BUCKETS.chatVoice, `${VOICE_PREFIX}${conversationId}`, [file])
+      : await uploadMany(BUCKETS.medicalRecords, `chat/${conversationId}`, [file]);
   const stored = uploaded[0];
   try {
     const row = await withTransaction(async (em) => {
@@ -124,7 +132,7 @@ async function send(
         `UPDATE chat_conversations SET last_message_at = now(), last_message_preview = $2, updated_at = now(),
            ${sender === 'patient' ? 'doctor_unread = doctor_unread + 1' : 'patient_unread = patient_unread + 1'}
          WHERE id = $1`,
-        [conversationId, preview(text, stored?.originalName ?? null)],
+        [conversationId, preview(text, stored?.originalName ?? null, stored?.contentType ?? null)],
       );
       return created!;
     });
@@ -141,7 +149,8 @@ async function fileUrl(conversationId: string, messageId: string) {
     [messageId, conversationId],
   )) as { filePath: string | null }[];
   if (!row?.filePath) throw AppError.notFound('File');
-  return createSignedUrl(BUCKETS.medicalRecords, row.filePath, 120);
+  const bucket = row.filePath.startsWith(VOICE_PREFIX) ? BUCKETS.chatVoice : BUCKETS.medicalRecords;
+  return createSignedUrl(bucket, row.filePath, 600);
 }
 
 export const patientChat = {
@@ -222,6 +231,7 @@ export const patientChat = {
     const rows = (await AppDataSource.query(
       `${MESSAGE_SELECT} JOIN chat_conversations c ON c.id = m.conversation_id
         WHERE c.patient_id = $1 AND c.doctor_id = $2 AND m.file_path IS NOT NULL
+          AND m.file_type NOT LIKE 'audio/%'
         ORDER BY m.created_at DESC LIMIT 200`,
       [patientId, doctorId],
     )) as MessageRow[];

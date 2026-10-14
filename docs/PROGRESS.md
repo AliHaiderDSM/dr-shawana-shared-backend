@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Chat: patient photos and voice notes only (2026-10-14)
+
+Patients can now send only photos (JPG, PNG, WebP) or voice notes (M4A/AAC/MP3/WebM/OGG, 10 MB) in chat; PDFs from the patient are rejected with 400. Doctors can still send PDFs and photos. Voice notes go to a new private bucket `chat-voice` under `voice/<conversationId>/`; the bucket is created automatically on the first upload (or run the storage setup script). Signed links are now 10 minutes so audio can stream. Voice notes are left out of the shared files list, and the conversation preview reads "Voice message". No migration needed.
+
 ## Patient profile edits and chat files (2026-10-14)
 
 - Migration `1792900000000-PatientAppProfile`: `patients.app_updated_at`. `PATCH /patient/me` lets the patient change name, city, country, age and date of birth (not the phone); it stamps `app_updated_at` and writes an audit entry (`update_from_app`).

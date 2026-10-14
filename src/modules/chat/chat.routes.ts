@@ -13,7 +13,7 @@ import {
 } from '../../lib/http';
 import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
-import { documentUpload } from '../../lib/upload';
+import { documentUpload, patientChatUpload } from '../../lib/upload';
 import { authenticate } from '../../middleware/auth';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import { authenticatePatient, patientOf } from '../patient-app/patient-auth';
@@ -62,6 +62,8 @@ const ok = (description: string, schema: z.ZodType) => ({
   ...errorResponses,
 });
 const upload = 'Send text in "body" and/or one PDF or photo (JPG, PNG, WebP, 10 MB) in "file" (multipart).';
+const patientUpload =
+  'Send text in "body" and/or one photo (JPG, PNG, WebP) or voice note (M4A, AAC, MP3, WebM, OGG) up to 10 MB in "file" (multipart).';
 
 registry.registerPath({
   ...patientDocs,
@@ -82,7 +84,7 @@ registry.registerPath({
   ...patientDocs,
   method: 'post',
   path: '/patient/chats/{doctorId}/messages',
-  summary: `Message a doctor the patient has seen. ${upload}`,
+  summary: `Message a doctor the patient has seen. ${patientUpload}`,
   request: { params: doctorParams },
   responses: { 201: { description: 'Sent', ...jsonContent(dataEnvelope(message)) }, ...errorResponses },
 });
@@ -90,7 +92,7 @@ registry.registerPath({
   ...patientDocs,
   method: 'get',
   path: '/patient/chats/{doctorId}/messages/{messageId}/file',
-  summary: 'Two-minute link to a file in the chat',
+  summary: 'Ten-minute link to a file or voice note in the chat',
   request: { params: doctorFileParams },
   responses: ok('Signed URL', signed),
 });
@@ -98,7 +100,7 @@ registry.registerPath({
   ...patientDocs,
   method: 'get',
   path: '/patient/chats/{doctorId}/files',
-  summary: 'Files shared with one doctor, newest first (both sides)',
+  summary: 'Files shared with one doctor, newest first (both sides, without voice notes)',
   request: { params: doctorParams },
   responses: ok('Files', z.array(message)),
 });
@@ -137,7 +139,7 @@ registry.registerPath({
   ...doctorDocs,
   method: 'get',
   path: '/branch/chats/{conversationId}/messages/{messageId}/file',
-  summary: 'Doctor only: two-minute link to a file in the chat',
+  summary: 'Doctor only: ten-minute link to a file or voice note in the chat',
   request: { params: conversationFileParams },
   responses: ok('Signed URL', signed),
 });
@@ -184,7 +186,7 @@ chatRouter.post(
   '/patient/chats/:doctorId/messages',
   authenticatePatient,
   messageLimiter,
-  documentUpload('file'),
+  patientChatUpload('file'),
   validate({ params: doctorParams, body: messageBody }),
   async (req, res) => {
     const { doctorId } = validParams(req, doctorParams);

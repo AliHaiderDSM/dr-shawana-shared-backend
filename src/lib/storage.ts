@@ -9,12 +9,23 @@ export const BUCKETS = {
   paymentProofs: 'payment-proofs',
   medicalRecords: 'medical-records',
   doctorSignatures: 'doctor-signatures',
+  chatVoice: 'chat-voice',
 } as const;
 export type BucketName = (typeof BUCKETS)[keyof typeof BUCKETS];
 
 const MB = 1024 * 1024;
 const IMAGES = ['image/jpeg', 'image/png', 'image/webp'];
 const DOCUMENTS = [...IMAGES, 'application/pdf'];
+export const AUDIO_TYPES = [
+  'audio/mp4',
+  'audio/m4a',
+  'audio/x-m4a',
+  'audio/aac',
+  'audio/mpeg',
+  'audio/webm',
+  'audio/ogg',
+  'audio/3gpp',
+];
 
 export const BUCKET_SETTINGS: Record<
   BucketName,
@@ -25,6 +36,7 @@ export const BUCKET_SETTINGS: Record<
   [BUCKETS.paymentProofs]: { public: false, fileSizeLimit: 10 * MB, allowedMimeTypes: DOCUMENTS },
   [BUCKETS.doctorSignatures]: { public: false, fileSizeLimit: 2 * MB, allowedMimeTypes: IMAGES },
   [BUCKETS.medicalRecords]: { public: false, fileSizeLimit: 10 * MB, allowedMimeTypes: DOCUMENTS },
+  [BUCKETS.chatVoice]: { public: false, fileSizeLimit: 10 * MB, allowedMimeTypes: AUDIO_TYPES },
 };
 
 const isMissingBucket = (message: string) => /bucket not found/i.test(message);

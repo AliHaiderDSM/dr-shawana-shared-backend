@@ -37818,7 +37818,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Message a doctor the patient has seen. Send text in \"body\" and/or one PDF or photo (JPG, PNG, WebP, 10 MB) in \"file\" (multipart).",
+        "summary": "Message a doctor the patient has seen. Send text in \"body\" and/or one photo (JPG, PNG, WebP) or voice note (M4A, AAC, MP3, WebM, OGG) up to 10 MB in \"file\" (multipart).",
         "parameters": [
           {
             "schema": {
@@ -37912,7 +37912,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Two-minute link to a file in the chat",
+        "summary": "Ten-minute link to a file or voice note in the chat",
         "parameters": [
           {
             "schema": {
@@ -38027,7 +38027,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Files shared with one doctor, newest first (both sides)",
+        "summary": "Files shared with one doctor, newest first (both sides, without voice notes)",
         "parameters": [
           {
             "schema": {
@@ -38497,7 +38497,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Doctor only: two-minute link to a file in the chat",
+        "summary": "Doctor only: ten-minute link to a file or voice note in the chat",
         "parameters": [
           {
             "schema": {

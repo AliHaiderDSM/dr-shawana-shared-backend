@@ -77,7 +77,7 @@ describe('patient and doctor chat', () => {
     expect((await patient('get', `/patient/chats/${otherDoctorId}/messages`)).status).toBe(404);
   });
 
-  it('lets the patient write and attach a report', async () => {
+  it('lets the patient write, send a photo and a voice note, but not a PDF', async () => {
     expect((await patient('post', `/patient/chats/${doctorId}/messages`).send({ body: '  ' })).status).toBe(
       400,
     );
@@ -90,11 +90,29 @@ describe('patient and doctor chat', () => {
       body: 'My hot flushes are better',
       file: null,
     });
+    const pdf = await patient('post', `/patient/chats/${doctorId}/messages`).attach(
+      'file',
+      Buffer.from('%PDF-1.4'),
+      { filename: 'tsh.pdf', contentType: 'application/pdf' },
+    );
+    expect(pdf.status).toBe(400);
     const withFile = await patient('post', `/patient/chats/${doctorId}/messages`)
       .field('body', 'New report')
-      .attach('file', Buffer.from('%PDF-1.4'), { filename: 'tsh.pdf', contentType: 'application/pdf' });
+      .attach('file', Buffer.from('fakejpeg'), { filename: 'tsh.jpg', contentType: 'image/jpeg' });
     expect(withFile.status).toBe(201);
-    expect(withFile.body.data.file).toEqual({ name: 'tsh.pdf', type: 'application/pdf', size: 8 });
+    expect(withFile.body.data.file).toEqual({ name: 'tsh.jpg', type: 'image/jpeg', size: 8 });
+    const voice = await patient('post', `/patient/chats/${doctorId}/messages`).attach(
+      'file',
+      Buffer.from('fakeaudio'),
+      { filename: 'voice.m4a', contentType: 'audio/mp4' },
+    );
+    expect(voice.status).toBe(201);
+    expect(voice.body.data).toMatchObject({
+      body: null,
+      file: { name: 'voice.m4a', type: 'audio/mp4', size: 9 },
+    });
+    const voiceUrl = await patient('get', `/patient/chats/${doctorId}/messages/${voice.body.data.id}/file`);
+    expect(voiceUrl.status).toBe(200);
     const files = await patient('get', `/patient/chats/${doctorId}/files`);
     expect(files.body.data).toEqual([
       expect.objectContaining({ id: withFile.body.data.id, sender: 'patient' }),
@@ -109,14 +127,14 @@ describe('patient and doctor chat', () => {
       expect((await staff('get', '/branch/chats', who)).status).toBe(403);
     }
     expect((await staff('get', '/branch/chats', otherDoctorUser)).body.data).toEqual([]);
-    expect((await staff('get', '/branch/badges', doctorUser)).body.data.patientMessages).toBe(2);
+    expect((await staff('get', '/branch/badges', doctorUser)).body.data.patientMessages).toBe(3);
 
     const list = await staff('get', '/branch/chats', doctorUser);
     expect(list.body.data).toEqual([
       expect.objectContaining({
         patient: expect.objectContaining({ id: patientId }),
-        unread: 2,
-        lastMessage: 'New report',
+        unread: 3,
+        lastMessage: 'Voice message',
       }),
     ]);
     conversationId = list.body.data[0].id;
@@ -128,6 +146,7 @@ describe('patient and doctor chat', () => {
     expect(thread.body.data.items.map((m: { body: string }) => m.body)).toEqual([
       'My hot flushes are better',
       'New report',
+      null,
     ]);
     expect((await staff('get', '/branch/badges', doctorUser)).body.data.patientMessages).toBe(0);
   });
