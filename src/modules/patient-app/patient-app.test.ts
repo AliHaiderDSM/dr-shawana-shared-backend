@@ -2,7 +2,6 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
-import { hashPassword, verifyPassword } from './patient-auth';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -27,6 +26,8 @@ describe('patient app', () => {
     request(app)
       [method](`/api/v1${path}`)
       .set({ Authorization: `Bearer ${token}` });
+  const loginWith = (phone: string, code: string) =>
+    request(app).post('/api/v1/patient/auth/login').send({ phone, code });
   const issueCode = async (id: string) =>
     (await staff('post', `/branch/patients/${id}/app-access/code`, frontDesk)).body.data as {
       code: string;
@@ -85,22 +86,11 @@ describe('patient app', () => {
     otherPrescriptionId = await prescribe(otherAppointment);
   });
 
-  it('hashes passwords with scrypt', async () => {
-    const hash = await hashPassword('secret123');
-    expect(hash.startsWith('scrypt$')).toBe(true);
-    expect(hash).not.toContain('secret123');
-    expect(await verifyPassword('secret123', hash)).toBe(true);
-    expect(await verifyPassword('wrong', hash)).toBe(false);
-  });
-
-  it('lets the clinic issue a one-time code and the patient activate the app with it', async () => {
+  it('logs the patient in with the phone number and a one-time code from the clinic', async () => {
     expect((await staff('get', `/branch/patients/${patientId}/app-access`, frontDesk)).body.data.status).toBe(
       'not_invited',
     );
-    const login = await request(app)
-      .post('/api/v1/patient/auth/login')
-      .send({ phone: '03001112233', password: 'abc12345' });
-    expect(login.status).toBe(401);
+    expect((await loginWith('03001112233', '123456')).status).toBe(401);
 
     const { code } = await issueCode(patientId);
     expect(code).toMatch(/^\d{6}$/);
@@ -108,37 +98,21 @@ describe('patient app', () => {
       'invited',
     );
 
-    const wrong = await request(app)
-      .post('/api/v1/patient/auth/activate')
-      .send({ phone: '03001112233', code: code === '000000' ? '111111' : '000000', password: 'abc12345' });
-    expect(wrong.status).toBe(400);
-    const otherPhone = await request(app)
-      .post('/api/v1/patient/auth/activate')
-      .send({ phone: '03004445566', code, password: 'abc12345' });
-    expect(otherPhone.status).toBe(400);
-    const weak = await request(app)
-      .post('/api/v1/patient/auth/activate')
-      .send({ phone: '03001112233', code, password: 'short' });
-    expect(weak.status).toBe(400);
-
-    const activated = await request(app)
-      .post('/api/v1/patient/auth/activate')
-      .send({ phone: '+92 300 1112233', code, password: 'abc12345', device: 'Pixel' });
-    expect(activated.status).toBe(200);
-    expect(activated.body.data).toMatchObject({
-      accessToken: expect.any(String),
-      refreshToken: expect.any(String),
-    });
-    const reused = await request(app)
-      .post('/api/v1/patient/auth/activate')
-      .send({ phone: '03001112233', code, password: 'abc12345' });
-    expect(reused.status).toBe(400);
+    expect((await loginWith('03001112233', code === '000000' ? '111111' : '000000')).status).toBe(401);
+    expect((await loginWith('03004445566', code)).status).toBe(401);
+    const withPassword = await request(app)
+      .post('/api/v1/patient/auth/login')
+      .send({ phone: '03001112233', password: 'abc12345' });
+    expect(withPassword.status).toBe(400);
+    expect((await request(app).post('/api/v1/patient/auth/activate').send({})).status).toBe(404);
 
     const ok = await request(app)
       .post('/api/v1/patient/auth/login')
-      .send({ phone: '03001112233', password: 'abc12345' });
+      .send({ phone: '+92 300 1112233', code, device: 'Pixel' });
     expect(ok.status).toBe(200);
+    expect(ok.body.data).toMatchObject({ accessToken: expect.any(String), refreshToken: expect.any(String) });
     session = ok.body.data;
+    expect((await loginWith('03001112233', code)).status).toBe(401);
     expect((await staff('get', `/branch/patients/${patientId}/app-access`, frontDesk)).body.data.status).toBe(
       'active',
     );
@@ -203,11 +177,7 @@ describe('patient app', () => {
     expect(bad.status).toBe(400);
 
     const { code } = await issueCode(otherPatientId);
-    const other = (
-      await request(app)
-        .post('/api/v1/patient/auth/activate')
-        .send({ phone: '03004445566', code, password: 'xyz12345' })
-    ).body.data;
+    const other = (await loginWith('03004445566', code)).body.data;
     expect((await asPatient('get', `/patient/documents/files/${fileId}/url`, other.accessToken)).status).toBe(
       404,
     );
@@ -271,34 +241,25 @@ describe('patient app', () => {
     expect((await asPatient('post', '/patient/auth/logout')).status).toBe(204);
     expect((await asPatient('get', '/patient/me')).status).toBe(401);
 
-    session = (
-      await request(app)
-        .post('/api/v1/patient/auth/login')
-        .send({ phone: '03001112233', password: 'abc12345' })
-    ).body.data;
+    session = (await loginWith('03001112233', (await issueCode(patientId)).code)).body.data;
+    expect(session.accessToken).toEqual(expect.any(String));
     const disabled = await staff('post', `/branch/patients/${patientId}/app-access/disable`, frontDesk);
     expect(disabled.body.data.status).toBe('disabled');
     expect((await asPatient('get', '/patient/me')).status).toBe(401);
-    const blocked = await request(app)
-      .post('/api/v1/patient/auth/login')
-      .send({ phone: '03001112233', password: 'abc12345' });
-    expect(blocked.status).toBe(403);
+    const old = await issueCode(patientId);
+    await staff('post', `/branch/patients/${patientId}/app-access/disable`, frontDesk);
+    expect((await loginWith('03001112233', old.code)).status).toBe(401);
+    const fresh = await issueCode(patientId);
+    expect((await loginWith('03001112233', fresh.code)).status).toBe(200);
+    expect((await staff('get', `/branch/patients/${patientId}/app-access`, frontDesk)).body.data.status).toBe(
+      'active',
+    );
   });
 
-  it('locks the account after five wrong passwords and resets the password with a new code', async () => {
+  it('stops a code after five wrong tries', async () => {
     const { code } = await issueCode(patientId);
-    const reset = await request(app)
-      .post('/api/v1/patient/auth/activate')
-      .send({ phone: '03001112233', code, password: 'new12345' });
-    expect(reset.status).toBe(200);
-    for (let i = 0; i < 5; i += 1) {
-      await request(app)
-        .post('/api/v1/patient/auth/login')
-        .send({ phone: '03001112233', password: 'nope1234' });
-    }
-    const locked = await request(app)
-      .post('/api/v1/patient/auth/login')
-      .send({ phone: '03001112233', password: 'new12345' });
-    expect(locked.status).toBe(429);
+    const wrong = code === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i += 1) expect((await loginWith('03001112233', wrong)).status).toBe(401);
+    expect((await loginWith('03001112233', code)).status).toBe(401);
   });
 });

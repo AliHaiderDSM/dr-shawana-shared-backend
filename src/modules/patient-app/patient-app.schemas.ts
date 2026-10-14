@@ -11,44 +11,23 @@ const phoneInput = z
   .min(7)
   .max(30)
   .refine((v) => normalizePhone(v) !== null, 'Enter a valid phone number, e.g. 03001234567');
-const newPassword = z
-  .string()
-  .min(8, 'Use at least 8 characters')
-  .max(72)
-  .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), 'Use letters and numbers');
 const device = z.string().trim().max(120).nullable().optional();
 
-export const patientActivateSchema = registry.register(
-  'PatientActivate',
+export const patientLoginSchema = registry.register(
+  'PatientLogin',
   z.object({
     phone: phoneInput,
     code: z
       .string()
       .trim()
       .regex(/^\d{6}$/, 'The code has 6 digits'),
-    password: newPassword,
     device,
   }),
-);
-
-export const patientLoginSchema = registry.register(
-  'PatientLogin',
-  z.object({ phone: phoneInput, password: z.string().min(1).max(72), device }),
 );
 
 export const patientRefreshSchema = registry.register(
   'PatientRefresh',
   z.object({ refreshToken: z.string().min(20).max(200) }),
-);
-
-export const patientChangePasswordSchema = registry.register(
-  'PatientChangePassword',
-  z
-    .object({ currentPassword: z.string().min(1).max(72), newPassword })
-    .refine((v) => v.currentPassword !== v.newPassword, {
-      message: 'New password must be different from the current one',
-      path: ['newPassword'],
-    }),
 );
 
 export const createPatientRequestSchema = registry.register(
@@ -140,17 +119,9 @@ const jsonBody = (schema: z.ZodType) => ({ body: { content: { 'application/json'
 registry.registerPath({
   ...appDocs,
   method: 'post',
-  path: '/patient/auth/activate',
-  summary:
-    'First sign-in with the 6-digit code from the clinic: sets the password and starts a session. Also used to reset a forgotten password with a new code.',
-  request: jsonBody(patientActivateSchema),
-  responses: ok('Session', sessionSchema),
-});
-registry.registerPath({
-  ...appDocs,
-  method: 'post',
   path: '/patient/auth/login',
-  summary: 'Patient login with phone and password. Five wrong passwords lock the account for 15 minutes.',
+  summary:
+    'Patient login with the phone number and the 6-digit code from the clinic. A code works once, for 24 hours, and stops after 5 wrong tries. The session then stays open while the app is used (60 days from the last use).',
   request: jsonBody(patientLoginSchema),
   responses: ok('Session', sessionSchema),
 });
@@ -168,14 +139,6 @@ registry.registerPath({
   path: '/patient/auth/logout',
   summary: 'End this device session',
   responses: { 204: { description: 'Logged out' }, ...errorResponses },
-});
-registry.registerPath({
-  ...patientDocs,
-  method: 'post',
-  path: '/patient/auth/change-password',
-  summary: 'Change password; other devices are signed out',
-  request: jsonBody(patientChangePasswordSchema),
-  responses: { 204: { description: 'Changed' }, ...errorResponses },
 });
 for (const [path, summary] of [
   ['/patient/me', 'Own profile and clinic contact'],
@@ -243,7 +206,7 @@ registry.registerPath({
   method: 'post',
   path: '/branch/patients/{id}/app-access/code',
   summary:
-    'Create a 6-digit activation code (valid 24 hours, one use) for the patient app. Earlier unused codes stop working. Shown once.',
+    'Create a 6-digit login code (valid 24 hours, one use) for the patient app. The patient logs in with the phone number and this code. Earlier unused codes stop working. Shown once.',
   request: { params: idParamsSchema, query: branchQuerySchema },
   responses: ok('Code', z.object({ code: z.string(), expiresAt: z.string() })),
 });

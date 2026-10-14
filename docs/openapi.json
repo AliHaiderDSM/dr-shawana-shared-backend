@@ -6810,7 +6810,7 @@
           "medicalRecords"
         ]
       },
-      "PatientActivate": {
+      "PatientLogin": {
         "type": "object",
         "properties": {
           "phone": {
@@ -6822,11 +6822,6 @@
             "type": "string",
             "pattern": "^\\d{6}$"
           },
-          "password": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 72
-          },
           "device": {
             "type": [
               "string",
@@ -6837,34 +6832,7 @@
         },
         "required": [
           "phone",
-          "code",
-          "password"
-        ]
-      },
-      "PatientLogin": {
-        "type": "object",
-        "properties": {
-          "phone": {
-            "type": "string",
-            "minLength": 7,
-            "maxLength": 30
-          },
-          "password": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 72
-          },
-          "device": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 120
-          }
-        },
-        "required": [
-          "phone",
-          "password"
+          "code"
         ]
       },
       "PatientRefresh": {
@@ -6878,25 +6846,6 @@
         },
         "required": [
           "refreshToken"
-        ]
-      },
-      "PatientChangePassword": {
-        "type": "object",
-        "properties": {
-          "currentPassword": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 72
-          },
-          "newPassword": {
-            "type": "string",
-            "minLength": 8,
-            "maxLength": 72
-          }
-        },
-        "required": [
-          "currentPassword",
-          "newPassword"
         ]
       },
       "CreatePatientRequest": {
@@ -35399,99 +35348,12 @@
         }
       }
     },
-    "/patient/auth/activate": {
-      "post": {
-        "tags": [
-          "Patient app"
-        ],
-        "summary": "First sign-in with the 6-digit code from the clinic: sets the password and starts a session. Also used to reset a forgotten password with a new code.",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PatientActivate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/PatientSession"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/patient/auth/login": {
       "post": {
         "tags": [
           "Patient app"
         ],
-        "summary": "Patient login with phone and password. Five wrong passwords lock the account for 15 minutes.",
+        "summary": "Patient login with the phone number and the 6-digit code from the clinic. A code works once, for 24 hours, and stops after 5 wrong tries. The session then stays open while the app is used (60 days from the last use).",
         "requestBody": {
           "content": {
             "application/json": {
@@ -35674,83 +35536,6 @@
         "responses": {
           "204": {
             "description": "Logged out"
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/patient/auth/change-password": {
-      "post": {
-        "tags": [
-          "Patient app"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Change password; other devices are signed out",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PatientChangePassword"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Changed"
           },
           "400": {
             "description": "Validation error",
@@ -36998,7 +36783,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Create a 6-digit activation code (valid 24 hours, one use) for the patient app. Earlier unused codes stop working. Shown once.",
+        "summary": "Create a 6-digit login code (valid 24 hours, one use) for the patient app. The patient logs in with the phone number and this code. Earlier unused codes stop working. Shown once.",
         "parameters": [
           {
             "schema": {

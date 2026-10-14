@@ -14,8 +14,6 @@ import { patientsService } from '../patients/patients.service';
 import { authenticatePatient, patientAuth, patientOf } from './patient-auth';
 import {
   createPatientRequestSchema,
-  patientActivateSchema,
-  patientChangePasswordSchema,
   patientFileParamsSchema,
   patientLoginSchema,
   patientRefreshSchema,
@@ -43,20 +41,11 @@ const byId = validate({ params: idParamsSchema });
 const patientId = (req: Parameters<typeof patientOf>[0]) => patientOf(req).patientId;
 
 patientAppRouter.post(
-  '/patient/auth/activate',
-  credentialLimiter,
-  validate({ body: patientActivateSchema }),
-  async (req, res) => {
-    sendOk(res, await patientAuth.activate(validBody(req, patientActivateSchema)));
-  },
-);
-
-patientAppRouter.post(
   '/patient/auth/login',
   credentialLimiter,
   validate({ body: patientLoginSchema }),
   async (req, res) => {
-    sendOk(res, await patientAuth.login(validBody(req, patientLoginSchema)));
+    sendOk(res, await patientAuth.loginWithCode(validBody(req, patientLoginSchema)));
   },
 );
 
@@ -73,19 +62,6 @@ patientAppRouter.post('/patient/auth/logout', authenticatePatient, async (req, r
   await patientAuth.logout(patientOf(req).sessionId);
   sendNoContent(res);
 });
-
-patientAppRouter.post(
-  '/patient/auth/change-password',
-  authenticatePatient,
-  credentialLimiter,
-  validate({ body: patientChangePasswordSchema }),
-  async (req, res) => {
-    const { currentPassword, newPassword } = validBody(req, patientChangePasswordSchema);
-    const session = patientOf(req);
-    await patientAuth.changePassword(session.patientId, session.sessionId, currentPassword, newPassword);
-    sendNoContent(res);
-  },
-);
 
 patientAppRouter.use('/patient', (req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');

@@ -40,7 +40,6 @@ const APPOINTMENT_SELECT = `
     LEFT JOIN consultations c ON c.appointment_id = a.id AND c.deleted_at IS NULL
    WHERE a.deleted_at IS NULL AND a.patient_id = $1`;
 
-
 function isUpcoming(row: { date: string; status: string }) {
   return row.status === 'booked' && row.date >= today();
 }

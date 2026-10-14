@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient app: code-only login (2026-10-14)
+
+- `POST /patient/auth/login` now takes phone + 6-digit clinic code (one use, 24 h, 5 wrong tries). `/patient/auth/activate` and `/patient/auth/change-password` are removed; no passwords are hashed or stored for patients (the `password_hash` column stays unused). A new code also re-enables access that was turned off.
+
 ## Dispatcher limits and stock out report (2026-10-13)
 - Stock out of the Super Admin stock: Warehouse Keeper only (the Super Admin no longer sends; 403 "Only the Warehouse Keeper sends stock out"). Tests send through a keeper.
 - Dispatcher, like Store Keeper, can be created only in the Dispatch Department (422 elsewhere). Existing dispatchers in other branches are not changed by this.
