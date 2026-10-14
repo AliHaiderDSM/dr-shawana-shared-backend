@@ -14,6 +14,7 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
   let frontDesk: { id: string };
   let deliveryPrint: { id: string };
   let islamabadAdmin: { id: string };
+  let superAdmin: { id: string };
   let lahoreId: string;
   let productId: string;
   let otherProductId: string;
@@ -22,6 +23,9 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
 
   const post = (path: string, body: object, who = admin) =>
     request(app).post(`/api/v1${path}`).set(bearer(who)).send(body);
+
+  const catalog = (path: string, body: object) =>
+    request(app).post(`/api/v1${path}?branchId=${lahoreId}`).set(bearer(superAdmin)).send(body);
 
   async function balance(id = productId, who = admin) {
     const res = await request(app).get('/api/v1/branch/inventory/stock?pageSize=100').set(bearer(who));
@@ -36,17 +40,18 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahoreId });
     deliveryPrint = await createStaff(fake, { role: 'delivery_print', branchId: lahoreId });
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
+    superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
 
-    const categoryId = (await post('/branch/categories', { name: 'Serums' })).body.data.id;
+    const categoryId = (await catalog('/branch/categories', { name: 'Serums' })).body.data.id;
     productId = (
-      await post('/branch/products', { name: 'Vitamin C Serum', categoryId, lowStockThreshold: '5' })
+      await catalog('/branch/products', { name: 'Vitamin C Serum', categoryId, lowStockThreshold: '5' })
     ).body.data.id;
-    otherProductId = (await post('/branch/products', { name: 'Toner', categoryId })).body.data.id;
+    otherProductId = (await catalog('/branch/products', { name: 'Toner', categoryId })).body.data.id;
     supplierId = (
-      await post('/branch/suppliers', { name: 'Falcon', phone: '923001234567', type: 'supplier' })
+      await catalog('/branch/suppliers', { name: 'Falcon', phone: '923001234567', type: 'supplier' })
     ).body.data.id;
     dispatcherId = (
-      await post('/branch/suppliers', { name: 'TCS', phone: '923007654321', type: 'dispatcher' })
+      await catalog('/branch/suppliers', { name: 'TCS', phone: '923007654321', type: 'dispatcher' })
     ).body.data.id;
   });
 

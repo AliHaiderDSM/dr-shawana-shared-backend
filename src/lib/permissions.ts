@@ -94,14 +94,20 @@ const frontDeskGrants: Grants = {
   reports: VIEW,
 };
 
+const CATALOG_MODULES: readonly Module[] = ['categories', 'products', 'bundles', 'suppliers'];
+
 const MATRIX: Record<Role, Grants> = {
   super_admin: grantAll([...PLATFORM_MODULES, ...BRANCH_MODULES], FULL),
-  branch_admin: grantAll(BRANCH_MODULES, FULL),
+  branch_admin: {
+    ...grantAll(BRANCH_MODULES, FULL),
+    ...grantAll(CATALOG_MODULES, VIEW),
+  },
   accountant: {
     ...grantAll(
       BRANCH_MODULES.filter((m) => m !== 'staff'),
       VIEW_CREATE,
     ),
+    ...grantAll(CATALOG_MODULES, VIEW),
     salePayments: ['view', 'update'],
   },
   doctor: {
@@ -166,6 +172,7 @@ const MATRIX: Record<Role, Grants> = {
   },
   lab_officer: {
     stock: VIEW_CREATE,
+    inventoryReport: VIEW,
     products: VIEW,
     suppliers: VIEW_CREATE,
   },

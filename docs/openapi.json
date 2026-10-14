@@ -3339,6 +3339,16 @@
                   "example": "10.000",
                   "description": "Returned by customers back into stock at the toBranchId branch (or every branch)"
                 },
+                "booked": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "In online orders booked and not dispatched yet (by the toBranchId branch, or every branch)"
+                },
+                "total": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "Now in branches plus the closing stock here"
+                },
                 "branches": {
                   "type": "array",
                   "items": {
@@ -3366,6 +3376,10 @@
                       "inBranch": {
                         "type": "string",
                         "example": "10.000"
+                      },
+                      "booked": {
+                        "type": "string",
+                        "example": "10.000"
                       }
                     },
                     "required": [
@@ -3374,7 +3388,8 @@
                       "sent",
                       "sold",
                       "returned",
-                      "inBranch"
+                      "inBranch",
+                      "booked"
                     ]
                   }
                 }
@@ -3395,6 +3410,8 @@
                 "branchSold",
                 "inBranch",
                 "branchReturned",
+                "booked",
+                "total",
                 "branches"
               ]
             }
@@ -3452,6 +3469,16 @@
                 "type": "string",
                 "example": "10.000",
                 "description": "Returned by customers back into stock at the toBranchId branch (or every branch)"
+              },
+              "booked": {
+                "type": "string",
+                "example": "10.000",
+                "description": "In online orders booked and not dispatched yet (by the toBranchId branch, or every branch)"
+              },
+              "total": {
+                "type": "string",
+                "example": "10.000",
+                "description": "Now in branches plus the closing stock here"
               }
             },
             "required": [
@@ -3466,7 +3493,9 @@
               "closing",
               "branchSold",
               "inBranch",
-              "branchReturned"
+              "branchReturned",
+              "booked",
+              "total"
             ]
           }
         },
@@ -43421,6 +43450,21 @@
                               ]
                             },
                             "description": "Products on the sale; a bundle shows once by its name without a qty"
+                          },
+                          "itemDiscount": {
+                            "type": "string",
+                            "example": "1250.50",
+                            "description": "Discounts given on the items"
+                          },
+                          "grossAmount": {
+                            "type": "string",
+                            "example": "1250.50",
+                            "description": "Before any discount (qty × price)"
+                          },
+                          "discountTotal": {
+                            "type": "string",
+                            "example": "1250.50",
+                            "description": "Item discounts plus the sale discount"
                           }
                         },
                         "required": [
@@ -43451,7 +43495,10 @@
                           "createdBy",
                           "createdAt",
                           "updatedAt",
-                          "products"
+                          "products",
+                          "itemDiscount",
+                          "grossAmount",
+                          "discountTotal"
                         ]
                       }
                     },
@@ -43478,6 +43525,20 @@
                                   "type": "string",
                                   "example": "1250.50"
                                 },
+                                "itemDiscount": {
+                                  "type": "string",
+                                  "example": "1250.50"
+                                },
+                                "gross": {
+                                  "type": "string",
+                                  "example": "1250.50",
+                                  "description": "Before any discount"
+                                },
+                                "discountTotal": {
+                                  "type": "string",
+                                  "example": "1250.50",
+                                  "description": "Item discounts plus sale discounts"
+                                },
                                 "total": {
                                   "type": "string",
                                   "example": "1250.50"
@@ -43495,6 +43556,9 @@
                                 "qty",
                                 "subtotal",
                                 "discount",
+                                "itemDiscount",
+                                "gross",
+                                "discountTotal",
                                 "total",
                                 "received",
                                 "remaining"

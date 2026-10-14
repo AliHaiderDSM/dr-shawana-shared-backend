@@ -10,6 +10,13 @@ const app = createApp();
 
 describe('accounts, expenses, reports and dashboard', () => {
   let admin: { id: string };
+  let owner: { id: string };
+  let ownerBranch: string;
+  const owned = (method: 'post' | 'patch', path: string) =>
+    request(app)
+      [method](`/api/v1${path}${path.includes('?') ? '&' : '?'}branchId=${ownerBranch}`)
+      .set(bearer(owner));
+  const catalog = (path: string, body: object) => owned('post', path).send(body);
   let accountant: { id: string };
   let frontDesk: { id: string };
   let doctorUser: { id: string };
@@ -36,6 +43,8 @@ describe('accounts, expenses, reports and dashboard', () => {
     const islamabadId = (await createBranch({ code: 'ISB', city: 'Islamabad' })).id;
     await catalogService.seedBranch(lahoreId);
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahoreId });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    ownerBranch = lahoreId;
     accountant = await createStaff(fake, { role: 'accountant', branchId: lahoreId });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahoreId });
     doctorUser = await createStaff(fake, { role: 'doctor', branchId: lahoreId });
@@ -67,16 +76,15 @@ describe('accounts, expenses, reports and dashboard', () => {
     ).body.data.id;
 
     const supplierId = (
-      await api('post', '/branch/suppliers', admin).send({
+      await catalog('/branch/suppliers', {
         name: 'Falcon',
         phone: '923001111111',
         type: 'supplier',
       })
     ).body.data.id;
-    const productCategory = (await api('post', '/branch/categories', admin).send({ name: 'Skin' })).body.data
-      .id;
+    const productCategory = (await catalog('/branch/categories', { name: 'Skin' })).body.data.id;
     serum = (
-      await api('post', '/branch/products', admin).send({
+      await catalog('/branch/products', {
         name: 'Serum',
         categoryId: productCategory,
         initialPurchase: { supplierId, date: '2026-09-01', quantity: '10', unitPrice: '1000' },

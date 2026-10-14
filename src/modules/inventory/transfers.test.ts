@@ -91,9 +91,13 @@ describe('Main Warehouse transfers to branches', () => {
     toner = (
       await asAdmin('post', '/branch/products').send({ name: 'Rose Toner', categoryId, salePrice: '900' })
     ).body.data.id;
-    const lahoreCategory = (await asBranch('post', '/branch/categories').send({ name: 'Face' })).body.data.id;
+    const lahoreCategory = (await asAdmin('post', '/branch/categories', lahoreId).send({ name: 'Face' })).body
+      .data.id;
     lahoreToner = (
-      await asBranch('post', '/branch/products').send({ name: 'rose toner', categoryId: lahoreCategory })
+      await asAdmin('post', '/branch/products', lahoreId).send({
+        name: 'rose toner',
+        categoryId: lahoreCategory,
+      })
     ).body.data.id;
     patientId = (
       await asBranch('post', '/branch/patients', lahoreDesk).send({
@@ -343,7 +347,7 @@ describe('Main Warehouse transfers to branches', () => {
       items: [{ productId: lahoreToner, qty: '5' }],
     });
     expect(stockIn.status).toBe(409);
-    const purchase = await asBranch('post', `/branch/products/${lahoreToner}/purchases`).send({
+    const purchase = await asAdmin('post', `/branch/products/${lahoreToner}/purchases`, lahoreId).send({
       date: '2026-10-04',
       quantity: '5',
       unitPrice: '500',

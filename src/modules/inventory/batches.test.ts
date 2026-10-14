@@ -13,6 +13,10 @@ interface Allocation {
 
 describe('product batches: stock in, FEFO sales, expiry and returns', () => {
   let admin: { id: string };
+  let owner: { id: string };
+  let ownerBranch: string;
+  const catalog = (path: string, body: object) =>
+    request(app).post(`/api/v1${path}?branchId=${ownerBranch}`).set(bearer(owner)).send(body);
   let frontDesk: { id: string };
   let islamabadAdmin: { id: string };
   let serum: string;
@@ -49,6 +53,8 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     const lahore = await createBranch({ code: 'LHR', city: 'Lahore' });
     const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    ownerBranch = lahore.id;
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     cashSheet = (
       await request(app)
@@ -57,10 +63,9 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
         .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
     ).body.data.id;
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
-    const categoryId = (await api('post', '/branch/categories').send({ name: 'Skin' })).body.data.id;
-    serum = (await api('post', '/branch/products').send({ name: 'Vitamin C Serum', categoryId })).body.data
-      .id;
-    cream = (await api('post', '/branch/products').send({ name: 'Night Cream', categoryId })).body.data.id;
+    const categoryId = (await catalog('/branch/categories', { name: 'Skin' })).body.data.id;
+    serum = (await catalog('/branch/products', { name: 'Vitamin C Serum', categoryId })).body.data.id;
+    cream = (await catalog('/branch/products', { name: 'Night Cream', categoryId })).body.data.id;
     patientId = (
       await api('post', '/branch/patients', frontDesk).send({
         name: 'Sana',

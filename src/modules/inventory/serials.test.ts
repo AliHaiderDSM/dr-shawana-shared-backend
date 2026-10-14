@@ -9,6 +9,10 @@ const app = createApp();
 
 describe('labelled pieces: DSM serials from stock in to sale and return', () => {
   let admin: { id: string };
+  let owner: { id: string };
+  let ownerBranch: string;
+  const catalog = (path: string, body: object) =>
+    request(app).post(`/api/v1${path}?branchId=${ownerBranch}`).set(bearer(owner)).send(body);
   let frontDesk: { id: string };
   let islamabadAdmin: { id: string };
   let serum: string;
@@ -54,6 +58,8 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
     const lahore = await createBranch({ code: 'LHR', city: 'Lahore' });
     const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    ownerBranch = lahore.id;
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     cashSheet = (
       await request(app)
@@ -62,10 +68,9 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
         .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
     ).body.data.id;
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
-    const categoryId = (await api('post', '/branch/categories').send({ name: 'Skin' })).body.data.id;
+    const categoryId = (await catalog('/branch/categories', { name: 'Skin' })).body.data.id;
     const product = async (name: string, extra: Record<string, unknown> = {}) =>
-      (await api('post', '/branch/products').send({ name, categoryId, salePrice: '1000', ...extra })).body
-        .data.id;
+      (await catalog('/branch/products', { name, categoryId, salePrice: '1000', ...extra })).body.data.id;
     serum = await product('Vitamin C Serum');
     cream = await product('Night Cream', {
       initialPurchase: { date: '2026-08-01', quantity: '10', unitPrice: '700' },
@@ -297,7 +302,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
 
   it('sends out exactly the scanned pieces and takes them back when the entry is removed', async () => {
     const dispatcherId = (
-      await api('post', '/branch/suppliers').send({ name: 'TCS', type: 'dispatcher', phone: '923001234567' })
+      await catalog('/branch/suppliers', { name: 'TCS', type: 'dispatcher', phone: '923001234567' })
     ).body.data.id;
     const missing = await api('post', '/branch/stock-outs').send({
       dispatcherId,
@@ -350,7 +355,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
       unlabelled: [],
     });
 
-    const purchase = await api('post', `/branch/products/${cream}/purchases`).send({
+    const purchase = await catalog(`/branch/products/${cream}/purchases`, {
       date: '2026-10-01',
       quantity: '5',
       unitPrice: '700',

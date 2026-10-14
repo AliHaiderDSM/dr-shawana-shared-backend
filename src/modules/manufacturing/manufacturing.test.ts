@@ -9,6 +9,10 @@ const app = createApp();
 
 describe('manufacturing', () => {
   let admin: { id: string };
+  let owner: { id: string };
+  let ownerBranch: string;
+  const catalog = (path: string, body: object) =>
+    request(app).post(`/api/v1${path}?branchId=${ownerBranch}`).set(bearer(owner)).send(body);
   let storeKeeper: { id: string };
   let pharmacy: { id: string };
   let islamabadAdmin: { id: string };
@@ -26,13 +30,15 @@ describe('manufacturing', () => {
     const lahore = await createBranch({ code: 'LHR' });
     const islamabad = await createBranch({ code: 'ISB' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    ownerBranch = lahore.id;
     storeKeeper = await createStaff(fake, { role: 'store_keeper', branchId: lahore.id });
     pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
 
-    const categoryId = (await post('/branch/categories', { name: 'Balms' })).body.data.id;
-    productId = (await post('/branch/products', { name: 'Lip Balm 100g', categoryId, sizeGrams: '100' })).body
-      .data.id;
+    const categoryId = (await catalog('/branch/categories', { name: 'Balms' })).body.data.id;
+    productId = (await catalog('/branch/products', { name: 'Lip Balm 100g', categoryId, sizeGrams: '100' }))
+      .body.data.id;
   });
 
   it('manages material categories with a case-insensitive unique name', async () => {

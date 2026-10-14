@@ -23,6 +23,9 @@ describe('products and purchase entries', () => {
   let accountant: { id: string };
   let storeKeeper: { id: string };
   let frontDesk: { id: string };
+  let superAdmin: { id: string };
+  let lahoreId: string;
+  let islamabadId: string;
   let categoryId: string;
   let islamabadCategoryId: string;
   let supplierId: string;
@@ -35,23 +38,37 @@ describe('products and purchase entries', () => {
     accountant = await createStaff(fake, { role: 'accountant', branchId: lahore.id });
     storeKeeper = await createStaff(fake, { role: 'store_keeper', branchId: lahore.id });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
+    superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
+    lahoreId = lahore.id;
+    islamabadId = islamabad.id;
 
     categoryId = (
-      await request(app).post('/api/v1/branch/categories').set(bearer(lahoreAdmin)).send({ name: 'Oils' })
+      await request(app)
+        .post('/api/v1/branch/categories')
+        .query({ branchId: lahoreId })
+        .set(bearer(superAdmin))
+        .send({ name: 'Oils' })
     ).body.data.id;
     islamabadCategoryId = (
-      await request(app).post('/api/v1/branch/categories').set(bearer(islamabadAdmin)).send({ name: 'Oils' })
+      await request(app)
+        .post('/api/v1/branch/categories')
+        .query({ branchId: islamabadId })
+        .set(bearer(superAdmin))
+        .send({ name: 'Oils' })
     ).body.data.id;
     supplierId = (
       await request(app)
         .post('/api/v1/branch/suppliers')
-        .set(bearer(lahoreAdmin))
+        .query({ branchId: lahoreId })
+        .set(bearer(superAdmin))
         .send({ name: 'Falcon Traders', phone: '923001234567', type: 'supplier' })
     ).body.data.id;
   });
 
-  const createProduct = (body: Record<string, unknown>, who = lahoreAdmin) =>
-    request(app).post('/api/v1/branch/products').set(bearer(who)).send(body);
+  const createProduct = (body: Record<string, unknown>, who?: { id: string }, branchId = lahoreId) =>
+    who
+      ? request(app).post('/api/v1/branch/products').set(bearer(who)).send(body)
+      : request(app).post('/api/v1/branch/products').query({ branchId }).set(bearer(superAdmin)).send(body);
 
   it('creates a product with its first purchase entry, stock and sale price', async () => {
     const res = await createProduct({
@@ -79,34 +96,48 @@ describe('products and purchase entries', () => {
 
     const first = await request(app)
       .post(url)
-      .set(bearer(lahoreAdmin))
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
       .send({ date: '2026-09-02', quantity: '10', unitPrice: '800.50' });
     expect(first.status).toBe(201);
     const second = await request(app)
       .post(url)
-      .set(bearer(lahoreAdmin))
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
       .send({ date: '2026-09-01', quantity: '5', unitPrice: '900' });
     expect(second.status).toBe(201);
 
-    let current = await request(app).get(`/api/v1/branch/products/${product.id}`).set(bearer(lahoreAdmin));
+    let current = await request(app)
+      .get(`/api/v1/branch/products/${product.id}`)
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin));
     expect(current.body.data.salePrice).toBe('900.00');
     expect(await stockOf(product.id)).toBe('15.000');
 
     const corrected = await request(app)
       .patch(`${url}/${first.body.data.id}`)
-      .set(bearer(lahoreAdmin))
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
       .send({ quantity: '12' });
     expect(corrected.status).toBe(200);
     expect(await stockOf(product.id)).toBe('17.000');
 
-    expect((await request(app).delete(`${url}/${second.body.data.id}`).set(bearer(lahoreAdmin))).status).toBe(
-      204,
-    );
-    current = await request(app).get(`/api/v1/branch/products/${product.id}`).set(bearer(lahoreAdmin));
+    expect(
+      (
+        await request(app)
+          .delete(`${url}/${second.body.data.id}`)
+          .query({ branchId: lahoreId })
+          .set(bearer(superAdmin))
+      ).status,
+    ).toBe(204);
+    current = await request(app)
+      .get(`/api/v1/branch/products/${product.id}`)
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin));
     expect(current.body.data.salePrice).toBe('800.50');
     expect(await stockOf(product.id)).toBe('12.000');
 
-    const history = await request(app).get(url).set(bearer(lahoreAdmin));
+    const history = await request(app).get(url).query({ branchId: lahoreId }).set(bearer(superAdmin));
     expect(history.body.data).toHaveLength(1);
     const movements = await AppDataSource.getRepository(StockMovement).find({
       where: { productId: product.id },
@@ -135,10 +166,12 @@ describe('products and purchase entries', () => {
     );
     const entries = await request(app)
       .get(`/api/v1/branch/products/${product.id}/purchases`)
-      .set(bearer(lahoreAdmin));
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin));
     const res = await request(app)
       .delete(`/api/v1/branch/products/${product.id}/purchases/${entries.body.data[0].id}`)
-      .set(bearer(lahoreAdmin));
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin));
     expect(res.status).toBe(422);
     expect(res.body.error.details.shortages[0]).toMatchObject({ available: '1', required: '3' });
   });
@@ -159,8 +192,13 @@ describe('products and purchase entries', () => {
     expect((await createProduct({ name: 'A', categoryId, sku: 'SKU-1' })).status).toBe(201);
     expect((await createProduct({ name: 'B', categoryId, sku: 'sku-1' })).status).toBe(409);
     expect(
-      (await createProduct({ name: 'B', categoryId: islamabadCategoryId, sku: 'SKU-1' }, islamabadAdmin))
-        .status,
+      (
+        await createProduct(
+          { name: 'B', categoryId: islamabadCategoryId, sku: 'SKU-1' },
+          undefined,
+          islamabadId,
+        )
+      ).status,
     ).toBe(201);
   });
 
@@ -168,7 +206,8 @@ describe('products and purchase entries', () => {
     const product = (await createProduct({ name: 'Soap', categoryId })).body.data;
     const res = await request(app)
       .post(`/api/v1/branch/products/${product.id}/image`)
-      .set(bearer(lahoreAdmin))
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
       .attach('image', Buffer.from('fake-png'), { filename: 'soap.png', contentType: 'image/png' });
     expect(res.status).toBe(200);
     expect(res.body.data.imagePath).toMatch(
@@ -178,7 +217,8 @@ describe('products and purchase entries', () => {
 
     const bad = await request(app)
       .post(`/api/v1/branch/products/${product.id}/image`)
-      .set(bearer(lahoreAdmin))
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
       .attach('image', Buffer.from('x'), { filename: 'evil.exe', contentType: 'application/x-msdownload' });
     expect(bad.status).toBe(400);
   });
@@ -188,7 +228,8 @@ describe('products and purchase entries', () => {
     fake.missingBuckets.add('product-images');
     const res = await request(app)
       .post(`/api/v1/branch/products/${product.id}/image`)
-      .set(bearer(lahoreAdmin))
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
       .attach('image', Buffer.from('fake-png'), { filename: 'shampoo.png', contentType: 'image/png' });
     expect(res.status).toBe(200);
     expect(fake.createdBuckets).toEqual([
@@ -206,21 +247,19 @@ describe('products and purchase entries', () => {
       expect((await createProduct({ name: 'Nope', categoryId }, frontDesk)).status).toBe(403);
     });
 
-    it('lets the accountant add but not edit or delete (posSoft admin-only buttons)', async () => {
-      const created = await createProduct({ name: 'Accountant item', categoryId }, accountant);
-      expect(created.status).toBe(201);
-      const id = created.body.data.id;
-      expect(
-        (
-          await request(app)
-            .patch(`/api/v1/branch/products/${id}`)
-            .set(bearer(accountant))
-            .send({ name: 'Y' })
-        ).status,
-      ).toBe(403);
-      expect(
-        (await request(app).delete(`/api/v1/branch/products/${id}`).set(bearer(accountant))).status,
-      ).toBe(403);
+    it('leaves the catalog to the Super Admin: branch admin and accountant only read', async () => {
+      const id = (await createProduct({ name: 'Admin item', categoryId })).body.data.id;
+      for (const who of [lahoreAdmin, accountant]) {
+        expect((await request(app).get('/api/v1/branch/products').set(bearer(who))).status).toBe(200);
+        expect((await createProduct({ name: 'Nope', categoryId }, who)).status).toBe(403);
+        expect(
+          (await request(app).patch(`/api/v1/branch/products/${id}`).set(bearer(who)).send({ name: 'Y' }))
+            .status,
+        ).toBe(403);
+        expect((await request(app).delete(`/api/v1/branch/products/${id}`).set(bearer(who))).status).toBe(
+          403,
+        );
+      }
     });
   });
 
@@ -229,14 +268,21 @@ describe('products and purchase entries', () => {
       const product = (await createProduct({ name: 'Lahore only', categoryId })).body.data;
       const base = `/api/v1/branch/products/${product.id}`;
       expect((await request(app).get(base).set(bearer(islamabadAdmin))).status).toBe(404);
-      expect((await request(app).patch(base).set(bearer(islamabadAdmin)).send({ name: 'Hack' })).status).toBe(
-        404,
-      );
+      expect(
+        (
+          await request(app)
+            .patch(base)
+            .query({ branchId: islamabadId })
+            .set(bearer(superAdmin))
+            .send({ name: 'Hack' })
+        ).status,
+      ).toBe(404);
       expect(
         (
           await request(app)
             .post(`${base}/purchases`)
-            .set(bearer(islamabadAdmin))
+            .query({ branchId: islamabadId })
+            .set(bearer(superAdmin))
             .send({ date: '2026-09-01', quantity: '1', unitPrice: '1' })
         ).status,
       ).toBe(404);

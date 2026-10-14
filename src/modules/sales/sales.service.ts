@@ -654,6 +654,10 @@ export const salesService = {
       .addSelect('COALESCE(SUM(sale.totalQty), 0)', 'qty')
       .addSelect('COALESCE(SUM(sale.subtotal), 0)', 'subtotal')
       .addSelect('COALESCE(SUM(sale.discountAmount), 0)', 'discount')
+      .addSelect(
+        'COALESCE(SUM((SELECT COALESCE(SUM(x.discount_amount), 0) FROM sale_items x WHERE x.sale_id = sale.id AND x.deleted_at IS NULL)), 0)',
+        'itemDiscount',
+      )
       .addSelect('COALESCE(SUM(sale.total), 0)', 'total')
       .addSelect('COALESCE(SUM(sale.received), 0)', 'received')
       .addSelect('COALESCE(SUM(sale.remaining), 0)', 'remaining')
@@ -706,6 +710,8 @@ export const salesService = {
       }
       return [...summary.values()].map((p) => ({ name: p.name, qty: p.qty ? p.qty.toFixed(3) : null }));
     };
+    const itemDiscountOf = (saleId: string) =>
+      lines.filter((l) => l.saleId === saleId).reduce((sum, l) => sum.plus(l.discountAmount), new Decimal(0));
     return {
       items: rows.map((r) => {
         const {
@@ -721,6 +727,9 @@ export const salesService = {
           ...rest,
           branch: r.branch ? { id: r.branch.id, code: r.branch.code, name: r.branch.name } : null,
           products: productsOf(r.id),
+          itemDiscount: toMoney(itemDiscountOf(r.id)),
+          grossAmount: toMoney(new Decimal(r.subtotal).plus(itemDiscountOf(r.id))),
+          discountTotal: toMoney(itemDiscountOf(r.id).plus(r.discountAmount)),
         };
       }),
       meta: {
@@ -729,6 +738,9 @@ export const salesService = {
           qty: new Decimal(totals?.qty ?? 0).toFixed(3),
           subtotal: toMoney(totals?.subtotal ?? 0),
           discount: toMoney(totals?.discount ?? 0),
+          itemDiscount: toMoney(totals?.itemDiscount ?? 0),
+          gross: toMoney(new Decimal(totals?.subtotal ?? 0).plus(totals?.itemDiscount ?? 0)),
+          discountTotal: toMoney(new Decimal(totals?.discount ?? 0).plus(totals?.itemDiscount ?? 0)),
           total: toMoney(totals?.total ?? 0),
           received: toMoney(totals?.received ?? 0),
           remaining: toMoney(totals?.remaining ?? 0),

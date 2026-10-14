@@ -46,6 +46,9 @@ const moneyTotals = z.object({
   qty: quantityOutput,
   subtotal: moneyOutput,
   discount: moneyOutput,
+  itemDiscount: moneyOutput,
+  gross: moneyOutput.openapi({ description: 'Before any discount' }),
+  discountTotal: moneyOutput.openapi({ description: 'Item discounts plus sale discounts' }),
   total: moneyOutput,
   received: moneyOutput,
   remaining: moneyOutput,
@@ -67,6 +70,9 @@ registry.registerPath({
               products: z.array(z.object({ name: z.string(), qty: quantityOutput.nullable() })).openapi({
                 description: 'Products on the sale; a bundle shows once by its name without a qty',
               }),
+              itemDiscount: moneyOutput.openapi({ description: 'Discounts given on the items' }),
+              grossAmount: moneyOutput.openapi({ description: 'Before any discount (qty × price)' }),
+              discountTotal: moneyOutput.openapi({ description: 'Item discounts plus the sale discount' }),
             }),
           ),
           meta: pageMetaSchema.extend({

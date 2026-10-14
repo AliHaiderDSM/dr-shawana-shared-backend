@@ -40,6 +40,8 @@ const REPORT_COLUMNS = [
   'branchSold',
   'inBranch',
   'branchReturned',
+  'booked',
+  'total',
 ] as const;
 type ReportColumn = (typeof REPORT_COLUMNS)[number];
 
@@ -99,6 +101,9 @@ function movementDetail(m: {
   }
 }
 
+const BOOKED = `si.deleted_at IS NULL AND s.deleted_at IS NULL AND s.sale_type = 'online'
+  AND s.delivery_status = 'pending' AND s.date <= $3`;
+
 async function branchBreakdown(params: unknown[], filters: string[]) {
   const rows: {
     productId: string;
@@ -108,6 +113,7 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
     sold: string;
     returned: string;
     inBranch: string;
+    booked: string;
   }[] = await AppDataSource.query(
     `SELECT p.id AS "productId", b.id AS "branchId", b.name AS "branchName",
             COALESCE((SELECT -SUM(m.qty) FROM stock_movements m JOIN stock_outs so ON so.id = m.reference_id
@@ -120,7 +126,10 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
                        WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id
                          AND bm.type = 'sale_return' AND bm.date BETWEEN $2 AND $3), 0)::text AS returned,
             COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
-                       WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id AND bm.date <= $3), 0)::text AS "inBranch"
+                       WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id AND bm.date <= $3), 0)::text AS "inBranch",
+            COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
+                        JOIN products sp ON sp.id = si.product_id
+                       WHERE s.branch_id = b.id AND sp.origin_product_id = p.id AND ${BOOKED}), 0)::text AS booked
        FROM products p
        CROSS JOIN branches b
       WHERE p.branch_id = $1 AND p.deleted_at IS NULL AND b.kind::text IN ('branch', 'dispatch') AND b.deleted_at IS NULL
@@ -130,7 +139,7 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
   );
   const byProduct = new Map<string, typeof rows>();
   for (const row of rows) {
-    if ([row.sent, row.sold, row.returned, row.inBranch].every((v) => Number(v) === 0)) continue;
+    if ([row.sent, row.sold, row.returned, row.inBranch, row.booked].every((v) => Number(v) === 0)) continue;
     byProduct.set(row.productId, [...(byProduct.get(row.productId) ?? []), row]);
   }
   return byProduct;
@@ -234,6 +243,9 @@ export const inventoryService = {
       ? `COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
             AND bm.type = 'sale_return' AND bm.date BETWEEN $2 AND $3), 0)`
       : '0';
+    const booked = `COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
+            JOIN products sp ON sp.id = si.product_id
+           WHERE (si.product_id = p.id OR sp.origin_product_id = p.id) AND ${BOOKED}${target ? ` AND s.branch_id = ${target}` : ''}), 0)`;
     const inBranch = branchProducts
       ? `COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
             AND bm.date <= $3), 0)`
@@ -253,6 +265,8 @@ export const inventoryService = {
                 (${branchSold})::text AS "branchSold",
                 (${inBranch})::text AS "inBranch",
                 (${branchReturned})::text AS "branchReturned",
+                (${booked})::text AS booked,
+                '0' AS total,
                 COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['sale'])}), 0)::text AS sold,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_return'])}), 0)::text AS returned,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_edit_adjust', 'adjustment'])}), 0)::text AS adjusted,
@@ -278,6 +292,7 @@ export const inventoryService = {
         row.branchReturned = list.reduce((sum, b) => sum.plus(b.returned), new Decimal(0)).toString();
       }
     }
+    for (const row of rows) row.total = new Decimal(row.inBranch).plus(row.closing).toString();
 
     const totals = Object.fromEntries(
       REPORT_COLUMNS.map((col) => [
@@ -300,6 +315,7 @@ export const inventoryService = {
           sold: toQuantity(b.sold),
           returned: toQuantity(b.returned),
           inBranch: toQuantity(b.inBranch),
+          booked: toQuantity(b.booked),
         })),
       })),
       totals,

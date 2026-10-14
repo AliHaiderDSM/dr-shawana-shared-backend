@@ -229,16 +229,41 @@ describe('Dispatch Department ships every online order from its own stock', () =
     expect((await stock(lahoreToner, lahoreId))!.quantity).toBe('0.000');
 
     const local = (
-      await as(lahoreAdmin, 'post', '/branch/products').send({
+      await as(superAdmin, 'post', '/branch/products', lahoreId).send({
         name: 'Lahore Only Cream',
-        categoryId: (await as(lahoreAdmin, 'post', '/branch/categories').send({ name: 'Local' })).body.data
-          .id,
+        categoryId: (await as(superAdmin, 'post', '/branch/categories', lahoreId).send({ name: 'Local' }))
+          .body.data.id,
       })
     ).body;
     expect(local.data).toBeDefined();
+    expect((await as(lahoreAdmin, 'post', '/branch/categories').send({ name: 'Mine' })).status).toBe(403);
     {
       const notStocked = await online(lahoreDesk, [{ productId: local.data.id, qty: '1' }], lahoreCash);
       expect(notStocked.status).toBe(422);
+    }
+  });
+
+  it('shows booked online orders and the total of every product in the inventory report', async () => {
+    const lab = await createStaff(fake, { role: 'lab_officer', branchId: warehouseId });
+    const query = '/branch/inventory/report?from=2026-01-01&to=2099-12-31';
+    const report = await as(superAdmin, 'get', query, warehouseId);
+    expect(report.status).toBe(200);
+    type Row = { name: string; booked: string; total: string; inBranch: string; closing: string };
+    const row = (name: string) => (report.body.data.rows as Row[]).find((r) => r.name === name)!;
+    expect(row('Rose Toner').booked).toBe('3.000');
+    expect(row('Vitamin C Serum').booked).toBe('1.000');
+    for (const r of report.body.data.rows as Row[]) {
+      expect(Number(r.total)).toBe(Number(r.inBranch) + Number(r.closing));
+    }
+    expect(report.body.data.totals.booked).toBe('4.000');
+    const lahoreShare = (
+      report.body.data.rows as (Row & { branches: { branchId: string; booked: string }[] })[]
+    )
+      .find((r) => r.name === 'Rose Toner')!
+      .branches.find((b) => b.branchId === lahoreId);
+    expect(lahoreShare?.booked).toBe('3.000');
+    for (const who of [keeper, lab]) {
+      expect((await as(who, 'get', query)).body.data.totals.booked).toBe('4.000');
     }
   });
 

@@ -101,6 +101,10 @@ const reportRow = z.object({
   branchReturned: quantityOutput.openapi({
     description: 'Returned by customers back into stock at the toBranchId branch (or every branch)',
   }),
+  booked: quantityOutput.openapi({
+    description: 'In online orders booked and not dispatched yet (by the toBranchId branch, or every branch)',
+  }),
+  total: quantityOutput.openapi({ description: 'Now in branches plus the closing stock here' }),
 });
 
 const branchShare = z.object({
@@ -110,6 +114,7 @@ const branchShare = z.object({
   sold: quantityOutput,
   returned: quantityOutput,
   inBranch: quantityOutput,
+  booked: quantityOutput,
 });
 
 export const inventoryReportSchema = registry.register(

@@ -11,6 +11,13 @@ const app = createApp();
 
 describe('POS sales', () => {
   let admin: { id: string };
+  let owner: { id: string };
+  let ownerBranch: string;
+  const owned = (method: 'post' | 'patch', path: string) =>
+    request(app)
+      [method](`/api/v1${path}${path.includes('?') ? '&' : '?'}branchId=${ownerBranch}`)
+      .set(bearer(owner));
+  const catalog = (path: string, body: object) => owned('post', path).send(body);
   let frontDesk: { id: string };
   let otherFrontDesk: { id: string };
   let accountant: { id: string };
@@ -40,6 +47,8 @@ describe('POS sales', () => {
     const lahore = await createBranch({ code: 'LHR', city: 'Lahore' });
     const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    ownerBranch = lahore.id;
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     otherFrontDesk = await createStaff(fake, { role: 'team_manager', branchId: lahore.id });
     accountant = await createStaff(fake, { role: 'accountant', branchId: lahore.id });
@@ -47,9 +56,9 @@ describe('POS sales', () => {
     pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
 
-    const categoryId = (await api('post', '/branch/categories', admin).send({ name: 'Skin' })).body.data.id;
+    const categoryId = (await catalog('/branch/categories', { name: 'Skin' })).body.data.id;
     const product = (name: string, quantity: string, unitPrice: string) =>
-      api('post', '/branch/products', admin).send({
+      catalog('/branch/products', {
         name,
         categoryId,
         initialPurchase: { date: '2026-09-01', quantity, unitPrice },
@@ -57,7 +66,7 @@ describe('POS sales', () => {
     serum = (await product('Serum', '10', '1000')).body.data.id;
     toner = (await product('Toner', '5', '500')).body.data.id;
     bundleId = (
-      await api('post', '/branch/bundles', admin).send({
+      await catalog('/branch/bundles', {
         name: 'Glow Kit',
         items: [
           { productId: serum, price: '900' },
@@ -558,6 +567,19 @@ describe('POS sales', () => {
     });
     const bill = await api('get', `/branch/sales/${res.body.data.id}/bill`, admin);
     expect(bill.body.data.items[0]).toMatchObject({ discountPercent: '25.00', lineTotal: '1500.00' });
+    const listed = await api('get', `/branch/sales?search=${res.body.data.invoiceNo}`, admin);
+    expect(listed.body.data[0]).toMatchObject({
+      grossAmount: '3000.00',
+      itemDiscount: '500.00',
+      discountTotal: '750.00',
+      total: '2250.00',
+    });
+    expect(listed.body.meta.totals).toMatchObject({
+      gross: '3000.00',
+      itemDiscount: '500.00',
+      discountTotal: '750.00',
+      total: '2250.00',
+    });
     const tooMuch = await api('post', '/branch/sales', admin).send({
       patientId,
       saleType: 'office',

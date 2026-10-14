@@ -13,10 +13,12 @@ describe('master data', () => {
   let pharmacy: { id: string };
   let superAdmin: { id: string };
   let lahoreId: string;
+  let islamabadId: string;
 
   beforeAll(async () => {
     lahoreId = (await createBranch({ code: 'LHR' })).id;
     const islamabad = await createBranch({ code: 'ISB' });
+    islamabadId = islamabad.id;
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahoreId });
     otherAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahoreId });
@@ -24,47 +26,43 @@ describe('master data', () => {
     superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
   });
 
+  const asOwner = (method: 'get' | 'post' | 'patch' | 'delete', path: string, branchId = lahoreId) =>
+    request(app)
+      [method](`/api/v1${path}${path.includes('?') ? '&' : '?'}branchId=${branchId}`)
+      .set(bearer(superAdmin));
+
   describe('categories', () => {
     it('rejects a duplicate name (case-insensitive) within a branch only', async () => {
-      const url = '/api/v1/branch/categories';
-      expect((await request(app).post(url).set(bearer(admin)).send({ name: 'Supplements' })).status).toBe(
-        201,
-      );
-      const dup = await request(app).post(url).set(bearer(admin)).send({ name: 'SUPPLEMENTS' });
+      expect((await asOwner('post', '/branch/categories').send({ name: 'Supplements' })).status).toBe(201);
+      const dup = await asOwner('post', '/branch/categories').send({ name: 'SUPPLEMENTS' });
       expect(dup.status).toBe(409);
       expect(
-        (await request(app).post(url).set(bearer(otherAdmin)).send({ name: 'Supplements' })).status,
+        (await asOwner('post', '/branch/categories', islamabadId).send({ name: 'Supplements' })).status,
       ).toBe(201);
     });
 
     it('blocks deleting a category that products use', async () => {
-      const category = (
-        await request(app).post('/api/v1/branch/categories').set(bearer(admin)).send({ name: 'Creams' })
-      ).body.data;
-      await request(app)
-        .post('/api/v1/branch/products')
-        .set(bearer(admin))
-        .send({ name: 'Night Cream', categoryId: category.id });
-      const res = await request(app).delete(`/api/v1/branch/categories/${category.id}`).set(bearer(admin));
+      const category = (await asOwner('post', '/branch/categories').send({ name: 'Creams' })).body.data;
+      await asOwner('post', '/branch/products').send({ name: 'Night Cream', categoryId: category.id });
+      const res = await asOwner('delete', `/branch/categories/${category.id}`);
       expect(res.status).toBe(409);
     });
 
-    it('is read-only for front desk and hidden from other branches', async () => {
-      expect(
-        (await request(app).post('/api/v1/branch/categories').set(bearer(frontDesk)).send({ name: 'X' }))
-          .status,
-      ).toBe(403);
+    it('is managed by the Super Admin only; branches can read their own', async () => {
+      for (const who of [admin, frontDesk]) {
+        expect(
+          (await request(app).post('/api/v1/branch/categories').set(bearer(who)).send({ name: 'X' })).status,
+        ).toBe(403);
+      }
       const lahore = await request(app).get('/api/v1/branch/categories/options').set(bearer(admin));
+      expect(lahore.status).toBe(200);
       const islamabad = await request(app).get('/api/v1/branch/categories/options').set(bearer(otherAdmin));
       const lahoreIds = new Set(lahore.body.data.map((c: { id: string }) => c.id));
       expect(islamabad.body.data.some((c: { id: string }) => lahoreIds.has(c.id))).toBe(false);
     });
 
     it('lets super admin work on a chosen branch', async () => {
-      const res = await request(app)
-        .post(`/api/v1/branch/categories?branchId=${lahoreId}`)
-        .set(bearer(superAdmin))
-        .send({ name: 'Super category' });
+      const res = await asOwner('post', '/branch/categories').send({ name: 'Super category' });
       expect(res.status).toBe(201);
       expect(res.body.data.branchId).toBe(lahoreId);
     });
@@ -72,62 +70,59 @@ describe('master data', () => {
 
   describe('suppliers', () => {
     it('separates suppliers and dispatchers', async () => {
-      const url = '/api/v1/branch/suppliers';
-      await request(app)
-        .post(url)
-        .set(bearer(admin))
-        .send({ name: 'Supplier A', phone: '923001111111', type: 'supplier' });
-      await request(app)
-        .post(url)
-        .set(bearer(admin))
-        .send({ name: 'TCS Courier', phone: '923002222222', type: 'dispatcher' });
-      const dispatchers = await request(app).get(`${url}/options?type=dispatcher`).set(bearer(admin));
+      await asOwner('post', '/branch/suppliers').send({
+        name: 'Supplier A',
+        phone: '923001111111',
+        type: 'supplier',
+      });
+      await asOwner('post', '/branch/suppliers').send({
+        name: 'TCS Courier',
+        phone: '923002222222',
+        type: 'dispatcher',
+      });
+      const dispatchers = await request(app)
+        .get('/api/v1/branch/suppliers/options?type=dispatcher')
+        .set(bearer(admin));
       expect(dispatchers.body.data.map((d: { name: string }) => d.name)).toEqual(['TCS Courier']);
-      const invalid = await request(app)
-        .post(url)
-        .set(bearer(admin))
-        .send({ name: 'X', phone: '1', type: 'vendor' });
+      const invalid = await asOwner('post', '/branch/suppliers').send({
+        name: 'X',
+        phone: '1',
+        type: 'vendor',
+      });
       expect(invalid.status).toBe(400);
     });
 
-    it('is readable by pharmacy but not writable', async () => {
-      expect((await request(app).get('/api/v1/branch/suppliers').set(bearer(pharmacy))).status).toBe(200);
-      expect(
-        (
-          await request(app)
-            .post('/api/v1/branch/suppliers')
-            .set(bearer(pharmacy))
-            .send({ name: 'X', phone: '923003333333', type: 'supplier' })
-        ).status,
-      ).toBe(403);
+    it('is readable by pharmacy and branch admin but not writable', async () => {
+      for (const who of [pharmacy, admin]) {
+        expect((await request(app).get('/api/v1/branch/suppliers').set(bearer(who))).status).toBe(200);
+        expect(
+          (
+            await request(app)
+              .post('/api/v1/branch/suppliers')
+              .set(bearer(who))
+              .send({ name: 'X', phone: '923003333333', type: 'supplier' })
+          ).status,
+        ).toBe(403);
+      }
     });
   });
 
   describe('bundles', () => {
     it('stores items as rows and computes the total on the server', async () => {
-      const category = (
-        await request(app).post('/api/v1/branch/categories').set(bearer(admin)).send({ name: 'Kits' })
-      ).body.data;
+      const category = (await asOwner('post', '/branch/categories').send({ name: 'Kits' })).body.data;
       const make = async (name: string) =>
-        (
-          await request(app)
-            .post('/api/v1/branch/products')
-            .set(bearer(admin))
-            .send({ name, categoryId: category.id })
-        ).body.data.id as string;
+        (await asOwner('post', '/branch/products').send({ name, categoryId: category.id })).body.data
+          .id as string;
       const shampoo = await make('Shampoo');
       const conditioner = await make('Conditioner');
 
-      const created = await request(app)
-        .post('/api/v1/branch/bundles')
-        .set(bearer(admin))
-        .send({
-          name: 'Hair Kit',
-          items: [
-            { productId: shampoo, price: '500' },
-            { productId: conditioner, price: '300.25', qty: '2' },
-          ],
-        });
+      const created = await asOwner('post', '/branch/bundles').send({
+        name: 'Hair Kit',
+        items: [
+          { productId: shampoo, price: '500' },
+          { productId: conditioner, price: '300.25', qty: '2' },
+        ],
+      });
       expect(created.status).toBe(201);
       expect(created.body.data.totalPrice).toBe('1100.50');
       expect(created.body.data.items.map((i: { productName: string }) => i.productName)).toEqual([
@@ -135,30 +130,32 @@ describe('master data', () => {
         'Conditioner',
       ]);
 
-      const updated = await request(app)
-        .patch(`/api/v1/branch/bundles/${created.body.data.id}`)
-        .set(bearer(admin))
-        .send({ items: [{ productId: shampoo, price: '450' }] });
+      const updated = await asOwner('patch', `/branch/bundles/${created.body.data.id}`).send({
+        items: [{ productId: shampoo, price: '450' }],
+      });
       expect(updated.body.data).toMatchObject({ totalPrice: '450.00' });
       expect(updated.body.data.items).toHaveLength(1);
 
-      const dup = await request(app)
-        .post('/api/v1/branch/bundles')
-        .set(bearer(admin))
-        .send({
-          name: 'Dup',
-          items: [
-            { productId: shampoo, price: '1' },
-            { productId: shampoo, price: '2' },
-          ],
-        });
+      const dup = await asOwner('post', '/branch/bundles').send({
+        name: 'Dup',
+        items: [
+          { productId: shampoo, price: '1' },
+          { productId: shampoo, price: '2' },
+        ],
+      });
       expect(dup.status).toBe(400);
 
-      const foreign = await request(app)
-        .post('/api/v1/branch/bundles')
-        .set(bearer(otherAdmin))
-        .send({ name: 'Stolen', items: [{ productId: shampoo, price: '1' }] });
+      const foreign = await asOwner('post', '/branch/bundles', islamabadId).send({
+        name: 'Stolen',
+        items: [{ productId: shampoo, price: '1' }],
+      });
       expect(foreign.status).toBe(400);
+
+      const byAdmin = await request(app)
+        .post('/api/v1/branch/bundles')
+        .set(bearer(admin))
+        .send({ name: 'Mine', items: [{ productId: shampoo, price: '1' }] });
+      expect(byAdmin.status).toBe(403);
 
       expect((await request(app).get('/api/v1/branch/bundles').set(bearer(frontDesk))).status).toBe(200);
     });

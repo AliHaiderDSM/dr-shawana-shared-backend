@@ -9,6 +9,13 @@ const app = createApp();
 
 describe('Sale returns and barcodes', () => {
   let admin: { id: string };
+  let owner: { id: string };
+  let ownerBranch: string;
+  const owned = (method: 'post' | 'patch', path: string) =>
+    request(app)
+      [method](`/api/v1${path}${path.includes('?') ? '&' : '?'}branchId=${ownerBranch}`)
+      .set(bearer(owner));
+  const catalog = (path: string, body: object) => owned('post', path).send(body);
   let frontDesk: { id: string };
   let pharmacy: { id: string };
   let doctor: { id: string };
@@ -30,14 +37,16 @@ describe('Sale returns and barcodes', () => {
     const lahore = await createBranch({ code: 'LHR', city: 'Lahore' });
     const islamabad = await createBranch({ code: 'ISB', city: 'Islamabad' });
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore.id });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    ownerBranch = lahore.id;
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
     doctor = await createStaff(fake, { role: 'doctor', branchId: lahore.id });
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
 
-    const categoryId = (await api('post', '/branch/categories', admin).send({ name: 'Skin' })).body.data.id;
+    const categoryId = (await catalog('/branch/categories', { name: 'Skin' })).body.data.id;
     const product = (name: string, barcode: string | null) =>
-      api('post', '/branch/products', admin).send({
+      catalog('/branch/products', {
         name,
         categoryId,
         barcode,
@@ -83,7 +92,7 @@ describe('Sale returns and barcodes', () => {
     expect((await api('get', '/branch/products/barcode/0000000000', admin)).status).toBe(404);
     expect((await api('get', '/branch/products/barcode/8964000123456', islamabadAdmin)).status).toBe(404);
     expect(
-      (await api('patch', `/branch/products/${toner}`, admin).send({ barcode: '8964000123456' })).status,
+      (await owned('patch', `/branch/products/${toner}`).send({ barcode: '8964000123456' })).status,
     ).toBe(409);
     const search = await api('get', '/branch/products?search=89640001', admin);
     expect(search.body.data.map((p: { id: string }) => p.id)).toEqual([serum]);
