@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Discount request customer and transfer receipt (2026-10-15)
+
+- Migration `1793000000000-DiscountRequestCustomer` adds `discount_requests.patient_id` (FK patients, SET NULL) and `customer_name`. `POST /branch/discount-requests` takes optional `patientId` or `customerName`; every request returns `customer {id, name, phone}` (from the sale once used, else the request).
+- `GET /branch/inventory/items` takes `group=in_stock|in_branches|sold|other` (same groups as the label batch counts).
+- `GET /branch/incoming-stock` takes `?transferNo=` for one transfer (used by the branch receiving receipt).
+
 ## Chat: patient photos and voice notes only (2026-10-14)
 
 Patients can now send only photos (JPG, PNG, WebP) or voice notes (M4A/AAC/MP3/WebM/OGG, 10 MB) in chat; PDFs from the patient are rejected with 400. Doctors can still send PDFs and photos. Voice notes go to a new private bucket `chat-voice` under `voice/<conversationId>/`; the bucket is created automatically on the first upload (or run the storage setup script). Signed links are now 10 minutes so audio can stream. Voice notes are left out of the shared files list, and the conversation preview reads "Voice message". No migration needed.

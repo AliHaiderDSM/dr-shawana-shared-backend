@@ -60,4 +60,11 @@ export class DiscountRequest extends BranchScopedEntity {
   @Index()
   @Column({ name: 'sale_id', type: 'uuid', nullable: true })
   saleId: string | null;
+
+  @Index('IDX_discount_requests_patient')
+  @Column({ name: 'patient_id', type: 'uuid', nullable: true })
+  patientId: string | null;
+
+  @Column({ name: 'customer_name', type: 'varchar', length: 200, nullable: true })
+  customerName: string | null;
 }

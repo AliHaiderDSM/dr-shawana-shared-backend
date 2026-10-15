@@ -20,6 +20,13 @@ export const createDiscountRequestSchema = registry.register(
       qty: positiveQuantityInput,
       discountPercent: percent,
       note: optionalText(500),
+      patientId: z.uuid().optional().openapi({ description: 'The customer of the sale, when already saved' }),
+      customerName: z
+        .string()
+        .trim()
+        .max(200)
+        .optional()
+        .openapi({ description: 'Name of a new customer that is not saved yet' }),
     })
     .refine((v) => (v.productId ? 1 : 0) + (v.bundleId ? 1 : 0) === 1, {
       message: 'Give either productId or bundleId',
@@ -66,6 +73,9 @@ export const discountRequestSchema = registry.register(
     decisionNote: z.string().nullable(),
     saleId: z.uuid().nullable(),
     invoiceNo: z.string().nullable(),
+    customer: z
+      .object({ id: z.uuid().nullable(), name: z.string(), phone: z.string().nullable() })
+      .nullable(),
     createdAt: z.iso.datetime(),
   }),
 );

@@ -521,8 +521,20 @@ describe('POS sales', () => {
       qty: '2',
       discountPercent: '25',
       note: 'Regular patient',
+      patientId,
     });
     expect(asked.status).toBe(201);
+    expect(asked.body.data.customer).toMatchObject({ id: patientId, name: expect.any(String) });
+    const walkIn = await api('post', '/branch/discount-requests', frontDesk).send({
+      productId: serum,
+      qty: '1',
+      discountPercent: '10',
+      customerName: 'New Walk-in',
+    });
+    expect(walkIn.body.data.customer).toEqual({ id: null, name: 'New Walk-in', phone: null });
+    expect(
+      (await api('post', `/branch/discount-requests/${walkIn.body.data.id}/cancel`, frontDesk)).status,
+    ).toBe(200);
     expect(asked.body.data).toMatchObject({
       requestNo: 'LHR-DR-000001',
       status: 'pending',

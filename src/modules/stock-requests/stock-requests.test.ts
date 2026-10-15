@@ -194,6 +194,17 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     });
     expect(got.status).toBe(200);
     expect(await stockOf('Vitamin C Serum', lahoreId)).toBe('5.000');
+    const receipt = (
+      await as(lahoreAdmin, 'get', '/branch/incoming-stock?transferNo=' + transferNo.toLowerCase())
+    ).body.data;
+    expect(receipt).toEqual([
+      expect.objectContaining({
+        transferNo,
+        received: true,
+        receivedBy: expect.objectContaining({ id: lahoreAdmin.id }),
+      }),
+    ]);
+    expect((await as(lahoreAdmin, 'get', '/branch/incoming-stock?transferNo=NOPE-1')).body.data).toEqual([]);
     expect(await stockOf('Rose Toner', lahoreId)).toBe('6.000');
     const done = (await as(lahoreAdmin, 'get', `/branch/stock-requests/${requestId}`)).body.data;
     expect(done).toMatchObject({ status: 'received', receivedBy: { id: lahoreAdmin.id } });

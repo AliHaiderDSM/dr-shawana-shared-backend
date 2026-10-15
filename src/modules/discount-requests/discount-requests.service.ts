@@ -37,6 +37,9 @@ interface Row {
   decisionNote: string | null;
   saleId: string | null;
   invoiceNo: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
   createdAt: Date;
 }
 
@@ -49,7 +52,9 @@ const SELECT = `
          r.note, r.status, r.decided_by AS "deciderId",
          NULLIF(TRIM(CONCAT(dc.first_name, ' ', dc.last_name)), '') AS "deciderName", dc.role::text AS "deciderRole",
          r.decided_at AS "decidedAt", r.decision_note AS "decisionNote", r.sale_id AS "saleId",
-         s.invoice_no AS "invoiceNo", r.created_at AS "createdAt"
+         s.invoice_no AS "invoiceNo", COALESCE(sp.id, rp.id) AS "customerId",
+         COALESCE(sp.name, rp.name, r.customer_name) AS "customerName",
+         COALESCE(sp.phone, rp.phone) AS "customerPhone", r.created_at AS "createdAt"
     FROM discount_requests r
     JOIN branches b ON b.id = r.branch_id
     LEFT JOIN staff_profiles rq ON rq.id = r.created_by
@@ -57,6 +62,8 @@ const SELECT = `
     LEFT JOIN products p ON p.id = r.product_id
     LEFT JOIN bundles bu ON bu.id = r.bundle_id
     LEFT JOIN sales s ON s.id = r.sale_id
+    LEFT JOIN patients sp ON sp.id = s.patient_id
+    LEFT JOIN patients rp ON rp.id = r.patient_id
    WHERE r.deleted_at IS NULL`;
 
 function toDto(r: Row) {
@@ -84,6 +91,7 @@ function toDto(r: Row) {
     decisionNote: r.decisionNote,
     saleId: r.saleId,
     invoiceNo: r.invoiceNo,
+    customer: r.customerName ? { id: r.customerId, name: r.customerName, phone: r.customerPhone } : null,
     createdAt: new Date(r.createdAt).toISOString(),
   };
 }
@@ -181,6 +189,12 @@ export const discountRequestsService = {
         if (!bundle) throw AppError.badRequest('The bundle was not found in this branch');
         unitPrice = toMoney(bundle.totalPrice);
       }
+      if (input.patientId) {
+        const [patient] = (await em.query('SELECT id FROM patients WHERE id = $1 AND deleted_at IS NULL', [
+          input.patientId,
+        ])) as { id: string }[];
+        if (!patient) throw AppError.badRequest('The customer was not found');
+      }
       const branch = await repo(Branch, em).findOneByOrFail({ id: branchId });
       const seq = await nextSequence(em, branchId, 'discount_request');
       const requests = repo(DiscountRequest, em);
@@ -194,6 +208,8 @@ export const discountRequestsService = {
           unitPrice,
           discountPercent: new Decimal(input.discountPercent).toFixed(2),
           note: input.note ?? null,
+          patientId: input.patientId ?? null,
+          customerName: input.patientId ? null : input.customerName || null,
           status: 'pending',
           createdBy: actor.userId,
           updatedBy: actor.userId,

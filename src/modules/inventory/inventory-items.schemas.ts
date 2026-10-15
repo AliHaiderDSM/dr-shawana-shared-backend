@@ -33,6 +33,10 @@ export const inventoryItemListQuerySchema = z.object({
     .openapi({ description: 'Only pieces that have no batch' }),
   saleId: z.uuid().optional(),
   status: z.enum(ITEM_STATUSES).optional(),
+  group: z.enum(['in_stock', 'in_branches', 'sold', 'other']).optional().openapi({
+    description:
+      'Same groups as the label batch counts: in stock here, in stock at branches it was sent to, sold, or anything else',
+  }),
   source: z.enum(ITEM_SOURCES).optional(),
   sourceId: z.uuid().optional(),
   from: serialInput.optional().openapi({ description: 'First label of a range' }),

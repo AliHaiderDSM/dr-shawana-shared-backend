@@ -369,6 +369,10 @@ export const stockRequestsService = {
       params.push(branchId);
       where.push(`o.to_branch_id = $${params.length}`);
     }
+    if (query.transferNo) {
+      params.push(query.transferNo.toUpperCase());
+      where.push(`o.transfer_no = $${params.length}`);
+    }
     const having =
       query.status === 'waiting'
         ? 'HAVING bool_or(o.received_at IS NULL)'

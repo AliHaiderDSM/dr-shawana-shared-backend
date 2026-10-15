@@ -504,6 +504,10 @@ export const inventoryItemsService = {
     if (query.batchId) add(`${batchColumn} = ?`, query.batchId);
     if (query.withoutBatch) where.push(`${batchColumn} IS NULL`);
     if (query.status) add('i.status = ?', query.status);
+    if (query.group === 'in_stock') where.push("so.id IS NULL AND i.status = 'in_stock'");
+    if (query.group === 'in_branches') where.push("so.id IS NOT NULL AND i.status = 'in_stock'");
+    if (query.group === 'sold') where.push("i.status = 'sold'");
+    if (query.group === 'other') where.push("i.status NOT IN ('in_stock', 'sold')");
     if (query.saleId) add('i.sale_id = ?', query.saleId);
     if (query.source && query.sourceId) {
       add('i.source_type = ?', query.source);

@@ -52,6 +52,7 @@ export const stockRequestCatalogQuerySchema = z.object({
 
 export const incomingStockQuerySchema = z.object({
   status: z.enum(['waiting', 'received']).optional(),
+  transferNo: z.string().trim().min(1).max(30).optional(),
   branchId: z.uuid().optional(),
 });
 

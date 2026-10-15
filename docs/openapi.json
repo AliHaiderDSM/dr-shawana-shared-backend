@@ -14213,6 +14213,16 @@
               "null"
             ],
             "maxLength": 500
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The customer of the sale, when already saved"
+          },
+          "customerName": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Name of a new customer that is not saved yet"
           }
         },
         "required": [
@@ -14382,6 +14392,35 @@
               "null"
             ]
           },
+          "customer": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "phone"
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -14406,6 +14445,7 @@
           "decisionNote",
           "saleId",
           "invoiceNo",
+          "customer",
           "createdAt"
         ]
       },
@@ -23087,6 +23127,22 @@
             },
             "required": false,
             "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "in_stock",
+                "in_branches",
+                "sold",
+                "other"
+              ],
+              "description": "Same groups as the label batch counts: in stock here, in stock at branches it was sent to, sold, or anything else"
+            },
+            "required": false,
+            "description": "Same groups as the label batch counts: in stock here, in stock at branches it was sent to, sold, or anything else",
+            "name": "group",
             "in": "query"
           },
           {
@@ -48964,6 +49020,16 @@
             },
             "required": false,
             "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "required": false,
+            "name": "transferNo",
             "in": "query"
           },
           {
