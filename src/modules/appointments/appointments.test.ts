@@ -56,7 +56,7 @@ describe('appointments and payments', () => {
       })
     ).body.data.id;
     cashSheetId = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await api('post', `/branch/account-sheets?branchId=${lahore.id}`, owner).send({
         accountName: 'Cash',
         accountCode: 'C1',
         type: 'cash',

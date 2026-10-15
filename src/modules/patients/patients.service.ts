@@ -1,4 +1,5 @@
 import { type EntityManager } from 'typeorm';
+import { AppDataSource } from '../../database/data-source';
 import { repo, withTransaction } from '../../database/transaction';
 import { Decimal, toMoney } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
@@ -70,7 +71,29 @@ function summaryAppointment(a: Appointment, received: Map<string, string>) {
 export const patientsService = {
   async list(branchId: string, query: PatientListQuery) {
     const { items, meta } = await patientsRepository.list(branchId, query);
-    return { items: items.map(toPatientDto), meta };
+    const ids = [...new Set(items.flatMap((p) => (p.createdBy ? [p.createdBy] : [])))];
+    const people = ids.length
+      ? ((await AppDataSource.query(
+          `SELECT s.id, NULLIF(TRIM(CONCAT(s.first_name, ' ', s.last_name)), '') AS name, s.role::text AS role,
+                  b.name AS "branchName"
+             FROM staff_profiles s LEFT JOIN branches b ON b.id = s.branch_id
+            WHERE s.id = ANY($1)`,
+          [ids],
+        )) as { id: string; name: string | null; role: string; branchName: string | null }[])
+      : [];
+    const byId = new Map(people.map((p) => [p.id, p]));
+    return {
+      items: items.map((p) => {
+        const by = p.createdBy ? byId.get(p.createdBy) : undefined;
+        return {
+          ...toPatientDto(p),
+          enteredBy: by
+            ? { id: by.id, name: by.name ?? 'Staff', role: by.role, branchName: by.branchName }
+            : null,
+        };
+      }),
+      meta,
+    };
   },
 
   async options(branchId: string, search?: string) {

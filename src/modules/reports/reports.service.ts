@@ -641,7 +641,6 @@ export const reportsService = {
           .slice(0, 10)
       : q.to;
     const f = new SqlFilter()
-      .when(scope.branchId, "(sh.branch_id = ? OR sh.type = 'bank')", scope.branchId)
       .add('sh.deleted_at IS NULL')
       .when(q.accountSheetId, 'sh.id = ?', q.accountSheetId);
     const startParam = f.params.length + 1;
@@ -695,7 +694,7 @@ export const reportsService = {
     }
 
     const rows = await query(
-      `SELECT CASE WHEN sh.type = 'bank' THEN 'Shared' ELSE b.code END AS branch, sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.type,
+      `SELECT 'Shared' AS branch, sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.type,
               COALESCE(SUM(m.debit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS debit,
               COALESCE(SUM(m.credit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS credit,
               (COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${endParam}::date IS NULL OR m.date <= $${endParam}::date), 0))::numeric(12,2)::text AS closing

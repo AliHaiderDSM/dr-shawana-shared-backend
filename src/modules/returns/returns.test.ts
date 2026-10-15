@@ -55,7 +55,7 @@ describe('Sale returns and barcodes', () => {
     serum = (await product('Serum', '8964000123456')).body.data.id;
     toner = (await product('Toner', null)).body.data.id;
     cashSheet = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await owned('post', '/branch/account-sheets').send({
         accountName: 'Cash',
         accountCode: 'C1',
         type: 'cash',

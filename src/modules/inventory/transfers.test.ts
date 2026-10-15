@@ -75,8 +75,8 @@ describe('Main Warehouse transfers to branches', () => {
     lahoreDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     cashSheet = (
       await request(app)
-        .post('/api/v1/branch/account-sheets')
-        .set(bearer(lahoreAdmin))
+        .post(`/api/v1/branch/account-sheets?branchId=${lahore.id}`)
+        .set(bearer(superAdmin))
         .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
     ).body.data.id;
 

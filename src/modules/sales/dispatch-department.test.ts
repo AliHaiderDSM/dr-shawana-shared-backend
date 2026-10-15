@@ -89,7 +89,7 @@ describe('Dispatch Department ships every online order from its own stock', () =
     lahoreAdmin = await createStaff(fake, { role: 'branch_admin', branchId: lahoreId });
     isbDesk = await createStaff(fake, { role: 'front_desk', branchId: isbId });
     lahoreCash = (
-      await as(lahoreAdmin, 'post', '/branch/account-sheets').send({
+      await as(superAdmin, 'post', '/branch/account-sheets', lahoreId).send({
         accountName: 'Cash',
         accountCode: 'CASH',
         type: 'cash',

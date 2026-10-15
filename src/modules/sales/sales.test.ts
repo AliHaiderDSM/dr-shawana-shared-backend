@@ -75,7 +75,7 @@ describe('POS sales', () => {
       })
     ).body.data.id;
     cashSheet = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await owned('post', '/branch/account-sheets').send({
         accountName: 'Cash',
         accountCode: 'C1',
         type: 'cash',

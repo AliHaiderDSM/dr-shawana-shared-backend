@@ -52,7 +52,7 @@ describe('accounts, expenses, reports and dashboard', () => {
     superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
 
     cashSheet = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await owned('post', '/branch/account-sheets').send({
         accountName: 'Cash',
         accountCode: 'C1',
         type: 'cash',
@@ -68,7 +68,7 @@ describe('accounts, expenses, reports and dashboard', () => {
       })
     ).body.data.id;
     isbCash = (
-      await api('post', '/branch/account-sheets', islamabadAdmin).send({
+      await api('post', `/branch/account-sheets?branchId=${islamabadId}`, superAdmin).send({
         accountName: 'ISB Cash',
         accountCode: 'I1',
         type: 'cash',
@@ -285,7 +285,10 @@ describe('accounts, expenses, reports and dashboard', () => {
         debit: '0.00',
         closing: '0.00',
       });
-      expect(isb.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1')).toBeUndefined();
+      expect(isb.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1')).toMatchObject({
+        debit: '0.00',
+        closing: '0.00',
+      });
 
       const october = await report('accounts-balance', accountant, 'month=2026-10');
       expect(

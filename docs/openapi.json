@@ -4773,6 +4773,37 @@
             ],
             "format": "uuid"
           },
+          "enteredBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "branchName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "role",
+              "branchName"
+            ],
+            "description": "Who added the patient (list only)"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"

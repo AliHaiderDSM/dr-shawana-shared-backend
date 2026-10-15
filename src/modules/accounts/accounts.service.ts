@@ -24,10 +24,11 @@ async function getSheet(branchId: string, id: string, manager?: EntityManager) {
   return sheet;
 }
 
-const SHARED_BANKS = 'Bank accounts are shared by every branch. Only the Super Admin adds or changes them.';
+const SHARED_ACCOUNTS =
+  'Bank and cash accounts are shared by every branch. Only the Super Admin adds, changes or deletes them.';
 
-function assertBankManager(actor: Actor) {
-  if (!actor.isSuperAdmin) throw AppError.forbidden(SHARED_BANKS);
+function assertAccountManager(actor: Actor) {
+  if (!actor.isSuperAdmin) throw AppError.forbidden(SHARED_ACCOUNTS);
 }
 
 async function bankIdFor(actor: Actor, branchId: string, name: string | null | undefined, em: EntityManager) {
@@ -56,7 +57,7 @@ export const accountSheetsService = {
   },
 
   async create(actor: Actor, branchId: string, input: CreateAccountSheetInput) {
-    if (input.type === 'bank') assertBankManager(actor);
+    assertAccountManager(actor);
     return withTransaction(async (em) => {
       const bankId = input.type === 'bank' ? await bankIdFor(actor, branchId, input.bankName, em) : null;
       const created = await accountSheetsRepository.create(
@@ -90,7 +91,7 @@ export const accountSheetsService = {
   async update(actor: Actor, branchId: string, id: string, input: UpdateAccountSheetInput) {
     return withTransaction(async (em) => {
       const sheet = await getSheet(branchId, id, em);
-      if (sheet.type === 'bank' || input.type === 'bank') assertBankManager(actor);
+      assertAccountManager(actor);
       const before = toAccountSheetDto(sheet);
       const { bankName, ...fields } = input;
       Object.assign(sheet, fields, { updatedBy: actor.userId });
@@ -120,7 +121,7 @@ export const accountSheetsService = {
   async remove(actor: Actor, branchId: string, id: string) {
     await withTransaction(async (em) => {
       const sheet = await getSheet(branchId, id, em);
-      if (sheet.type === 'bank') assertBankManager(actor);
+      assertAccountManager(actor);
       await accountSheetsRepository.softDelete(sheet, actor.userId, em);
       await auditService.record(
         {

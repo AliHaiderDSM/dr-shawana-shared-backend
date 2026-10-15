@@ -87,6 +87,11 @@ export const patientSchema = registry.register(
     bhrtStatus: z.enum(BHRT_STATUSES),
     createdInBranchId: z.uuid().nullable(),
     createdBy: z.uuid().nullable(),
+    enteredBy: z
+      .object({ id: z.uuid(), name: z.string(), role: z.string(), branchName: z.string().nullable() })
+      .nullable()
+      .optional()
+      .openapi({ description: 'Who added the patient (list only)' }),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   }),

@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Shared accounts for every branch, patient Entered by (2026-10-15)
+
+- All account sheets (cash and bank) are shared by every branch and show in every branch's payment options. Only the Super Admin creates, edits or deletes them (403 for others). Reports show the viewing branch's money only (branch column: Shared).
+- `GET /branch/patients` rows carry `enteredBy {id, name, role, branchName}`.
+
 ## Shared patients and bank accounts, sale labels (2026-10-15)
 
 - Patients are shared: `/branch/patients` and `/options` list every patient, not only the ones linked to the branch.

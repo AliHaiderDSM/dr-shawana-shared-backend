@@ -25,34 +25,28 @@ export const banksRepository = {
   },
 };
 
-const visible = (branchId: string, manager?: EntityManager) =>
-  repo(AccountSheet, manager)
-    .createQueryBuilder('a')
-    .where("(a.branchId = :branchId OR a.type = 'bank')", { branchId });
+const shared = (manager?: EntityManager) => repo(AccountSheet, manager).createQueryBuilder('a');
 
 export const accountSheetsRepository = {
   ...sheetsBase,
 
-  findById(branchId: string, id: string, manager?: EntityManager) {
-    return visible(branchId, manager).andWhere('a.id = :id', { id }).getOne();
+  findById(_branchId: string, id: string, manager?: EntityManager) {
+    return shared(manager).andWhere('a.id = :id', { id }).getOne();
   },
 
-  findByIds(branchId: string, ids: string[], manager?: EntityManager) {
+  findByIds(_branchId: string, ids: string[], manager?: EntityManager) {
     if (ids.length === 0) return Promise.resolve([]);
-    return visible(branchId, manager)
+    return shared(manager)
       .andWhere({ id: In(ids) })
       .getMany();
   },
 
-  findWithBank(branchId: string, id: string, manager?: EntityManager) {
-    return visible(branchId, manager)
-      .leftJoinAndSelect('a.bank', 'bank')
-      .andWhere('a.id = :id', { id })
-      .getOne();
+  findWithBank(_branchId: string, id: string, manager?: EntityManager) {
+    return shared(manager).leftJoinAndSelect('a.bank', 'bank').andWhere('a.id = :id', { id }).getOne();
   },
 
-  list(branchId: string, query: AccountSheetListQuery, manager?: EntityManager) {
-    const qb = visible(branchId, manager).leftJoinAndSelect('a.bank', 'bank');
+  list(_branchId: string, query: AccountSheetListQuery, manager?: EntityManager) {
+    const qb = shared(manager).leftJoinAndSelect('a.bank', 'bank');
     if (query.type) qb.andWhere('a.type = :type', { type: query.type });
     if (query.bankId) qb.andWhere('a.bankId = :bankId', { bankId: query.bankId });
     return paginate(qb, query, {
@@ -66,8 +60,8 @@ export const accountSheetsRepository = {
     });
   },
 
-  async options(branchId: string, manager?: EntityManager) {
-    const sheets = await visible(branchId, manager)
+  async options(_branchId: string, manager?: EntityManager) {
+    const sheets = await shared(manager)
       .leftJoinAndSelect('a.bank', 'bank')
       .orderBy('bank.name', 'ASC', 'NULLS FIRST')
       .addOrderBy('a.accountName', 'ASC')

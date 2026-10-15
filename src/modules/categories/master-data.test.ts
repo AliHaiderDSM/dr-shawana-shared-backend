@@ -195,10 +195,16 @@ describe('master data', () => {
       });
       expect(second.body.data.bankId).toBe(sheet.body.data.bankId);
 
-      const cash = await request(app)
+      const cashByAdmin = await request(app)
         .post('/api/v1/branch/account-sheets')
         .set(bearer(admin))
         .send({ accountName: 'Cash in hand', accountCode: 'CASH', type: 'cash' });
+      expect(cashByAdmin.status).toBe(403);
+      const cash = await asOwner('post', '/branch/account-sheets').send({
+        accountName: 'Cash in hand',
+        accountCode: 'CASH',
+        type: 'cash',
+      });
       expect(cash.body.data).toMatchObject({ bankId: null });
 
       expect(
@@ -242,7 +248,7 @@ describe('master data', () => {
       );
     });
 
-    it('shares bank accounts with every branch and keeps cash sheets per branch', async () => {
+    it('shares bank and cash accounts with every branch', async () => {
       const bank = await asOwner('post', '/branch/account-sheets').send({
         accountName: 'Shared Alfalah',
         accountCode: 'AL1',
@@ -257,10 +263,11 @@ describe('master data', () => {
         bankName: 'alfalah',
       });
       expect(again.body.data.bankId).toBe(bank.body.data.bankId);
-      const theirCash = await request(app)
-        .post('/api/v1/branch/account-sheets')
-        .set(bearer(otherAdmin))
-        .send({ accountName: 'ISB Cash', accountCode: 'IC', type: 'cash' });
+      const theirCash = await asOwner('post', '/branch/account-sheets', islamabadId).send({
+        accountName: 'ISB Cash',
+        accountCode: 'IC',
+        type: 'cash',
+      });
       expect(theirCash.status).toBe(201);
 
       const otherOptions = await request(app)
@@ -270,8 +277,7 @@ describe('master data', () => {
       expect(otherIds).toEqual(expect.arrayContaining([bank.body.data.id, theirCash.body.data.id]));
       const mine = await request(app).get('/api/v1/branch/account-sheets/options').set(bearer(admin));
       const mineIds = mine.body.data.map((o: { id: string }) => o.id);
-      expect(mineIds).toContain(bank.body.data.id);
-      expect(mineIds).not.toContain(theirCash.body.data.id);
+      expect(mineIds).toEqual(expect.arrayContaining([bank.body.data.id, theirCash.body.data.id]));
     });
   });
 });

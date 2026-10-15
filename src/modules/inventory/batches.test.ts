@@ -58,8 +58,8 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     cashSheet = (
       await request(app)
-        .post('/api/v1/branch/account-sheets')
-        .set(bearer(admin))
+        .post(`/api/v1/branch/account-sheets?branchId=${ownerBranch}`)
+        .set(bearer(owner))
         .send({ accountName: 'Cash', accountCode: 'CASH', type: 'cash' })
     ).body.data.id;
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
