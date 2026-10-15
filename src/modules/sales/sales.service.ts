@@ -661,6 +661,10 @@ export const salesService = {
       .addSelect('COALESCE(SUM(sale.total), 0)', 'total')
       .addSelect('COALESCE(SUM(sale.received), 0)', 'received')
       .addSelect('COALESCE(SUM(sale.remaining), 0)', 'remaining')
+      .addSelect(
+        'COALESCE(SUM((SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r WHERE r.sale_id = sale.id AND r.deleted_at IS NULL)), 0)',
+        'refund',
+      )
       .getRawOne<Record<string, string>>();
     applyListQuery(
       qb,
@@ -686,7 +690,7 @@ export const salesService = {
           .getRawMany<Record<string, string>>();
     const [totals, rows, byBranch] = await Promise.all([totalsQuery, qb.getMany(), byBranchQuery]);
     const ids = rows.map((r) => r.id);
-    const [withPayments, lines] = ids.length
+    const [withPayments, lines, refunds] = ids.length
       ? await Promise.all([
           repo(SalePayment).find({ where: { saleId: In(ids) } }),
           repo(SaleItem)
@@ -697,8 +701,14 @@ export const salesService = {
             .andWhere('si.deletedAt IS NULL')
             .orderBy('si.createdAt', 'ASC')
             .getMany(),
+          AppDataSource.query(
+            `SELECT sale_id AS "saleId", SUM(refund_amount)::text AS amount FROM sale_returns
+              WHERE sale_id = ANY($1::uuid[]) AND deleted_at IS NULL GROUP BY sale_id`,
+            [ids],
+          ) as Promise<{ saleId: string; amount: string }[]>,
         ])
-      : [[], []];
+      : [[], [], []];
+    const refundOf = (saleId: string) => new Decimal(refunds.find((x) => x.saleId === saleId)?.amount ?? 0);
     const productsOf = (saleId: string) => {
       const summary = new Map<string, { name: string; qty: Decimal | null }>();
       for (const line of lines.filter((l) => l.saleId === saleId)) {
@@ -730,6 +740,8 @@ export const salesService = {
           itemDiscount: toMoney(itemDiscountOf(r.id)),
           grossAmount: toMoney(new Decimal(r.subtotal).plus(itemDiscountOf(r.id))),
           discountTotal: toMoney(itemDiscountOf(r.id).plus(r.discountAmount)),
+          refund: toMoney(refundOf(r.id)),
+          netAmount: toMoney(new Decimal(r.total).minus(refundOf(r.id))),
         };
       }),
       meta: {
@@ -744,6 +756,8 @@ export const salesService = {
           total: toMoney(totals?.total ?? 0),
           received: toMoney(totals?.received ?? 0),
           remaining: toMoney(totals?.remaining ?? 0),
+          refund: toMoney(totals?.refund ?? 0),
+          net: toMoney(new Decimal(totals?.total ?? 0).minus(totals?.refund ?? 0)),
         },
         ...(byBranch
           ? {

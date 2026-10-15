@@ -215,11 +215,30 @@ export const stockRequestsService = {
       const ids = [...new Set(input.items.map((i) => i.productId))];
       if (ids.length !== input.items.length) throw AppError.badRequest('Each product can be asked once');
       const found = (await em.query(
-        `SELECT id FROM products WHERE id = ANY($1::uuid[]) AND branch_id = $2 AND deleted_at IS NULL`,
+        `SELECT p.id, p.name, ${SELLABLE}::text AS available
+           FROM products p WHERE p.id = ANY($1::uuid[]) AND p.branch_id = $2 AND p.deleted_at IS NULL`,
         [ids, source],
-      )) as { id: string }[];
+      )) as { id: string; name: string; available: string }[];
       if (found.length !== ids.length) {
         throw AppError.badRequest('Ask only for products of the Super Admin stock');
+      }
+      const short = input.items.flatMap((item) => {
+        const product = found.find((p) => p.id === item.productId)!;
+        return new Decimal(item.qty).gt(product.available)
+          ? [
+              {
+                productId: product.id,
+                name: product.name,
+                available: toQuantity(product.available).toString(),
+              },
+            ]
+          : [];
+      });
+      if (short.length) {
+        throw AppError.unprocessable(
+          short.map((p) => `${p.name}: only ${p.available} in the Super Admin stock`).join('; '),
+          { products: short },
+        );
       }
       const seq = await nextSequence(em, branchId, 'stock_request');
       const requests = repo(StockRequest, em);

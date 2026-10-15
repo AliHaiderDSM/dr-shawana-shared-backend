@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Stock request limit, sale refunds (2026-10-15)
+
+- `POST /branch/stock-requests` refuses (422) a qty above what the Super Admin stock holds (unexpired), naming each product and the qty there.
+- `GET /branch/sales` rows carry `refund` (sum of return refunds) and `netAmount` (total minus refund); `meta.totals` carries `refund` and `net`.
+
 ## Shared accounts for every branch, patient Entered by (2026-10-15)
 
 - All account sheets (cash and bank) are shared by every branch and show in every branch's payment options. Only the Super Admin creates, edits or deletes them (403 for others). Reports show the viewing branch's money only (branch column: Shared).

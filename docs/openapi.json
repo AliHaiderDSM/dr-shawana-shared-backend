@@ -44808,6 +44808,16 @@
                             "type": "string",
                             "example": "1250.50",
                             "description": "Item discounts plus the sale discount"
+                          },
+                          "refund": {
+                            "type": "string",
+                            "example": "1250.50",
+                            "description": "Money refunded on returns of this sale"
+                          },
+                          "netAmount": {
+                            "type": "string",
+                            "example": "1250.50",
+                            "description": "Total after discounts minus refunds"
                           }
                         },
                         "required": [
@@ -44841,7 +44851,9 @@
                           "products",
                           "itemDiscount",
                           "grossAmount",
-                          "discountTotal"
+                          "discountTotal",
+                          "refund",
+                          "netAmount"
                         ]
                       }
                     },
@@ -44893,6 +44905,16 @@
                                 "remaining": {
                                   "type": "string",
                                   "example": "1250.50"
+                                },
+                                "refund": {
+                                  "type": "string",
+                                  "example": "1250.50",
+                                  "description": "Money refunded on returns of these sales"
+                                },
+                                "net": {
+                                  "type": "string",
+                                  "example": "1250.50",
+                                  "description": "Total after discounts minus refunds"
                                 }
                               },
                               "required": [
@@ -44904,7 +44926,9 @@
                                 "discountTotal",
                                 "total",
                                 "received",
-                                "remaining"
+                                "remaining",
+                                "refund",
+                                "net"
                               ]
                             },
                             "byBranch": {

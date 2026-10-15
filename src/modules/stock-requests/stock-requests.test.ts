@@ -76,6 +76,11 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
         })
       ).status,
     ).toBe(403);
+    const tooMuch = await as(lahoreAdmin, 'post', '/branch/stock-requests').send({
+      items: [{ productId: serum, qty: '100000' }],
+    });
+    expect(tooMuch.status).toBe(422);
+    expect(tooMuch.body.error.message).toContain('only');
     const asked = await as(lahoreAdmin, 'post', '/branch/stock-requests').send({
       note: 'Weekend rush',
       items: [

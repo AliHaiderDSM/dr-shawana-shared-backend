@@ -138,6 +138,12 @@ describe('Sale returns and barcodes', () => {
     expect(ret).toMatchObject({ status: 'pending', totalQty: '4.000', refundAmount: '1500.00' });
     expect(ret.returnNo).toBe('LHR-RET-000001');
     expect(await stock(serum)).toBe('7.000');
+    const listed = (await api('get', '/branch/sales?pageSize=100', admin)).body;
+    const row = listed.data.find((s: { id: string }) => s.id === saleId);
+    expect(row.refund).toBe('1500.00');
+    expect(Number(row.netAmount)).toBe(Number(row.total) - 1500);
+    expect(listed.meta.totals.refund).toBe('1500.00');
+    expect(Number(listed.meta.totals.net)).toBe(Number(listed.meta.totals.total) - 1500);
 
     expect(
       (await api('post', '/branch/returns', pharmacy).send({ saleId, reason: 'other', items: [] })).status,
