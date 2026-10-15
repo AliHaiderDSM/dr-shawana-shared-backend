@@ -60,7 +60,7 @@ describe('accounts, expenses, reports and dashboard', () => {
       })
     ).body.data.id;
     bankSheet = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await owned('post', '/branch/account-sheets').send({
         accountName: 'Bank',
         accountCode: 'B1',
         type: 'bank',
@@ -279,6 +279,13 @@ describe('accounts, expenses, reports and dashboard', () => {
       });
       const bank = res.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'B1');
       expect(bank).toMatchObject({ debit: '2600.00', closing: '2600.00' });
+      const isb = await report('accounts-balance', islamabadAdmin, 'month=2026-09');
+      expect(isb.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'B1')).toMatchObject({
+        branch: 'Shared',
+        debit: '0.00',
+        closing: '0.00',
+      });
+      expect(isb.body.data.rows.find((r: { accountCode: string }) => r.accountCode === 'C1')).toBeUndefined();
 
       const october = await report('accounts-balance', accountant, 'month=2026-10');
       expect(

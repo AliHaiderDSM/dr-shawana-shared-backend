@@ -82,7 +82,7 @@ describe('POS sales', () => {
       })
     ).body.data.id;
     bankSheet = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await owned('post', '/branch/account-sheets').send({
         accountName: 'Meezan',
         accountCode: 'M1',
         type: 'bank',

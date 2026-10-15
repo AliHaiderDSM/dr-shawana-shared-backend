@@ -42,6 +42,7 @@ describe('appointments and payments', () => {
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
+    const owner = await createStaff(fake, { role: 'super_admin', branchId: null });
     doctorUser = await createStaff(fake, { role: 'doctor', branchId: lahore.id });
     const otherDoctorUser = await createStaff(fake, { role: 'doctor', branchId: lahore.id });
 
@@ -62,7 +63,7 @@ describe('appointments and payments', () => {
       })
     ).body.data.id;
     bankSheetId = (
-      await api('post', '/branch/account-sheets', admin).send({
+      await api('post', `/branch/account-sheets?branchId=${lahore.id}`, owner).send({
         accountName: 'Clinic Meezan',
         accountCode: 'M1',
         type: 'bank',

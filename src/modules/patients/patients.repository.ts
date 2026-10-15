@@ -22,17 +22,6 @@ function applySearch(qb: SelectQueryBuilder<Patient>, search: string) {
   );
 }
 
-function linkedToBranch(qb: SelectQueryBuilder<Patient>, branchId: string) {
-  qb.andWhere(
-    new Brackets((w) => {
-      w.where('p.createdInBranchId = :branchId', { branchId }).orWhere(
-        `EXISTS (SELECT 1 FROM appointments a WHERE a.patient_id = p.id AND a.branch_id = :branchId AND a.deleted_at IS NULL)`,
-        { branchId },
-      );
-    }),
-  );
-}
-
 export const patientsRepository = {
   findById(id: string, manager?: EntityManager) {
     return patients(manager).findOne({ where: { id } });
@@ -60,7 +49,6 @@ export const patientsRepository = {
   list(branchId: string, query: PatientListQuery) {
     const qb = patients().createQueryBuilder('p');
     if (query.search) applySearch(qb, query.search);
-    else linkedToBranch(qb, branchId);
     if (query.city) qb.andWhere('p.city ILIKE :city', { city: escapeLike(query.city) });
     if (query.bhrtStatus) qb.andWhere('p.bhrtStatus = :bhrt', { bhrt: query.bhrtStatus });
     return paginate(
@@ -77,7 +65,6 @@ export const patientsRepository = {
       .orderBy('p.name', 'ASC')
       .take(50);
     if (search) applySearch(qb, search);
-    else linkedToBranch(qb, branchId);
     return qb.getMany();
   },
 

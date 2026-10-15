@@ -640,20 +640,25 @@ export const reportsService = {
           .toISOString()
           .slice(0, 10)
       : q.to;
-    const f = scoped(scope, 'sh.branch_id')
+    const f = new SqlFilter()
+      .when(scope.branchId, "(sh.branch_id = ? OR sh.type = 'bank')", scope.branchId)
       .add('sh.deleted_at IS NULL')
       .when(q.accountSheetId, 'sh.id = ?', q.accountSheetId);
     const startParam = f.params.length + 1;
     const endParam = f.params.length + 2;
-    const params = [...f.params, start ?? null, end ?? null];
+    const branchParam = f.params.length + 3;
+    const params = [...f.params, start ?? null, end ?? null, scope.branchId ?? null];
+    const inBranch = (column: string, index: number) =>
+      `($${index}::uuid IS NULL OR ${column} = $${index}::uuid)`;
 
     if (q.accountSheetId) {
       const [sheet] = await query(
         `SELECT sh.account_name AS "accountName", sh.account_code AS "accountCode",
                 (COALESCE((SELECT SUM(m.debit - m.credit) FROM account_movements m
-                  WHERE m.account_sheet_id = sh.id AND $${startParam}::date IS NOT NULL AND m.date < $${startParam}::date), 0))::numeric(12,2)::text AS opening
+                  WHERE m.account_sheet_id = sh.id AND $${startParam}::date IS NOT NULL AND m.date < $${startParam}::date
+                    AND ${inBranch('m.branch_id', startParam + 1)}), 0))::numeric(12,2)::text AS opening
            FROM account_sheets sh ${f.where}`,
-        [...f.params, start ?? null],
+        [...f.params, start ?? null, scope.branchId ?? null],
       );
       if (!sheet) return build(scope, 'Account Ledger', [], []);
       const movements = await query(
@@ -662,8 +667,9 @@ export const reportsService = {
            FROM account_movements m
           WHERE m.account_sheet_id = $1
             AND ($2::date IS NULL OR m.date >= $2::date) AND ($3::date IS NULL OR m.date <= $3::date)
+            AND ${inBranch('m.branch_id', 4)}
           ORDER BY m.date, m.source, m.reference`,
-        [q.accountSheetId, start ?? null, end ?? null],
+        [q.accountSheetId, start ?? null, end ?? null, scope.branchId ?? null],
       );
       let balance = new Decimal(String(sheet.opening));
       const rows = movements.map((m) => {
@@ -689,16 +695,16 @@ export const reportsService = {
     }
 
     const rows = await query(
-      `SELECT b.code AS branch, sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.type,
+      `SELECT CASE WHEN sh.type = 'bank' THEN 'Shared' ELSE b.code END AS branch, sh.account_name AS "accountName", sh.account_code AS "accountCode", sh.type,
               COALESCE(SUM(m.debit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS debit,
               COALESCE(SUM(m.credit) FILTER (WHERE ($${startParam}::date IS NULL OR m.date >= $${startParam}::date) AND ($${endParam}::date IS NULL OR m.date <= $${endParam}::date)), 0)::numeric(12,2)::text AS credit,
               (COALESCE(SUM(m.debit - m.credit) FILTER (WHERE $${endParam}::date IS NULL OR m.date <= $${endParam}::date), 0))::numeric(12,2)::text AS closing
          FROM account_sheets sh
-         LEFT JOIN account_movements m ON m.account_sheet_id = sh.id
+         LEFT JOIN account_movements m ON m.account_sheet_id = sh.id AND ${inBranch('m.branch_id', branchParam)}
          JOIN branches b ON b.id = sh.branch_id
         ${f.where}
         GROUP BY b.code, sh.id
-        ORDER BY b.code, sh.account_name`,
+        ORDER BY sh.type DESC, b.code, sh.account_name`,
       params,
     );
     return build(

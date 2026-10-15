@@ -344,6 +344,13 @@ describe('Dispatch Department ships every online order from its own stock', () =
     });
     expect(sent.status).toBe(200);
     expect(sent.body.data.deliveryStatus).toBe('delivered');
+    const seen = (await as(lahoreAdmin, 'get', `/branch/sales/${order.id}`)).body.data;
+    const serumLine = seen.items.find(
+      (i: { product: { name: string } | null }) => i.product?.name === 'Vitamin C Serum',
+    );
+    expect(seen.serials).toEqual([
+      expect.objectContaining({ serial: serials[2], productId: serumLine.productId }),
+    ]);
 
     const dspToner = await productIn(dispatchId, 'Rose Toner');
     expect((await stock(dspToner, dispatchId))!).toMatchObject({

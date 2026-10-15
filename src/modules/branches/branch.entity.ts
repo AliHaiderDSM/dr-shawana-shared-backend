@@ -8,7 +8,10 @@ export const BRANCH_KINDS = ['branch', 'warehouse', 'dispatch'] as const;
 export type BranchKind = (typeof BRANCH_KINDS)[number];
 
 @Entity('branches')
-@Check('CHK_branches_code_format', `"code" ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' AND char_length("code") BETWEEN 2 AND 12`)
+@Check(
+  'CHK_branches_code_format',
+  `"code" ~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' AND char_length("code") BETWEEN 2 AND 12`,
+)
 @Index('UQ_branches_code', ['code'], { unique: true, where: '"deleted_at" IS NULL' })
 @Index('UQ_branches_single_warehouse', ['kind'], {
   unique: true,

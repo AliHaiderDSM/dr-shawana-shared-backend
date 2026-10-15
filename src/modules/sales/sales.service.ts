@@ -770,14 +770,15 @@ export const salesService = {
     const pieces = await inventoryItemsService.itemsOf(AppDataSource.manager, { saleId: id });
     const dto = toSaleDto(sale);
     const asDispatch = sale.branchId !== branchId;
-    const map = asDispatch
-      ? await stockProducts(
-          AppDataSource.manager,
-          sale,
-          dto.items.map((i) => i.productId),
-          false,
-        )
-      : null;
+    const stockMap = await stockProducts(
+      AppDataSource.manager,
+      sale,
+      dto.items.map((i) => i.productId),
+      false,
+    );
+    const map = asDispatch ? stockMap : null;
+    const back = new Map([...stockMap].map(([saleProduct, stockProduct]) => [stockProduct, saleProduct]));
+    const shown = (productId: string) => (asDispatch ? productId : (back.get(productId) ?? productId));
     return {
       ...dto,
       items: map
@@ -786,8 +787,12 @@ export const salesService = {
             return { ...i, productId, product: i.product ? { ...i.product, id: productId } : null };
           })
         : dto.items,
-      batches: batches.map((b) => ({ ...b, qty: toQuantity(b.qty.negated()) })),
-      serials: pieces.map((p) => ({ serial: p.serial, productId: p.productId, status: p.status })),
+      batches: batches.map((b) => ({
+        ...b,
+        productId: shown(b.productId),
+        qty: toQuantity(b.qty.negated()),
+      })),
+      serials: pieces.map((p) => ({ serial: p.serial, productId: shown(p.productId), status: p.status })),
     };
   },
 

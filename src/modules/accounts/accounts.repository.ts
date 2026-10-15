@@ -1,4 +1,5 @@
-import { type EntityManager } from 'typeorm';
+import { In, type EntityManager } from 'typeorm';
+import { repo } from '../../database/transaction';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { paginate } from '../../lib/pagination';
 import { AccountSheet } from './account-sheet.entity';
@@ -14,21 +15,44 @@ export const banksRepository = {
   findByName(branchId: string, name: string, manager?: EntityManager) {
     return banksBase.query(branchId, manager).andWhere('lower(bk.name) = lower(:name)', { name }).getOne();
   },
+
+  findAnyByName(name: string, manager?: EntityManager) {
+    return repo(Bank, manager)
+      .createQueryBuilder('bk')
+      .where('lower(bk.name) = lower(:name)', { name })
+      .orderBy('bk.createdAt', 'ASC')
+      .getOne();
+  },
 };
+
+const visible = (branchId: string, manager?: EntityManager) =>
+  repo(AccountSheet, manager)
+    .createQueryBuilder('a')
+    .where("(a.branchId = :branchId OR a.type = 'bank')", { branchId });
 
 export const accountSheetsRepository = {
   ...sheetsBase,
 
+  findById(branchId: string, id: string, manager?: EntityManager) {
+    return visible(branchId, manager).andWhere('a.id = :id', { id }).getOne();
+  },
+
+  findByIds(branchId: string, ids: string[], manager?: EntityManager) {
+    if (ids.length === 0) return Promise.resolve([]);
+    return visible(branchId, manager)
+      .andWhere({ id: In(ids) })
+      .getMany();
+  },
+
   findWithBank(branchId: string, id: string, manager?: EntityManager) {
-    return sheetsBase
-      .query(branchId, manager)
+    return visible(branchId, manager)
       .leftJoinAndSelect('a.bank', 'bank')
       .andWhere('a.id = :id', { id })
       .getOne();
   },
 
   list(branchId: string, query: AccountSheetListQuery, manager?: EntityManager) {
-    const qb = sheetsBase.query(branchId, manager).leftJoinAndSelect('a.bank', 'bank');
+    const qb = visible(branchId, manager).leftJoinAndSelect('a.bank', 'bank');
     if (query.type) qb.andWhere('a.type = :type', { type: query.type });
     if (query.bankId) qb.andWhere('a.bankId = :bankId', { bankId: query.bankId });
     return paginate(qb, query, {
@@ -43,8 +67,7 @@ export const accountSheetsRepository = {
   },
 
   async options(branchId: string, manager?: EntityManager) {
-    const sheets = await sheetsBase
-      .query(branchId, manager)
+    const sheets = await visible(branchId, manager)
       .leftJoinAndSelect('a.bank', 'bank')
       .orderBy('bank.name', 'ASC', 'NULLS FIRST')
       .addOrderBy('a.accountName', 'ASC')

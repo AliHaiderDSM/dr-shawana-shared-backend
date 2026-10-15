@@ -96,12 +96,14 @@ describe('patients and doctors', () => {
       );
     });
 
-    it('lists branch patients, and finds other branches only by search', async () => {
+    it('shares patients with every branch', async () => {
       const own = await api('get', '/branch/patients', admin);
       expect(own.body.data.map((p: { id: string }) => p.id)).toEqual([patientId]);
 
       const other = await api('get', '/branch/patients', islamabadAdmin);
-      expect(other.body.data).toEqual([]);
+      expect(other.body.data.map((p: { id: string }) => p.id)).toEqual([patientId]);
+      const otherOptions = await api('get', '/branch/patients/options', islamabadAdmin);
+      expect(otherOptions.body.data.map((p: { id: string }) => p.id)).toEqual([patientId]);
       const searched = await api('get', '/branch/patients?search=0300%201234567', islamabadAdmin);
       expect(searched.body.data.map((p: { id: string }) => p.id)).toEqual([patientId]);
 

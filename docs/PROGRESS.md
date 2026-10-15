@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Shared patients and bank accounts, sale labels (2026-10-15)
+
+- Patients are shared: `/branch/patients` and `/options` list every patient, not only the ones linked to the branch.
+- Bank account sheets (`type = bank`) are shared by every branch; only the Super Admin creates, edits or deletes them (403 for others). Cash sheets stay per branch. Bank names are reused across branches. No migration: existing bank sheets become visible to all branches.
+- Accounts Balance and Account Ledger count only the viewing branch's movements on a shared bank sheet; the branch column shows Shared.
+- Sale detail maps DSM labels and batches back to the sale's products, so online sales fulfilled by the Dispatch Department show their labels.
+
 ## Discount request customer and transfer receipt (2026-10-15)
 
 - Migration `1793000000000-DiscountRequestCustomer` adds `discount_requests.patient_id` (FK patients, SET NULL) and `customer_name`. `POST /branch/discount-requests` takes optional `patientId` or `customerName`; every request returns `customer {id, name, phone}` (from the sale once used, else the request).

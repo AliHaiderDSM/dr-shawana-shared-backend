@@ -16,7 +16,10 @@ const branchFields = z.object({
     .toUpperCase()
     .min(2, 'Use at least 2 characters')
     .max(12, 'Use at most 12 characters')
-    .regex(/^[A-Z0-9]+(-[A-Z0-9]+)*$/, 'Use letters and digits, with a dash between parts, e.g. LHR or LHR-00001'),
+    .regex(
+      /^[A-Z0-9]+(-[A-Z0-9]+)*$/,
+      'Use letters and digits, with a dash between parts, e.g. LHR or LHR-00001',
+    ),
   city: z.string().trim().min(2).max(100),
   address: optionalText(500),
   phone: optionalText(30),
