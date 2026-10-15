@@ -3,6 +3,7 @@ import { withTransaction } from '../../database/transaction';
 import { AppError } from '../../lib/errors';
 import { discardUploads, uploadMany } from '../../lib/file-uploads';
 import { sendExpoPush } from '../../lib/push';
+import { realtime } from '../../lib/realtime';
 import { BUCKETS, createSignedUrl } from '../../lib/storage';
 
 export type Sender = 'patient' | 'doctor';
@@ -82,7 +83,7 @@ async function doctorConversation(staffId: string, conversationId: string) {
     [conversationId, doctorId],
   )) as { id: string; patientId: string }[];
   if (!row) throw AppError.notFound('Conversation');
-  return row;
+  return { ...row, doctorId };
 }
 
 const isVoice = (type: string | null | undefined) => Boolean(type?.startsWith('audio/'));
@@ -214,7 +215,13 @@ export const patientChat = {
   async send(patientId: string, doctorId: string, body: string | null, file?: Express.Multer.File) {
     if (!(await patientHasDoctor(patientId, doctorId))) throw AppError.notFound('Doctor');
     const conversationId = await conversationFor(patientId, doctorId);
-    return send(conversationId, 'patient', null, body, file);
+    const message = await send(conversationId, 'patient', null, body, file);
+    await realtime.publish('doctor', doctorId, 'message', { conversationId });
+    return message;
+  },
+
+  realtime(patientId: string) {
+    return realtime.config('patient', patientId);
   },
 
   async fileUrl(patientId: string, doctorId: string, messageId: string) {
@@ -298,6 +305,7 @@ export const doctorChat = {
   async send(staffId: string, conversationId: string, body: string | null, file?: Express.Multer.File) {
     const conversation = await doctorConversation(staffId, conversationId);
     const message = await send(conversation.id, 'doctor', staffId, body, file);
+    await realtime.publish('patient', conversation.patientId, 'message', { doctorId: conversation.doctorId });
     const tokens = (await AppDataSource.query(`SELECT token FROM patient_push_tokens WHERE patient_id = $1`, [
       conversation.patientId,
     ])) as { token: string }[];
@@ -315,5 +323,9 @@ export const doctorChat = {
   async fileUrl(staffId: string, conversationId: string, messageId: string) {
     const conversation = await doctorConversation(staffId, conversationId);
     return fileUrl(conversation.id, messageId);
+  },
+
+  async realtime(staffId: string) {
+    return realtime.config('doctor', await doctorOf(staffId));
   },
 };

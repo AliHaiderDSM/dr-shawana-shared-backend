@@ -3,6 +3,7 @@ import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtur
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 import { AppDataSource } from '../../database/data-source';
+import { realtime, realtimeTopic } from '../../lib/realtime';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -163,12 +164,31 @@ describe('patient and doctor chat', () => {
     const pushed = jest
       .spyOn(global, 'fetch')
       .mockImplementation(async () => new Response('{}', { status: 200 }));
+    const pinged = jest.spyOn(realtime, 'publish');
     try {
       const reply = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser).send({
         body: 'Good. Continue the same dose.',
       });
       expect(reply.status).toBe(201);
       expect(reply.body.data).toMatchObject({ sender: 'doctor' });
+      expect(pinged).toHaveBeenCalledWith('patient', patientId, 'message', { doctorId });
+      const toDoctor = await patient('post', `/patient/chats/${doctorId}/messages`).send({
+        body: 'Thank you',
+      });
+      expect(toDoctor.status).toBe(201);
+      expect(pinged).toHaveBeenCalledWith('doctor', doctorId, 'message', { conversationId });
+      const patientChannel = await patient('get', '/patient/chats/realtime');
+      expect(patientChannel.status).toBe(200);
+      if (patientChannel.body.data) {
+        expect(patientChannel.body.data.topic).toBe(realtimeTopic('patient', patientId));
+        expect(JSON.stringify(patientChannel.body.data)).not.toContain(patientId);
+      }
+      const doctorChannel = await staff('get', '/branch/chats/realtime', doctorUser);
+      expect(doctorChannel.status).toBe(200);
+      if (doctorChannel.body.data) {
+        expect(doctorChannel.body.data.topic).toBe(realtimeTopic('doctor', doctorId));
+      }
+      expect((await staff('get', '/branch/chats/realtime', admin)).status).toBe(403);
       expect(pushed).toHaveBeenCalledTimes(1);
       const [url, init] = pushed.mock.calls[0]!;
       expect(String(url)).toContain('exp.host');
@@ -176,6 +196,7 @@ describe('patient and doctor chat', () => {
       expect(String(init?.body)).not.toContain('Continue the same dose');
     } finally {
       pushed.mockRestore();
+      pinged.mockRestore();
     }
     expect(
       (await staff('post', `/branch/chats/${conversationId}/messages`, otherDoctorUser).send({ body: 'x' }))
@@ -185,7 +206,7 @@ describe('patient and doctor chat', () => {
     expect((await patient('get', '/patient/chats')).body.data[0]).toMatchObject({ unread: 1 });
     expect((await patient('get', '/patient/chats/unread')).body.data).toEqual({ unread: 1 });
     const seen = await patient('get', `/patient/chats/${doctorId}/messages`);
-    expect(seen.body.data.items.at(-1)).toMatchObject({
+    expect(seen.body.data.items.find((m: { sender: string }) => m.sender === 'doctor')).toMatchObject({
       sender: 'doctor',
       body: 'Good. Continue the same dose.',
     });

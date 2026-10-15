@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Chat realtime instead of polling (2026-10-15)
+
+- New `lib/realtime.ts`: after a chat message is saved the backend sends a Supabase Realtime **broadcast ping** (REST `/realtime/v1/api/broadcast`, service role) with no message content: `{doctorId}` to the patient, `{conversationId}` to the doctor. Failures are logged and never break the send; off in tests.
+- Channel names are HMAC topics (`chat-patient-<hmac>` / `chat-doctor-<hmac>`, secret PATIENT_LINK_SECRET) so nobody can guess another person's channel. `GET /patient/chats/realtime` and `GET /branch/chats/realtime` (doctor only) return `{url, key (anon), topic}` or null.
+- Needs SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY on Vercel, and Supabase Realtime public channels allowed (default). Checked end to end against the project.
+
 ## Stock request limit, sale refunds (2026-10-15)
 
 - `POST /branch/stock-requests` refuses (422) a qty above what the Super Admin stock holds (unexpired), naming each product and the qty there.

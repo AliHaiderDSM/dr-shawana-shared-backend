@@ -55,6 +55,13 @@ const conversation = registry.register(
   }),
 );
 const signed = z.object({ url: z.string(), expiresIn: z.number() });
+const realtimeConfig = registry.register(
+  'ChatRealtime',
+  z.object({ url: z.string(), key: z.string(), topic: z.string() }).nullable().openapi({
+    description:
+      'Supabase Realtime broadcast channel that pings when a new message arrives (no message content). Null when realtime is off; then poll slowly.',
+  }),
+);
 const patientDocs = { tags: ['Patient app'], security: [{ bearerAuth: [] }] };
 const doctorDocs = securedDocs('Doctor chat');
 const ok = (description: string, schema: z.ZodType) => ({
@@ -103,6 +110,20 @@ registry.registerPath({
   summary: 'Files shared with one doctor, newest first (both sides, without voice notes)',
   request: { params: doctorParams },
   responses: ok('Files', z.array(message)),
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'get',
+  path: '/patient/chats/realtime',
+  summary: 'Realtime channel for new-message pings to this patient',
+  responses: ok('Realtime channel', realtimeConfig),
+});
+registry.registerPath({
+  ...doctorDocs,
+  method: 'get',
+  path: '/branch/chats/realtime',
+  summary: 'Doctor only: realtime channel for new-message pings to this doctor',
+  responses: ok('Realtime channel', realtimeConfig),
 });
 registry.registerPath({
   ...patientDocs,
@@ -161,6 +182,11 @@ export const chatRouter = Router();
 chatRouter.get('/patient/chats', authenticatePatient, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   sendOk(res, await patientChat.doctors(patientOf(req).patientId));
+});
+
+chatRouter.get('/patient/chats/realtime', authenticatePatient, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  sendOk(res, patientChat.realtime(patientOf(req).patientId));
 });
 
 chatRouter.get('/patient/chats/unread', authenticatePatient, async (req, res) => {
@@ -233,6 +259,11 @@ chatRouter.post(
     sendNoContent(res);
   },
 );
+
+chatRouter.get('/branch/chats/realtime', authenticate, doctorOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  sendOk(res, await doctorChat.realtime(req.auth!.userId));
+});
 
 chatRouter.get('/branch/chats', authenticate, doctorOnly, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
