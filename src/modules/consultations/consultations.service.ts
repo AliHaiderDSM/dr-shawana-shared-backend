@@ -172,13 +172,13 @@ export const consultationsService = {
       AppDataSource.query(
         `SELECT a.id, a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
                 a.visit_type AS "visitType", a.status, a.issues, a.remark, d.display_name AS doctor,
-                NULLIF(TRIM(cs.data->>'plan'), '') AS plan
+                NULLIF(TRIM(cs.data->>'plan'), '') AS plan, (a.id = $2) AS "thisVisit"
            FROM appointments a
            LEFT JOIN doctors d ON d.id = a.doctor_id
            LEFT JOIN consultations c ON c.appointment_id = a.id AND c.deleted_at IS NULL
            LEFT JOIN consultation_sections cs ON cs.consultation_id = c.id
                  AND cs.section_key = 'clinical_assessment' AND cs.deleted_at IS NULL
-          WHERE a.patient_id = $1 AND a.id <> $2 AND a.deleted_at IS NULL AND a.status <> 'cancelled'
+          WHERE a.patient_id = $1 AND a.deleted_at IS NULL AND (a.status <> 'cancelled' OR a.id = $2)
           ORDER BY a.date DESC, a.time_from DESC
           LIMIT 30`,
         [consultation.patientId, consultation.appointmentId],

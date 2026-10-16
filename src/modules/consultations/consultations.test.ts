@@ -5,6 +5,7 @@ import { createApp } from '../../app';
 import { env } from '../../config/env';
 import { AppDataSource } from '../../database/data-source';
 import { AuditLog } from '../audit/audit-log.entity';
+import { patientAppService } from '../patient-app/patient-app.service';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -305,6 +306,27 @@ describe('consultations and clinical records', () => {
       });
       const first = await api('get', `/branch/consultations/${consultationId}/history`, doctorUser);
       expect(first.body.data.previousSymptoms).toBeNull();
+      expect(first.body.data.visits.find((v: { thisVisit: boolean }) => v.thisVisit)).toMatchObject({
+        plan: 'Start estradiol',
+      });
+    });
+
+    it('shows the educational resources the doctor said yes to in the patient app', async () => {
+      const saved = await section('plans', {
+        glpDietPlan: 'yes',
+        generalDietPlan: 'no',
+        liverDetox: 'yes',
+        skinCareRoutine: 'no',
+        hairCareRoutine: 'no',
+      });
+      expect(saved.status).toBe(200);
+      const overview = await patientAppService.overview(patientId);
+      expect(overview.resources).toMatchObject({
+        items: [
+          { key: 'glpDietPlan', label: 'GLP diet plan' },
+          { key: 'liverDetox', label: 'Liver detox' },
+        ],
+      });
     });
 
     it('marks a consultation completed', async () => {

@@ -9968,6 +9968,10 @@
                     "null"
                   ]
                 },
+                "thisVisit": {
+                  "type": "boolean",
+                  "description": "The appointment of this consultation"
+                },
                 "plan": {
                   "type": [
                     "string",
@@ -9990,6 +9994,7 @@
                 "status",
                 "issues",
                 "remark",
+                "thisVisit",
                 "plan",
                 "doctor"
               ]

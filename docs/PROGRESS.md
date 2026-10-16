@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## History includes this visit, educational resources in the app (2026-10-16)
+
+- Consultation history now also lists the consultation's own appointment (`thisVisit: true`) with its remarks.
+- `GET /patient/overview` carries `resources`: the items marked Yes in the latest Educational resources section (`{date, doctor, items: [{key, label}]}`), or null.
+
 ## Consultation history shows the plan (2026-10-16)
 
 - `GET /branch/consultations/:id/history` visits carry `plan`: the Plan from the Clinical remarks (clinical_assessment) of that visit. It is HTML from the dashboard editor (p, strong, em, u, s, ul, ol, li) or older plain text; the dashboard sanitises it before showing. Plan limit raised to 50,000 characters.

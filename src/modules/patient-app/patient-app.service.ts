@@ -142,6 +142,33 @@ async function documents(patientId: string) {
   }));
 }
 
+const RESOURCE_LABELS = {
+  glpDietPlan: 'GLP diet plan',
+  generalDietPlan: 'General diet plan',
+  liverDetox: 'Liver detox',
+  skinCareRoutine: 'Skin care routine',
+  hairCareRoutine: 'Hair care routine',
+} as const;
+
+async function educationalResources(patientId: string) {
+  const [row] = (await AppDataSource.query(
+    `SELECT cs.data, to_char(a.date, 'YYYY-MM-DD') AS date, d.display_name AS doctor
+       FROM consultation_sections cs
+       JOIN consultations c ON c.id = cs.consultation_id AND c.deleted_at IS NULL
+       JOIN appointments a ON a.id = c.appointment_id AND a.deleted_at IS NULL
+       LEFT JOIN doctors d ON d.id = c.doctor_id
+      WHERE c.patient_id = $1 AND cs.section_key = 'plans' AND cs.deleted_at IS NULL
+      ORDER BY a.date DESC, a.time_from DESC, cs.updated_at DESC
+      LIMIT 1`,
+    [patientId],
+  )) as { data: Record<string, unknown>; date: string; doctor: string | null }[];
+  if (!row) return null;
+  const items = (Object.keys(RESOURCE_LABELS) as (keyof typeof RESOURCE_LABELS)[])
+    .filter((key) => row.data[key] === 'yes')
+    .map((key) => ({ key, label: RESOURCE_LABELS[key] }));
+  return items.length ? { date: row.date, doctor: row.doctor, items } : null;
+}
+
 export const patientAppService = {
   async me(patientId: string) {
     const patient = await repo(Patient).findOne({ where: { id: patientId } });
@@ -194,11 +221,12 @@ export const patientAppService = {
   },
 
   async overview(patientId: string) {
-    const [me, appointments, prescriptions, requests] = await Promise.all([
+    const [me, appointments, prescriptions, requests, resources] = await Promise.all([
       this.me(patientId),
       appointmentRows(patientId),
       prescriptionRows(patientId),
       patientRequestsService.listForPatient(patientId),
+      educationalResources(patientId),
     ]);
     const upcoming = appointments
       .filter(isUpcoming)
@@ -223,6 +251,7 @@ export const patientAppService = {
         appointments: appointments.length,
         prescriptions: prescriptions.length,
       },
+      resources,
     };
   },
 

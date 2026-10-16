@@ -146,6 +146,7 @@ describe('patient app', () => {
     expect(me.body.data).toMatchObject({ id: patientId, name: 'Ayesha', phone: expect.any(String) });
 
     const overview = await asPatient('get', '/patient/overview');
+    expect(overview.body.data.resources).toBeNull();
     expect(overview.body.data.nextAppointment).toMatchObject({
       upcoming: true,
       doctor: { name: 'Dr. Shawana' },

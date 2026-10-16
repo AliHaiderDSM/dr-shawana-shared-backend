@@ -259,6 +259,7 @@ export const consultationHistorySchema = registry.register(
         status: z.string(),
         issues: z.string().nullable(),
         remark: z.string().nullable(),
+        thisVisit: z.boolean().openapi({ description: 'The appointment of this consultation' }),
         plan: z.string().nullable().openapi({
           description: 'Plan from the Clinical remarks of that visit (HTML: p, strong, em, u, s, ul, ol, li)',
         }),
