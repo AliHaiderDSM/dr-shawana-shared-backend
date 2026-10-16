@@ -19,7 +19,6 @@ import './modules/appointments/appointments.schemas';
 import './modules/patient-links/patient-links.schemas';
 import './modules/patient-app/patient-app.schemas';
 import './modules/chat/chat.routes';
-import './modules/educational-resources/educational-resources.routes';
 import './modules/consultations/consultations.schemas';
 import './modules/clinical-records/clinical-records.schemas';
 import './modules/prescriptions/prescriptions.schemas';

@@ -5,7 +5,6 @@ import { createApp } from '../../app';
 import { env } from '../../config/env';
 import { AppDataSource } from '../../database/data-source';
 import { AuditLog } from '../audit/audit-log.entity';
-import { educationalResourcesService } from '../educational-resources/educational-resources.service';
 import { patientAppService } from '../patient-app/patient-app.service';
 
 const fake = installFakeSupabase();
@@ -321,50 +320,20 @@ describe('consultations and clinical records', () => {
         hairCareRoutine: 'no',
       });
       expect(saved.status).toBe(200);
-      expect(
-        (
-          await api('post', '/admin/educational-resources/liverDetox/files', admin).attach(
-            'files',
-            Buffer.from('%PDF-1.4'),
-            { filename: 'detox.pdf', contentType: 'application/pdf' },
-          )
-        ).status,
-      ).toBe(403);
-      const uploaded = await api('post', '/admin/educational-resources/liverDetox/files', superAdmin).attach(
-        'files',
-        Buffer.from('%PDF-1.4'),
-        { filename: 'detox.pdf', contentType: 'application/pdf' },
-      );
-      expect(uploaded.status).toBe(200);
-      expect(uploaded.body.data).toMatchObject({ key: 'liverDetox', files: [{ name: 'detox.pdf' }] });
-      const hair = await api('post', '/admin/educational-resources/hairCareRoutine/files', superAdmin).attach(
-        'files',
-        Buffer.from('fakejpeg'),
-        { filename: 'hair.jpg', contentType: 'image/jpeg' },
-      );
-      const hairFileId = hair.body.data.files[0].id as string;
-
       const overview = await patientAppService.overview(patientId);
       expect(overview.resources).toMatchObject({
         items: [
-          { key: 'glpDietPlan', label: 'GLP diet plan', files: [] },
-          { key: 'liverDetox', label: 'Liver detox', files: [{ name: 'detox.pdf' }] },
+          {
+            key: 'glpDietPlan',
+            label: 'GLP diet plan',
+            file: { path: '/resources/glp-diet-plan.pdf', type: 'application/pdf' },
+          },
+          { key: 'liverDetox', label: 'Liver detox', file: { path: '/resources/liver-detox.jpeg' } },
         ],
       });
-      const detoxFileId = overview.resources!.items[1]!.files[0]!.id;
-      await expect(educationalResourcesService.patientFileUrl(patientId, detoxFileId)).resolves.toMatchObject(
-        {
-          expiresIn: 600,
-        },
-      );
-      await expect(educationalResourcesService.patientFileUrl(patientId, hairFileId)).rejects.toMatchObject({
-        status: 404,
-      });
-      expect(
-        (await api('delete', `/admin/educational-resources/files/${hairFileId}`, superAdmin)).status,
-      ).toBe(204);
-      const all = await api('get', '/admin/educational-resources', superAdmin);
-      expect(all.body.data.find((r: { key: string }) => r.key === 'hairCareRoutine').files).toEqual([]);
+      const pdf = await request(app).get('/resources/glp-diet-plan.pdf');
+      expect(pdf.status).toBe(200);
+      expect(pdf.headers['content-type']).toContain('application/pdf');
     });
 
     it('marks a consultation completed', async () => {

@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Educational resources from the existing guides (2026-10-16)
+
+- The Super Admin upload (admin routes, bucket) is removed. The five guides that the patient link already uses are copied to `backend/public/resources` and served at `/resources/<file>` (Vercel static from `public`; express.static locally).
+- `GET /patient/overview` `resources.items[]` carry `file {name, type, path}` for each guide the doctor marked Yes.
+- Migration `1793200000000-DropEducationalResourceFiles` drops the unused `educational_resource_files` table that `1793100000000` created.
+
 ## Educational resource files (2026-10-16)
 
 - Migration `1793100000000-EducationalResources`: table `educational_resource_files` (resource_key one of glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine; file path/name/type/size; soft delete; RLS on). New private bucket `educational-resources` (PDF and photos, 10 MB), created on the first upload.

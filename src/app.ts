@@ -1,4 +1,5 @@
 import './lib/openapi';
+import path from 'node:path';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -11,6 +12,7 @@ import { AppError } from './lib/errors';
 import { logger } from './lib/logger';
 import { requestTiming } from './lib/perf';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { RESOURCES_PATH } from './modules/educational-resources/educational-resources.service';
 import { requestId } from './middleware/requestId';
 import { apiRouter } from './routes';
 
@@ -64,6 +66,11 @@ export function createApp(): Express {
   const openApiDocument = buildOpenApiDocument();
   app.get('/api/docs/openapi.json', (_req, res) => res.json(openApiDocument));
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
+
+  app.use(
+    RESOURCES_PATH,
+    express.static(path.resolve(process.cwd(), 'public', 'resources'), { maxAge: '7d', index: false }),
+  );
 
   app.use('/api/v1', apiRouter);
 
