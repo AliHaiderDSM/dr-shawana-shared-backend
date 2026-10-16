@@ -10,6 +10,7 @@ export const BUCKETS = {
   medicalRecords: 'medical-records',
   doctorSignatures: 'doctor-signatures',
   chatVoice: 'chat-voice',
+  educationalResources: 'educational-resources',
 } as const;
 export type BucketName = (typeof BUCKETS)[keyof typeof BUCKETS];
 
@@ -37,6 +38,7 @@ export const BUCKET_SETTINGS: Record<
   [BUCKETS.doctorSignatures]: { public: false, fileSizeLimit: 2 * MB, allowedMimeTypes: IMAGES },
   [BUCKETS.medicalRecords]: { public: false, fileSizeLimit: 10 * MB, allowedMimeTypes: DOCUMENTS },
   [BUCKETS.chatVoice]: { public: false, fileSizeLimit: 10 * MB, allowedMimeTypes: AUDIO_TYPES },
+  [BUCKETS.educationalResources]: { public: false, fileSizeLimit: 10 * MB, allowedMimeTypes: DOCUMENTS },
 };
 
 const isMissingBucket = (message: string) => /bucket not found/i.test(message);

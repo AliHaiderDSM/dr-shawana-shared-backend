@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Educational resource files (2026-10-16)
+
+- Migration `1793100000000-EducationalResources`: table `educational_resource_files` (resource_key one of glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine; file path/name/type/size; soft delete; RLS on). New private bucket `educational-resources` (PDF and photos, 10 MB), created on the first upload.
+- Super Admin: `GET /admin/educational-resources`, `POST /admin/educational-resources/:key/files` (multipart `files`, up to 5), `DELETE /admin/educational-resources/files/:id`, `GET .../files/:id/url`.
+- Patient: overview `resources.items[].files`; `GET /patient/resources/files/:id/url` opens a file only for a resource the doctor marked Yes on the patient's latest visit (404 otherwise).
+
 ## History includes this visit, educational resources in the app (2026-10-16)
 
 - Consultation history now also lists the consultation's own appointment (`thisVisit: true`) with its remarks.

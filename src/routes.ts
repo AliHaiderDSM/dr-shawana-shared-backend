@@ -23,6 +23,7 @@ import { stockDocumentsRouter } from './modules/inventory/stock-documents.routes
 import { manufacturingRouter } from './modules/manufacturing/manufacturing.routes';
 import { patientLinksRouter } from './modules/patient-links/patient-links.routes';
 import { chatRouter } from './modules/chat/chat.routes';
+import { educationalResourcesRouter } from './modules/educational-resources/educational-resources.routes';
 import { patientAppRouter } from './modules/patient-app/patient-app.routes';
 import { patientsRouter } from './modules/patients/patients.routes';
 import { prescriptionsRouter } from './modules/prescriptions/prescriptions.routes';
@@ -57,6 +58,7 @@ apiRouter.use(patientsRouter);
 apiRouter.use(doctorsRouter);
 apiRouter.use(patientLinksRouter);
 apiRouter.use(chatRouter);
+apiRouter.use(educationalResourcesRouter);
 apiRouter.use(patientAppRouter);
 apiRouter.use(appointmentsRouter);
 apiRouter.use(consultationsRouter);
