@@ -259,6 +259,9 @@ export const consultationHistorySchema = registry.register(
         status: z.string(),
         issues: z.string().nullable(),
         remark: z.string().nullable(),
+        plan: z.string().nullable().openapi({
+          description: 'Plan from the Clinical remarks of that visit (HTML: p, strong, em, u, s, ul, ol, li)',
+        }),
         doctor: z.string().nullable(),
       }),
     ),
@@ -288,7 +291,7 @@ registry.registerPath({
   method: 'get',
   path: '/branch/consultations/{id}/history',
   summary:
-    'The patient’s other appointments with their issues and remarks, every prescription (previous or new), and the additional symptoms of the last earlier visit',
+    'The patient’s other appointments with the plan from their clinical remarks, every prescription (previous or new), and the additional symptoms of the last earlier visit',
   request: byId,
   responses: {
     200: { description: 'History', ...jsonContent(dataEnvelope(consultationHistorySchema)) },

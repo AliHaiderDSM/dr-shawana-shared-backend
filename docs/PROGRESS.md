@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Consultation history shows the plan (2026-10-16)
+
+- `GET /branch/consultations/:id/history` visits carry `plan`: the Plan from the Clinical remarks (clinical_assessment) of that visit. It is HTML from the dashboard editor (p, strong, em, u, s, ul, ol, li) or older plain text; the dashboard sanitises it before showing. Plan limit raised to 50,000 characters.
+
 ## Chat realtime instead of polling (2026-10-15)
 
 - New `lib/realtime.ts`: after a chat message is saved the backend sends a Supabase Realtime **broadcast ping** (REST `/realtime/v1/api/broadcast`, service role) with no message content: `{doctorId}` to the patient, `{conversationId}` to the doctor. Failures are logged and never break the send; off in tests.

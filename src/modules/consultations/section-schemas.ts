@@ -379,7 +379,7 @@ export const clinicalAssessmentSchema = z.object({
   ]),
   clinicalStatus: flags(['improved', 'stable', 'worsened', 'no_change']),
   treatmentPlan: flags(TREATMENT_PLAN),
-  plan: text(20000),
+  plan: text(50000),
 });
 
 const requiredText = (max: number) => z.string().trim().min(1).max(max);

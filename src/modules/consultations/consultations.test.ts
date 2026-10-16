@@ -300,6 +300,9 @@ describe('consultations and clinical records', () => {
         severity: { hair_loss: 2 },
       });
       expect(history.body.data.visits.map((v: { date: string }) => v.date)).toContain('2026-09-01');
+      expect(history.body.data.visits.find((v: { date: string }) => v.date === '2026-09-01')).toMatchObject({
+        plan: 'Start estradiol',
+      });
       const first = await api('get', `/branch/consultations/${consultationId}/history`, doctorUser);
       expect(first.body.data.previousSymptoms).toBeNull();
     });
