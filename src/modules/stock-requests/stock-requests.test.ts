@@ -2,6 +2,7 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { realtime } from '../../lib/realtime';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -76,11 +77,13 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
         })
       ).status,
     ).toBe(403);
+    const pinged = jest.spyOn(realtime, 'publish');
     const tooMuch = await as(lahoreAdmin, 'post', '/branch/stock-requests').send({
       items: [{ productId: serum, qty: '100000' }],
     });
     expect(tooMuch.status).toBe(422);
     expect(tooMuch.body.error.message).toContain('only');
+    expect(pinged).not.toHaveBeenCalled();
     const asked = await as(lahoreAdmin, 'post', '/branch/stock-requests').send({
       note: 'Weekend rush',
       items: [
@@ -88,6 +91,13 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
         { productId: toner, qty: '10', note: 'Big bottles' },
       ],
     });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(pinged).toHaveBeenCalledWith('staff', 'all', 'badges', {});
+    pinged.mockClear();
+    await as(lahoreAdmin, 'get', '/branch/stock-requests');
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(pinged).not.toHaveBeenCalled();
+    pinged.mockRestore();
     expect(asked.status).toBe(201);
     expect(asked.body.data).toMatchObject({
       requestNo: 'LHR-SR-000001',

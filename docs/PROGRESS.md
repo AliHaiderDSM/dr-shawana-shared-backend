@@ -22,6 +22,19 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Web Push for staff (2026-10-18)
+
+- Migration `1793300000000-StaffPushSubscriptions` adds `staff_push_subscriptions` (one row per browser, `last_counts` holds the badge counts last pushed).
+- `GET /branch/push/public-key`, `POST /branch/push/subscriptions`, `POST /branch/push/unsubscribe`.
+- After every watched change, `staffNotify` runs `staffPush.notifyChanges()`: each subscribed person gets one push per badge that went up (only badges they can see). Expired browsers (404/410) are removed.
+- Env: `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`. Generate once with `npm run webpush:keys`. Without keys push stays off.
+- Badge counting moved to `src/modules/badges/badges.service.ts`. Suite: 262 passed.
+
+## Staff notifications over Supabase Realtime (2026-10-18)
+
+- `middleware/staffNotify.ts` (mounted on the API router): after a successful POST/PUT/PATCH/DELETE on stock requests, approvals, incoming stock, stock in/out, store receipts, write-offs, discount requests, returns, sale dispatch/cancel, patient requests or patient/doctor chat, the backend broadcasts an empty `badges` ping to the staff channel (`realtime.publish('staff','all','badges',{})`, sent with `waitUntil` from `@vercel/functions` so Vercel finishes it after the response).
+- `GET /branch/realtime/staff` (any signed-in staff) returns `{url, key, topic}` (HMAC topic) or null.
+
 ## Educational resources from the existing guides (2026-10-16)
 
 - The Super Admin upload (admin routes, bucket) is removed. The five guides that the patient link already uses are copied to `backend/public/resources` and served at `/resources/<file>` (Vercel static from `public`; express.static locally).

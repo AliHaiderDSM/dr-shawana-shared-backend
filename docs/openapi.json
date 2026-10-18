@@ -7384,6 +7384,257 @@
         ],
         "description": "Supabase Realtime broadcast channel that pings when a new message arrives (no message content). Null when realtime is off; then poll slowly."
       },
+      "ConfirmStoreReceipt": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "receivedQty": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500
+                },
+                "missingSerials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^DSM-\\d{1,12}$",
+                    "example": "DSM-000001"
+                  },
+                  "maxItems": 5000,
+                  "description": "Scanned piece labels. Required for products tracked by label."
+                }
+              },
+              "required": [
+                "id",
+                "receivedQty"
+              ]
+            },
+            "maxItems": 200,
+            "description": "Lines that did not arrive in full. Lines left out arrived in full."
+          }
+        }
+      },
+      "StoreReceipt": {
+        "type": "object",
+        "properties": {
+          "grnNo": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "confirmed"
+            ]
+          },
+          "supplier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enteredBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "role"
+            ]
+          },
+          "confirmedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "role"
+            ]
+          },
+          "confirmedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "productName": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "receivedQty": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "batch": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expiryDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "labels": {
+                  "type": "integer"
+                },
+                "receiptNote": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "productId",
+                "productName",
+                "unit",
+                "qty",
+                "receivedQty",
+                "batch",
+                "expiryDate",
+                "labels",
+                "receiptNote"
+              ]
+            }
+          }
+        },
+        "required": [
+          "grnNo",
+          "date",
+          "createdAt",
+          "status",
+          "supplier",
+          "note",
+          "enteredBy",
+          "confirmedBy",
+          "confirmedAt",
+          "lines"
+        ]
+      },
+      "StaffPushSubscription": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          },
+          "keys": {
+            "type": "object",
+            "properties": {
+              "p256dh": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "auth": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "required": [
+              "p256dh",
+              "auth"
+            ]
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ]
+      },
       "ConsultationStatusChange": {
         "type": "object",
         "properties": {
@@ -15055,224 +15306,6 @@
           "request",
           "note",
           "items"
-        ]
-      },
-      "ConfirmStoreReceipt": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 1000
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "receivedQty": {
-                  "type": "string",
-                  "example": "10.000"
-                },
-                "note": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "maxLength": 500
-                },
-                "missingSerials": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^DSM-\\d{1,12}$",
-                    "example": "DSM-000001"
-                  },
-                  "maxItems": 5000,
-                  "description": "Scanned piece labels. Required for products tracked by label."
-                }
-              },
-              "required": [
-                "id",
-                "receivedQty"
-              ]
-            },
-            "maxItems": 200,
-            "description": "Lines that did not arrive in full. Lines left out arrived in full."
-          }
-        }
-      },
-      "StoreReceipt": {
-        "type": "object",
-        "properties": {
-          "grnNo": {
-            "type": "string"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "confirmed"
-            ]
-          },
-          "supplier": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "enteredBy": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "role"
-            ]
-          },
-          "confirmedBy": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "role"
-            ]
-          },
-          "confirmedAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "lines": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "productId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "productName": {
-                  "type": "string"
-                },
-                "unit": {
-                  "type": "string"
-                },
-                "qty": {
-                  "type": "string"
-                },
-                "receivedQty": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "batch": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "expiryDate": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "labels": {
-                  "type": "integer"
-                },
-                "receiptNote": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "productId",
-                "productName",
-                "unit",
-                "qty",
-                "receivedQty",
-                "batch",
-                "expiryDate",
-                "labels",
-                "receiptNote"
-              ]
-            }
-          }
-        },
-        "required": [
-          "grnNo",
-          "date",
-          "createdAt",
-          "status",
-          "supplier",
-          "note",
-          "enteredBy",
-          "confirmedBy",
-          "confirmedAt",
-          "lines"
         ]
       },
       "SidebarBadges": {
@@ -38891,6 +38924,495 @@
         }
       }
     },
+    "/branch/stock-receipts": {
+      "get": {
+        "tags": [
+          "Store receipts"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Stock In entries of the Super Admin stock by GRN number. A Lab Officer entry waits until the Warehouse Keeper counts and confirms it; a Super Admin entry is stock at once.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "confirmed"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 30
+            },
+            "required": false,
+            "name": "grnNo",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Receipts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreReceipt"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/stock-receipts/{grnNo}/confirm": {
+      "post": {
+        "tags": [
+          "Store receipts"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Warehouse Keeper confirms what arrived. Short lines keep the received quantity and a note; missing labels are written off.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 30
+            },
+            "required": true,
+            "name": "grnNo",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmStoreReceipt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/StoreReceipt"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/push/public-key": {
+      "get": {
+        "tags": [
+          "Push notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "VAPID public key for browser push subscriptions; null when web push is not configured",
+        "responses": {
+          "200": {
+            "description": "Key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "publicKey": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "publicKey"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/push/subscriptions": {
+      "post": {
+        "tags": [
+          "Push notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Save this browser for push notifications. The signed-in staff member then gets a notification when one of their sidebar badges (requests, approvals, returns, patient messages) goes up, even with the dashboard closed.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaffPushSubscription"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/push/unsubscribe": {
+      "post": {
+        "tags": [
+          "Push notifications"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Stop push notifications for this browser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "endpoint"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/appointments/{id}/consultation": {
       "post": {
         "tags": [
@@ -49497,237 +50019,6 @@
         }
       }
     },
-    "/branch/stock-receipts": {
-      "get": {
-        "tags": [
-          "Store receipts"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Stock In entries of the Super Admin stock by GRN number. A Lab Officer entry waits until the Warehouse Keeper counts and confirms it; a Super Admin entry is stock at once.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "confirmed"
-              ]
-            },
-            "required": false,
-            "name": "status",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "maxLength": 30
-            },
-            "required": false,
-            "name": "grnNo",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Receipts",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/StoreReceipt"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/stock-receipts/{grnNo}/confirm": {
-      "post": {
-        "tags": [
-          "Store receipts"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Warehouse Keeper confirms what arrived. Short lines keep the received quantity and a note; missing labels are written off.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 3,
-              "maxLength": 30
-            },
-            "required": true,
-            "name": "grnNo",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConfirmStoreReceipt"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Confirmed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/StoreReceipt"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/branch/badges": {
       "get": {
         "tags": [
@@ -49749,6 +50040,108 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/SidebarBadges"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/realtime/staff": {
+      "get": {
+        "tags": [
+          "Sidebar"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Supabase Realtime channel that pings signed-in staff when a request, approval, return or patient message changes the sidebar badges (no data in the ping). Null when realtime is off.",
+        "responses": {
+          "200": {
+            "description": "Realtime channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "topic": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "key",
+                        "topic"
+                      ]
                     }
                   },
                   "required": [

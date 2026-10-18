@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 import { env } from '../config/env';
 import { logger } from './logger';
 
-export type RealtimeAudience = 'patient' | 'doctor';
+export type RealtimeAudience = 'patient' | 'doctor' | 'staff';
 
 export interface RealtimeConfig {
   url: string;

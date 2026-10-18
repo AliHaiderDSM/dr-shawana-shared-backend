@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { notifyStaffOnChange } from './middleware/staffNotify';
 import { accountsRouter } from './modules/accounts/accounts.routes';
 import { appointmentsRouter } from './modules/appointments/appointments.routes';
 import { authRouter } from './modules/auth/auth.routes';
@@ -23,6 +24,7 @@ import { stockDocumentsRouter } from './modules/inventory/stock-documents.routes
 import { manufacturingRouter } from './modules/manufacturing/manufacturing.routes';
 import { patientLinksRouter } from './modules/patient-links/patient-links.routes';
 import { chatRouter } from './modules/chat/chat.routes';
+import { pushRouter } from './modules/push/push.routes';
 import { patientAppRouter } from './modules/patient-app/patient-app.routes';
 import { patientsRouter } from './modules/patients/patients.routes';
 import { prescriptionsRouter } from './modules/prescriptions/prescriptions.routes';
@@ -34,6 +36,8 @@ import { staffRouter } from './modules/staff/staff.routes';
 import { suppliersRouter } from './modules/suppliers/suppliers.routes';
 
 export const apiRouter = Router();
+
+apiRouter.use(notifyStaffOnChange);
 
 apiRouter.use(healthRouter);
 apiRouter.use(authRouter);
@@ -57,6 +61,7 @@ apiRouter.use(patientsRouter);
 apiRouter.use(doctorsRouter);
 apiRouter.use(patientLinksRouter);
 apiRouter.use(chatRouter);
+apiRouter.use(pushRouter);
 apiRouter.use(patientAppRouter);
 apiRouter.use(appointmentsRouter);
 apiRouter.use(consultationsRouter);

@@ -42,6 +42,10 @@ const envSchema = z
     SUPABASE_ANON_KEY: supabaseVar,
     PATIENT_LINK_SECRET: z.string().min(32).optional(),
 
+    WEB_PUSH_PUBLIC_KEY: z.string().optional(),
+    WEB_PUSH_PRIVATE_KEY: z.string().optional(),
+    WEB_PUSH_SUBJECT: z.string().optional(),
+
     CORS_ORIGINS: z
       .string()
       .default('')
