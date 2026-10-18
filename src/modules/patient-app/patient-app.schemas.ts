@@ -25,6 +25,31 @@ export const patientLoginSchema = registry.register(
   }),
 );
 
+const passwordInput = z
+  .string()
+  .min(6, 'Use at least 6 characters')
+  .max(72, 'Use at most 72 characters')
+  .refine((v) => v.trim().length === v.length, 'Do not start or end with a space');
+const codeInput = z
+  .string()
+  .trim()
+  .regex(/^\d{6}$/, 'The code has 6 digits');
+
+export const patientPasswordLoginSchema = registry.register(
+  'PatientPasswordLogin',
+  z.object({ phone: phoneInput, password: z.string().min(1, 'Enter your password').max(72), device }),
+);
+
+export const patientResetPasswordSchema = registry.register(
+  'PatientResetPassword',
+  z.object({ phone: phoneInput, code: codeInput, password: passwordInput, device }),
+);
+
+export const patientSetPasswordSchema = registry.register(
+  'PatientSetPassword',
+  z.object({ currentPassword: z.string().max(72).nullable().optional(), password: passwordInput }),
+);
+
 export const patientRefreshSchema = registry.register(
   'PatientRefresh',
   z.object({ refreshToken: z.string().min(20).max(200) }),
@@ -91,6 +116,11 @@ const appAccessSchema = registry.register(
     activatedAt: z.string().nullable(),
     lastLoginAt: z.string().nullable(),
     codeExpiresAt: z.string().nullable(),
+    hasPassword: z.boolean().openapi({ description: 'The patient has made an app password' }),
+    passwordSetAt: z
+      .string()
+      .nullable()
+      .openapi({ description: 'When the password was last made or changed' }),
   }),
 );
 
@@ -139,6 +169,32 @@ registry.registerPath({
     'Patient login with the phone number and the 6-digit code from the clinic. A code works once, for 24 hours, and stops after 5 wrong tries. The session then stays open while the app is used (60 days from the last use).',
   request: jsonBody(patientLoginSchema),
   responses: ok('Session', sessionSchema),
+});
+registry.registerPath({
+  ...appDocs,
+  method: 'post',
+  path: '/patient/auth/password-login',
+  summary:
+    'Patient login with the phone number and the password the patient made in the app. Ten wrong tries lock password login for 15 minutes.',
+  request: jsonBody(patientPasswordLoginSchema),
+  responses: ok('Session', sessionSchema),
+});
+registry.registerPath({
+  ...appDocs,
+  method: 'post',
+  path: '/patient/auth/reset-password',
+  summary:
+    'Forgot password: the phone number, a new 6-digit code from the clinic and a new password. Signs the patient out on other phones and opens a session here.',
+  request: jsonBody(patientResetPasswordSchema),
+  responses: ok('Session', sessionSchema),
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'post',
+  path: '/patient/me/password',
+  summary: 'Make or change the app password. Changing it needs the current password.',
+  request: jsonBody(patientSetPasswordSchema),
+  responses: { 204: { description: 'Password saved' }, ...errorResponses },
 });
 registry.registerPath({
   ...appDocs,

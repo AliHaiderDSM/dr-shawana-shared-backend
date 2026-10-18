@@ -16,7 +16,10 @@ import {
   createPatientRequestSchema,
   patientFileParamsSchema,
   patientLoginSchema,
+  patientPasswordLoginSchema,
   patientRefreshSchema,
+  patientResetPasswordSchema,
+  patientSetPasswordSchema,
   patientRequestListQuerySchema,
   updatePatientProfileSchema,
   updatePatientRequestSchema,
@@ -51,6 +54,24 @@ patientAppRouter.post(
 );
 
 patientAppRouter.post(
+  '/patient/auth/password-login',
+  credentialLimiter,
+  validate({ body: patientPasswordLoginSchema }),
+  async (req, res) => {
+    sendOk(res, await patientAuth.loginWithPassword(validBody(req, patientPasswordLoginSchema)));
+  },
+);
+
+patientAppRouter.post(
+  '/patient/auth/reset-password',
+  credentialLimiter,
+  validate({ body: patientResetPasswordSchema }),
+  async (req, res) => {
+    sendOk(res, await patientAuth.resetPassword(validBody(req, patientResetPasswordSchema)));
+  },
+);
+
+patientAppRouter.post(
   '/patient/auth/refresh',
   credentialLimiter,
   validate({ body: patientRefreshSchema }),
@@ -77,6 +98,16 @@ patientAppRouter.get('/patient/me', async (req, res) => {
 patientAppRouter.patch('/patient/me', validate({ body: updatePatientProfileSchema }), async (req, res) => {
   sendOk(res, await patientAppService.updateMe(patientId(req), validBody(req, updatePatientProfileSchema)));
 });
+
+patientAppRouter.post(
+  '/patient/me/password',
+  credentialLimiter,
+  validate({ body: patientSetPasswordSchema }),
+  async (req, res) => {
+    await patientAuth.setPassword(patientId(req), validBody(req, patientSetPasswordSchema));
+    sendNoContent(res);
+  },
+);
 
 patientAppRouter.get('/patient/overview', async (req, res) => {
   sendOk(res, await patientAppService.overview(patientId(req)));

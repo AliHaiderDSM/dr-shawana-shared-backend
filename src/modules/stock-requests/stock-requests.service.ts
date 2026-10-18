@@ -15,6 +15,7 @@ import { StockRequest, StockRequestItem, type StockRequestStatus } from './stock
 import {
   type CreateStockRequestInput,
   type DecideStockRequestInput,
+  type EditStockRequestInput,
   type IncomingStockQuery,
   type StockRequestListQuery,
 } from './stock-requests.schemas';
@@ -309,6 +310,65 @@ export const stockRequestsService = {
       });
       await repo(StockRequest, em).save(request);
       await record(em, actor, request, approve ? 'approve' : 'reject', { status: 'pending' });
+      return findOne(id, null, em);
+    });
+  },
+
+  async edit(actor: Actor, id: string, input: EditStockRequestInput) {
+    return withTransaction(async (em) => {
+      const request = await lock(em, id);
+      if (request.status !== 'approved' && request.status !== 'sent') {
+        throw AppError.conflict(
+          request.status === 'pending'
+            ? 'Approve this request first; you can change the quantities while approving'
+            : `This request is already ${request.status} and cannot be changed`,
+        );
+      }
+      const items = await repo(StockRequestItem, em).findBy({ requestId: id });
+      const sent = (await em.query(
+        `SELECT product_id AS "productId", SUM(qty)::text AS qty FROM stock_outs
+          WHERE stock_request_id = $1 AND deleted_at IS NULL GROUP BY product_id`,
+        [id],
+      )) as { productId: string; qty: string }[];
+      const before = items.map((i) => ({ id: i.id, approvedQty: i.approvedQty }));
+      const names = (await em.query(`SELECT id, name FROM products WHERE id = ANY($1::uuid[])`, [
+        items.map((i) => i.productId),
+      ])) as { id: string; name: string }[];
+      for (const line of input.items) {
+        const item = items.find((i) => i.id === line.id);
+        if (!item) throw AppError.badRequest('An item is not on this request');
+        const already = sent.find((s) => s.productId === item.productId)?.qty ?? '0';
+        if (new Decimal(line.approvedQty).lt(already)) {
+          const name = names.find((n) => n.id === item.productId)?.name ?? 'A product';
+          throw AppError.unprocessable(
+            `${name}: ${toQuantity(already).toString()} is already sent, so approve at least that much`,
+            { itemId: item.id, sent: toQuantity(already).toString() },
+          );
+        }
+        item.approvedQty = toQuantity(line.approvedQty);
+      }
+      if (items.every((i) => new Decimal(i.approvedQty ?? 0).isZero())) {
+        throw AppError.badRequest('Keep at least one product, or reject the request');
+      }
+      await repo(StockRequestItem, em).save(items);
+      if (input.note !== undefined) request.decisionNote = input.note ?? null;
+      request.updatedBy = actor.userId;
+      await repo(StockRequest, em).save(request);
+      await auditService.record(
+        {
+          actor,
+          branchId: request.branchId,
+          action: 'edit_approval',
+          entity: 'stock_request',
+          entityId: request.id,
+          before: { items: before },
+          after: {
+            requestNo: request.requestNo,
+            items: items.map((i) => ({ id: i.id, approvedQty: i.approvedQty })),
+          },
+        },
+        em,
+      );
       return findOne(id, null, em);
     });
   },

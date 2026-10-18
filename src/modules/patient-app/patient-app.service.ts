@@ -1,3 +1,4 @@
+import { patientAuth } from './patient-auth';
 import { AppDataSource } from '../../database/data-source';
 import { repo } from '../../database/transaction';
 import { AppError } from '../../lib/errors';
@@ -156,6 +157,7 @@ export const patientAppService = {
       dateOfBirth: patient.dateOfBirth,
       city: patient.city,
       country: patient.country,
+      hasPassword: await patientAuth.hasPassword(patient.id),
       weightKg: patient.weightKg === null ? null : Number(patient.weightKg),
       heightCm: patient.heightCm === null ? null : Number(patient.heightCm),
       clinic: company ? { name: company.name, phone: company.phone, address: company.address } : null,

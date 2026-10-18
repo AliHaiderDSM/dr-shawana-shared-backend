@@ -125,6 +125,55 @@ describe('patient app', () => {
     expect((await asPatient('get', `/branch/patients/${patientId}`)).status).toBe(401);
   });
 
+  it('lets the patient make a password, log in with it and reset it with a clinic code', async () => {
+    const passwordLogin = (password: string) =>
+      request(app).post('/api/v1/patient/auth/password-login').send({ phone: '03001112233', password });
+
+    expect((await asPatient('get', '/patient/me')).body.data).toMatchObject({ hasPassword: false });
+    expect((await passwordLogin('Secret123')).status).toBe(401);
+    expect((await asPatient('post', '/patient/me/password').send({ password: '123' })).status).toBe(400);
+    expect((await asPatient('post', '/patient/me/password').send({ password: 'Secret123' })).status).toBe(
+      204,
+    );
+    expect((await asPatient('get', '/patient/me')).body.data).toMatchObject({ hasPassword: true });
+
+    expect((await passwordLogin('Wrong999')).status).toBe(401);
+    const byPassword = await passwordLogin('Secret123');
+    expect(byPassword.status).toBe(200);
+    expect(byPassword.body.data).toMatchObject({ accessToken: expect.any(String) });
+
+    expect((await asPatient('post', '/patient/me/password').send({ password: 'Other456' })).status).toBe(400);
+    expect(
+      (
+        await asPatient('post', '/patient/me/password').send({
+          currentPassword: 'Secret123',
+          password: 'Other456',
+        })
+      ).status,
+    ).toBe(204);
+    expect((await passwordLogin('Secret123')).status).toBe(401);
+    expect((await passwordLogin('Other456')).status).toBe(200);
+
+    const access = (await staff('get', `/branch/patients/${patientId}/app-access`, frontDesk)).body.data;
+    expect(access).toMatchObject({ hasPassword: true, passwordSetAt: expect.any(String) });
+    expect(JSON.stringify(access)).not.toMatch(/Other456|scrypt/);
+
+    const { code } = await issueCode(patientId);
+    const reset = (password: string, given = code) =>
+      request(app)
+        .post('/api/v1/patient/auth/reset-password')
+        .send({ phone: '03001112233', code: given, password });
+    expect((await reset('Fresh789', code === '000000' ? '111111' : '000000')).status).toBe(401);
+    const fresh = await reset('Fresh789');
+    expect(fresh.status).toBe(200);
+    expect((await asPatient('get', '/patient/me')).status).toBe(401);
+    expect((await reset('Again000')).status).toBe(401);
+    session = fresh.body.data;
+    expect((await passwordLogin('Other456')).status).toBe(401);
+    expect((await passwordLogin('Fresh789')).status).toBe(200);
+    expect((await asPatient('get', '/patient/me')).status).toBe(200);
+  });
+
   it('lets the patient edit the profile and marks it as changed in the app', async () => {
     expect((await asPatient('patch', '/patient/me').send({})).status).toBe(400);
     const edited = await asPatient('patch', '/patient/me').send({

@@ -1,4 +1,5 @@
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { type RequestHandler } from 'express';
 import { AppDataSource } from '../../database/data-source';
 import { withTransaction } from '../../database/transaction';
@@ -10,22 +11,48 @@ const ACCESS_TTL_SECONDS = 15 * 60;
 const REFRESH_TTL_MS = 60 * 24 * 60 * 60 * 1000;
 const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CODE_ATTEMPTS = 5;
+const MAX_PASSWORD_FAILURES = 10;
+const PASSWORD_LOCK_MS = 15 * 60 * 1000;
 
 const INVALID_CODE = 'This phone number and code do not match. Ask the clinic for a new code.';
 const SESSION_ENDED = 'Your session has ended. Ask the clinic for a new code to log in.';
+const INVALID_PASSWORD =
+  'This phone number and password do not match. Use Forgot password with a code from the clinic.';
+const LOCKED = 'Too many wrong passwords. Try again in 15 minutes or use Forgot password.';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const codeHash = (patientId: string, code: string) => sha256(`patient-activation:${patientId}:${code}`);
+const scryptAsync = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16);
+  const key = await scryptAsync(password, salt, 64);
+  return `scrypt$${salt.toString('base64')}$${key.toString('base64')}`;
+}
+
+async function passwordMatches(password: string, stored: string) {
+  const [scheme, salt, key] = stored.split('$');
+  if (scheme !== 'scrypt' || !salt || !key) return false;
+  const expected = Buffer.from(key, 'base64');
+  const given = await scryptAsync(password, Buffer.from(salt, 'base64'), expected.length);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
 
 interface AccountRow {
   activatedAt: Date | null;
   disabledAt: Date | null;
   lastLoginAt: Date | null;
+  passwordHash: string | null;
+  passwordSetAt: Date | null;
+  passwordFailures: number;
+  passwordLockedUntil: Date | null;
 }
 
 async function accountOf(patientId: string) {
   const [row] = (await AppDataSource.query(
-    `SELECT activated_at AS "activatedAt", disabled_at AS "disabledAt", last_login_at AS "lastLoginAt"
+    `SELECT activated_at AS "activatedAt", disabled_at AS "disabledAt", last_login_at AS "lastLoginAt",
+            password_hash AS "passwordHash", password_set_at AS "passwordSetAt",
+            failed_attempts AS "passwordFailures", locked_until AS "passwordLockedUntil"
        FROM patient_accounts WHERE patient_id = $1`,
     [patientId],
   )) as AccountRow[];
@@ -51,6 +78,52 @@ async function openSession(patientId: string, device: string | null) {
     [patientId, sha256(refreshToken), expiresAt, device?.slice(0, 120) ?? null],
   )) as { id: string }[];
   return tokensFor(patientId, session!.id, refreshToken, expiresAt);
+}
+
+async function consumeCode(phone: string, given: string) {
+  const patientId = await patientByPhone(phone);
+  if (!patientId) throw AppError.unauthorized(INVALID_CODE);
+  const [code] = (await AppDataSource.query(
+    `SELECT id, code_hash AS "codeHash", attempts FROM patient_activation_codes
+      WHERE patient_id = $1 AND used_at IS NULL AND expires_at > now()
+      ORDER BY created_at DESC LIMIT 1`,
+    [patientId],
+  )) as { id: string; codeHash: string; attempts: number }[];
+  if (!code || code.attempts >= MAX_CODE_ATTEMPTS) throw AppError.unauthorized(INVALID_CODE);
+  const actual = Buffer.from(codeHash(patientId, given.trim()));
+  const expected = Buffer.from(code.codeHash);
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    await AppDataSource.query(`UPDATE patient_activation_codes SET attempts = attempts + 1 WHERE id = $1`, [
+      code.id,
+    ]);
+    throw AppError.unauthorized(INVALID_CODE);
+  }
+  return { patientId, codeId: code.id };
+}
+
+async function activate(patientId: string, codeId: string, passwordHash: string | null) {
+  await withTransaction(async (em) => {
+    await em.query(`UPDATE patient_activation_codes SET used_at = now() WHERE id = $1`, [codeId]);
+    await em.query(
+      `INSERT INTO patient_accounts (patient_id, activated_at, last_login_at)
+       VALUES ($1, now(), now())
+       ON CONFLICT (patient_id) DO UPDATE SET activated_at = COALESCE(patient_accounts.activated_at, now()),
+         disabled_at = NULL, last_login_at = now(), updated_at = now()`,
+      [patientId],
+    );
+    if (passwordHash) {
+      await em.query(
+        `UPDATE patient_accounts SET password_hash = $2, password_set_at = now(), failed_attempts = 0,
+           locked_until = NULL WHERE patient_id = $1`,
+        [patientId, passwordHash],
+      );
+      await em.query(
+        `UPDATE patient_sessions SET revoked_at = now() WHERE patient_id = $1 AND revoked_at IS NULL`,
+        [patientId],
+      );
+      await em.query(`DELETE FROM patient_push_tokens WHERE patient_id = $1`, [patientId]);
+    }
+  });
 }
 
 function tokensFor(patientId: string, sessionId: string, refreshToken: string, refreshExpiresAt: Date) {
@@ -84,6 +157,8 @@ export const patientAuth = {
       activatedAt: account?.activatedAt?.toISOString() ?? null,
       lastLoginAt: account?.lastLoginAt?.toISOString() ?? null,
       codeExpiresAt: code ? code.expiresAt.toISOString() : null,
+      hasPassword: Boolean(account?.passwordHash),
+      passwordSetAt: account?.passwordSetAt?.toISOString() ?? null,
     };
   },
 
@@ -127,34 +202,57 @@ export const patientAuth = {
   },
 
   async loginWithCode(input: { phone: string; code: string; device?: string | null }) {
-    const patientId = await patientByPhone(input.phone);
-    if (!patientId) throw AppError.unauthorized(INVALID_CODE);
-    const [code] = (await AppDataSource.query(
-      `SELECT id, code_hash AS "codeHash", attempts FROM patient_activation_codes
-        WHERE patient_id = $1 AND used_at IS NULL AND expires_at > now()
-        ORDER BY created_at DESC LIMIT 1`,
-      [patientId],
-    )) as { id: string; codeHash: string; attempts: number }[];
-    if (!code || code.attempts >= MAX_CODE_ATTEMPTS) throw AppError.unauthorized(INVALID_CODE);
-    const given = Buffer.from(codeHash(patientId, input.code.trim()));
-    const expected = Buffer.from(code.codeHash);
-    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-      await AppDataSource.query(`UPDATE patient_activation_codes SET attempts = attempts + 1 WHERE id = $1`, [
-        code.id,
-      ]);
-      throw AppError.unauthorized(INVALID_CODE);
-    }
-    await withTransaction(async (em) => {
-      await em.query(`UPDATE patient_activation_codes SET used_at = now() WHERE id = $1`, [code.id]);
-      await em.query(
-        `INSERT INTO patient_accounts (patient_id, activated_at, last_login_at)
-         VALUES ($1, now(), now())
-         ON CONFLICT (patient_id) DO UPDATE SET activated_at = COALESCE(patient_accounts.activated_at, now()),
-           disabled_at = NULL, last_login_at = now(), updated_at = now()`,
-        [patientId],
-      );
-    });
+    const { patientId, codeId } = await consumeCode(input.phone, input.code);
+    await activate(patientId, codeId, null);
     return openSession(patientId, input.device ?? null);
+  },
+
+  async loginWithPassword(input: { phone: string; password: string; device?: string | null }) {
+    const patientId = await patientByPhone(input.phone);
+    const account = patientId ? await accountOf(patientId) : null;
+    if (!patientId || !account?.passwordHash || !account.activatedAt || account.disabledAt)
+      throw AppError.unauthorized(INVALID_PASSWORD);
+    if (account.passwordLockedUntil && account.passwordLockedUntil > new Date())
+      throw new AppError(429, 'RATE_LIMITED', LOCKED);
+    if (!(await passwordMatches(input.password, account.passwordHash))) {
+      const failures = account.passwordFailures + 1;
+      const locked = failures >= MAX_PASSWORD_FAILURES;
+      await AppDataSource.query(
+        `UPDATE patient_accounts SET failed_attempts = $2, locked_until = $3 WHERE patient_id = $1`,
+        [patientId, locked ? 0 : failures, locked ? new Date(Date.now() + PASSWORD_LOCK_MS) : null],
+      );
+      throw AppError.unauthorized(INVALID_PASSWORD);
+    }
+    await AppDataSource.query(
+      `UPDATE patient_accounts SET failed_attempts = 0, locked_until = NULL, last_login_at = now(),
+         updated_at = now() WHERE patient_id = $1`,
+      [patientId],
+    );
+    return openSession(patientId, input.device ?? null);
+  },
+
+  async resetPassword(input: { phone: string; code: string; password: string; device?: string | null }) {
+    const { patientId, codeId } = await consumeCode(input.phone, input.code);
+    await activate(patientId, codeId, await hashPassword(input.password));
+    return openSession(patientId, input.device ?? null);
+  },
+
+  async setPassword(patientId: string, input: { currentPassword?: string | null; password: string }) {
+    const account = await accountOf(patientId);
+    if (!account) throw AppError.unauthorized();
+    if (account.passwordHash) {
+      if (!input.currentPassword || !(await passwordMatches(input.currentPassword, account.passwordHash)))
+        throw AppError.badRequest('Your current password is not right');
+    }
+    await AppDataSource.query(
+      `UPDATE patient_accounts SET password_hash = $2, password_set_at = now(), failed_attempts = 0,
+         locked_until = NULL, updated_at = now() WHERE patient_id = $1`,
+      [patientId, await hashPassword(input.password)],
+    );
+  },
+
+  async hasPassword(patientId: string) {
+    return Boolean((await accountOf(patientId))?.passwordHash);
   },
 
   async refresh(refreshToken: string) {

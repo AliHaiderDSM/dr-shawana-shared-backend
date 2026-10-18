@@ -139,6 +139,19 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
         expect.objectContaining({ productName: 'Vitamin C Serum', approvedQty: '5.000' }),
       ]),
     );
+    const editApproval = (who: { id: string }, approvedQty: string) =>
+      as(who, 'post', `/admin/stock-requests/${requestId}/edit`).send({
+        note: `Toner ${approvedQty}`,
+        items: [{ id: tonerLine.id, approvedQty }],
+      });
+    expect((await editApproval(lahoreAdmin, '4')).status).toBe(403);
+    const lowered = await editApproval(superAdmin, '4');
+    expect(lowered.status).toBe(200);
+    expect(lowered.body.data).toMatchObject({ status: 'approved', decisionNote: 'Toner 4' });
+    expect(lowered.body.data.items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ productName: 'Rose Toner', approvedQty: '4.000' })]),
+    );
+    expect((await editApproval(superAdmin, '6')).status).toBe(200);
 
     const bySuperAdmin = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
       date: '2026-10-02',
@@ -177,6 +190,10 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       ],
     });
     expect(sent.status).toBe(201);
+    const belowSent = await editApproval(superAdmin, '5');
+    expect(belowSent.status).toBe(422);
+    expect(belowSent.body.error.message).toContain('6 is already sent');
+    expect((await editApproval(superAdmin, '6')).status).toBe(200);
     const transferNo = sent.body.data[0].transferNo as string;
     expect(transferNo).toBe('MAINWH-TR-000001');
     const onTheWay = (await as(lahoreAdmin, 'get', `/branch/stock-requests/${requestId}`)).body.data;
