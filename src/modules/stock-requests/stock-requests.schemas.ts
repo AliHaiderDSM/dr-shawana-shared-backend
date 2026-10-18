@@ -28,17 +28,6 @@ export const createStockRequestSchema = registry.register(
   }),
 );
 
-export const editStockRequestSchema = registry.register(
-  'EditStockRequest',
-  z.object({
-    note: optionalText(500),
-    items: z
-      .array(z.object({ id: z.uuid(), approvedQty: quantityInput }))
-      .max(100)
-      .openapi({ description: 'New approved quantity per line. Lines left out keep their quantity.' }),
-  }),
-);
-
 export const decideStockRequestSchema = registry.register(
   'DecideStockRequest',
   z.object({
@@ -156,7 +145,6 @@ const catalogItemSchema = z.object({
 
 export type CreateStockRequestInput = z.output<typeof createStockRequestSchema>;
 export type DecideStockRequestInput = z.output<typeof decideStockRequestSchema>;
-export type EditStockRequestInput = z.output<typeof editStockRequestSchema>;
 export type StockRequestListQuery = z.output<typeof stockRequestListQuerySchema>;
 export type IncomingStockQuery = Partial<z.output<typeof incomingStockQuerySchema>>;
 
@@ -214,6 +202,19 @@ registry.registerPath({
 });
 registry.registerPath({
   ...docs,
+  method: 'patch',
+  path: '/branch/stock-requests/{id}',
+  summary:
+    'The branch corrects its own request (products, quantities, note) while the Super Admin has not answered it. The whole list is replaced.',
+  request: {
+    params: idParamsSchema,
+    query: branchQuerySchema,
+    body: { content: { 'application/json': { schema: createStockRequestSchema } } },
+  },
+  responses: { 200: one('Changed'), ...errorResponses },
+});
+registry.registerPath({
+  ...docs,
   method: 'get',
   path: '/admin/stock-requests/pending-count',
   summary: 'Requests waiting for the Super Admin, and approved ones still to send',
@@ -241,18 +242,6 @@ for (const action of ['approve', 'reject'] as const) {
     responses: { 200: one(action === 'approve' ? 'Approved' : 'Rejected'), ...errorResponses },
   });
 }
-registry.registerPath({
-  ...docs,
-  method: 'post',
-  path: '/admin/stock-requests/{id}/edit',
-  summary:
-    'Super Admin changes the approved quantities (and note) of an approved request until it is fully received. A line cannot go below what is already sent.',
-  request: {
-    params: idParamsSchema,
-    body: { content: { 'application/json': { schema: editStockRequestSchema } } },
-  },
-  responses: { 200: one('Changed'), ...errorResponses },
-});
 registry.registerPath({
   ...docs,
   method: 'get',

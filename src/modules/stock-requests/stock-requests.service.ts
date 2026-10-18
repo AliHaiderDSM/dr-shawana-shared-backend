@@ -15,7 +15,6 @@ import { StockRequest, StockRequestItem, type StockRequestStatus } from './stock
 import {
   type CreateStockRequestInput,
   type DecideStockRequestInput,
-  type EditStockRequestInput,
   type IncomingStockQuery,
   type StockRequestListQuery,
 } from './stock-requests.schemas';
@@ -132,6 +131,53 @@ async function lock(manager: EntityManager, id: string) {
   return request;
 }
 
+async function checkItems(em: EntityManager, input: CreateStockRequestInput) {
+  const source = await warehouseId(em);
+  const ids = [...new Set(input.items.map((i) => i.productId))];
+  if (ids.length !== input.items.length) throw AppError.badRequest('Each product can be asked once');
+  const found = (await em.query(
+    `SELECT p.id, p.name, ${SELLABLE}::text AS available
+       FROM products p WHERE p.id = ANY($1::uuid[]) AND p.branch_id = $2 AND p.deleted_at IS NULL`,
+    [ids, source],
+  )) as { id: string; name: string; available: string }[];
+  if (found.length !== ids.length) {
+    throw AppError.badRequest('Ask only for products of the Super Admin stock');
+  }
+  const short = input.items.flatMap((item) => {
+    const product = found.find((p) => p.id === item.productId)!;
+    return new Decimal(item.qty).gt(product.available)
+      ? [
+          {
+            productId: product.id,
+            name: product.name,
+            available: toQuantity(product.available).toString(),
+          },
+        ]
+      : [];
+  });
+  if (short.length) {
+    throw AppError.unprocessable(
+      short.map((p) => `${p.name}: only ${p.available} in the Super Admin stock`).join('; '),
+      { products: short },
+    );
+  }
+}
+
+async function saveItems(em: EntityManager, requestId: string, input: CreateStockRequestInput) {
+  const items = repo(StockRequestItem, em);
+  await items.save(
+    input.items.map((i) =>
+      items.create({
+        requestId,
+        productId: i.productId,
+        qty: toQuantity(i.qty),
+        approvedQty: null,
+        note: i.note ?? null,
+      }),
+    ),
+  );
+}
+
 async function record(
   manager: EntityManager,
   actor: Actor,
@@ -212,35 +258,7 @@ export const stockRequestsService = {
       if (!branch || (branch.kind !== 'branch' && branch.kind !== 'dispatch')) {
         throw AppError.conflict('Only a branch or the Dispatch Department asks the Super Admin for stock');
       }
-      const source = await warehouseId(em);
-      const ids = [...new Set(input.items.map((i) => i.productId))];
-      if (ids.length !== input.items.length) throw AppError.badRequest('Each product can be asked once');
-      const found = (await em.query(
-        `SELECT p.id, p.name, ${SELLABLE}::text AS available
-           FROM products p WHERE p.id = ANY($1::uuid[]) AND p.branch_id = $2 AND p.deleted_at IS NULL`,
-        [ids, source],
-      )) as { id: string; name: string; available: string }[];
-      if (found.length !== ids.length) {
-        throw AppError.badRequest('Ask only for products of the Super Admin stock');
-      }
-      const short = input.items.flatMap((item) => {
-        const product = found.find((p) => p.id === item.productId)!;
-        return new Decimal(item.qty).gt(product.available)
-          ? [
-              {
-                productId: product.id,
-                name: product.name,
-                available: toQuantity(product.available).toString(),
-              },
-            ]
-          : [];
-      });
-      if (short.length) {
-        throw AppError.unprocessable(
-          short.map((p) => `${p.name}: only ${p.available} in the Super Admin stock`).join('; '),
-          { products: short },
-        );
-      }
+      await checkItems(em, input);
       const seq = await nextSequence(em, branchId, 'stock_request');
       const requests = repo(StockRequest, em);
       const saved = await requests.save(
@@ -253,20 +271,46 @@ export const stockRequestsService = {
           updatedBy: actor.userId,
         }),
       );
-      const items = repo(StockRequestItem, em);
-      await items.save(
-        input.items.map((i) =>
-          items.create({
-            requestId: saved.id,
-            productId: i.productId,
-            qty: toQuantity(i.qty),
-            approvedQty: null,
-            note: i.note ?? null,
-          }),
-        ),
-      );
+      await saveItems(em, saved.id, input);
       await record(em, actor, saved, 'create', null);
       return findOne(saved.id, branchId, em);
+    });
+  },
+
+  async update(actor: Actor, branchId: string, id: string, input: CreateStockRequestInput) {
+    return withTransaction(async (em) => {
+      const request = await lock(em, id);
+      if (request.branchId !== branchId) throw AppError.notFound('Stock request');
+      if (request.status !== 'pending') {
+        throw AppError.conflict(`This request is already ${request.status}, so it cannot be changed`);
+      }
+      const before = await findOne(id, branchId, em);
+      const beforeNote = request.note;
+      await checkItems(em, input);
+      await repo(StockRequestItem, em).delete({ requestId: id });
+      await saveItems(em, id, input);
+      request.note = input.note ?? null;
+      request.updatedBy = actor.userId;
+      await repo(StockRequest, em).save(request);
+      await auditService.record(
+        {
+          actor,
+          branchId,
+          action: 'update',
+          entity: 'stock_request',
+          entityId: id,
+          before: {
+            note: beforeNote,
+            items: before.items.map((i) => ({ productId: i.productId, qty: i.qty })),
+          },
+          after: {
+            note: request.note,
+            items: input.items.map((i) => ({ productId: i.productId, qty: i.qty })),
+          },
+        },
+        em,
+      );
+      return findOne(id, branchId, em);
     });
   },
 
@@ -310,65 +354,6 @@ export const stockRequestsService = {
       });
       await repo(StockRequest, em).save(request);
       await record(em, actor, request, approve ? 'approve' : 'reject', { status: 'pending' });
-      return findOne(id, null, em);
-    });
-  },
-
-  async edit(actor: Actor, id: string, input: EditStockRequestInput) {
-    return withTransaction(async (em) => {
-      const request = await lock(em, id);
-      if (request.status !== 'approved' && request.status !== 'sent') {
-        throw AppError.conflict(
-          request.status === 'pending'
-            ? 'Approve this request first; you can change the quantities while approving'
-            : `This request is already ${request.status} and cannot be changed`,
-        );
-      }
-      const items = await repo(StockRequestItem, em).findBy({ requestId: id });
-      const sent = (await em.query(
-        `SELECT product_id AS "productId", SUM(qty)::text AS qty FROM stock_outs
-          WHERE stock_request_id = $1 AND deleted_at IS NULL GROUP BY product_id`,
-        [id],
-      )) as { productId: string; qty: string }[];
-      const before = items.map((i) => ({ id: i.id, approvedQty: i.approvedQty }));
-      const names = (await em.query(`SELECT id, name FROM products WHERE id = ANY($1::uuid[])`, [
-        items.map((i) => i.productId),
-      ])) as { id: string; name: string }[];
-      for (const line of input.items) {
-        const item = items.find((i) => i.id === line.id);
-        if (!item) throw AppError.badRequest('An item is not on this request');
-        const already = sent.find((s) => s.productId === item.productId)?.qty ?? '0';
-        if (new Decimal(line.approvedQty).lt(already)) {
-          const name = names.find((n) => n.id === item.productId)?.name ?? 'A product';
-          throw AppError.unprocessable(
-            `${name}: ${toQuantity(already).toString()} is already sent, so approve at least that much`,
-            { itemId: item.id, sent: toQuantity(already).toString() },
-          );
-        }
-        item.approvedQty = toQuantity(line.approvedQty);
-      }
-      if (items.every((i) => new Decimal(i.approvedQty ?? 0).isZero())) {
-        throw AppError.badRequest('Keep at least one product, or reject the request');
-      }
-      await repo(StockRequestItem, em).save(items);
-      if (input.note !== undefined) request.decisionNote = input.note ?? null;
-      request.updatedBy = actor.userId;
-      await repo(StockRequest, em).save(request);
-      await auditService.record(
-        {
-          actor,
-          branchId: request.branchId,
-          action: 'edit_approval',
-          entity: 'stock_request',
-          entityId: request.id,
-          before: { items: before },
-          after: {
-            requestNo: request.requestNo,
-            items: items.map((i) => ({ id: i.id, approvedQty: i.approvedQty })),
-          },
-        },
-        em,
-      );
       return findOne(id, null, em);
     });
   },

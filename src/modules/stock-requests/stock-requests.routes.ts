@@ -10,7 +10,6 @@ import { validate, validBody, validParams, validQuery } from '../../middleware/v
 import {
   createStockRequestSchema,
   decideStockRequestSchema,
-  editStockRequestSchema,
   incomingStockQuerySchema,
   receiveStockSchema,
   stockRequestCatalogQuerySchema,
@@ -80,6 +79,26 @@ stockRequestsRouter.get(
   },
 );
 
+stockRequestsRouter.patch(
+  `${path}/:id`,
+  authenticate,
+  branchScope(),
+  canAsk,
+  byId,
+  validate({ body: createStockRequestSchema }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await stockRequestsService.update(
+        actorFrom(req),
+        branchIdOf(req),
+        idOf(req),
+        validBody(req, createStockRequestSchema),
+      ),
+    );
+  },
+);
+
 stockRequestsRouter.post(
   `${path}/:id/cancel`,
   authenticate,
@@ -120,20 +139,6 @@ for (const action of ['approve', 'reject'] as const) {
     },
   );
 }
-
-stockRequestsRouter.post(
-  '/admin/stock-requests/:id/edit',
-  authenticate,
-  requireRole(),
-  byId,
-  validate({ body: editStockRequestSchema }),
-  async (req, res) => {
-    sendOk(
-      res,
-      await stockRequestsService.edit(actorFrom(req), idOf(req), validBody(req, editStockRequestSchema)),
-    );
-  },
-);
 
 stockRequestsRouter.get(
   '/branch/incoming-stock',

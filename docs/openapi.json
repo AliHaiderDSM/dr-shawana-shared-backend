@@ -14934,43 +14934,6 @@
           "items"
         ]
       },
-      "EditStockRequest": {
-        "type": "object",
-        "properties": {
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "approvedQty": {
-                  "type": "string",
-                  "example": "10.000"
-                }
-              },
-              "required": [
-                "id",
-                "approvedQty"
-              ]
-            },
-            "maxItems": 100,
-            "description": "New approved quantity per line. Lines left out keep their quantity."
-          }
-        },
-        "required": [
-          "items"
-        ]
-      },
       "DecideStockRequest": {
         "type": "object",
         "properties": {
@@ -49781,6 +49744,116 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Stock requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "The branch corrects its own request (products, quantities, note) while the Super Admin has not answered it. The whole list is replaced.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/StockRequest"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/branch/stock-requests/{id}/cancel": {
@@ -50118,109 +50191,6 @@
         "responses": {
           "200": {
             "description": "Rejected",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/StockRequest"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/stock-requests/{id}/edit": {
-      "post": {
-        "tags": [
-          "Stock requests"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Super Admin changes the approved quantities (and note) of an approved request until it is fully received. A line cannot go below what is already sent.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EditStockRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Changed",
             "content": {
               "application/json": {
                 "schema": {

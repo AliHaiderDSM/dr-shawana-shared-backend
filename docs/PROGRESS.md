@@ -22,11 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
-## Patient app passwords and editing approved stock requests (2026-10-18)
+## Patient app passwords and editing stock requests (2026-10-18)
 
 - Patients can make an app password after a code login: `POST /patient/me/password` (changing needs the current one), `POST /patient/auth/password-login`, and Forgot password with a fresh clinic code: `POST /patient/auth/reset-password` (signs out other phones). Passwords are scrypt-hashed in the existing `patient_accounts.password_hash`; ten wrong tries lock password login for 15 minutes (`failed_attempts`, `locked_until`).
 - Migration `1793600000000-PatientPasswords` adds `password_set_at`. `GET /patient/me` has `hasPassword`; staff app-access shows `hasPassword` and `passwordSetAt` only. The password itself is never shown to anyone.
-- `POST /admin/stock-requests/:id/edit`: the Super Admin changes approved quantities and the note while a request is approved or sent; a line cannot go below what is already sent.
+- `PATCH /branch/stock-requests/:id`: the branch that asked corrects its own request (products, quantities, note) while it is still pending. Same checks as a new request; the item list is replaced.
 - Suite: 265 passed.
 
 ## Doctor employees, doctor voice notes, patient weight and height (2026-10-18)

@@ -18,7 +18,7 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
   let serum: string;
   let toner: string;
 
-  const as = (who: { id: string }, method: 'get' | 'post', path: string, branchId?: string) =>
+  const as = (who: { id: string }, method: 'get' | 'post' | 'patch', path: string, branchId?: string) =>
     request(app)
       [method](`/api/v1${path}${branchId ? `${path.includes('?') ? '&' : '?'}branchId=${branchId}` : ''}`)
       .set(bearer(who));
@@ -85,11 +85,8 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     expect(tooMuch.body.error.message).toContain('only');
     expect(pinged).not.toHaveBeenCalled();
     const asked = await as(lahoreAdmin, 'post', '/branch/stock-requests').send({
-      note: 'Weekend rush',
-      items: [
-        { productId: serum, qty: '5' },
-        { productId: toner, qty: '10', note: 'Big bottles' },
-      ],
+      note: 'Weekend',
+      items: [{ productId: serum, qty: '3' }],
     });
     await new Promise((resolve) => setImmediate(resolve));
     expect(pinged).toHaveBeenCalledWith('staff', 'all', 'badges', {});
@@ -106,7 +103,37 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       branch: { id: lahoreId },
     });
     const requestId = asked.body.data.id as string;
-    const tonerLine = (asked.body.data.items as { id: string; productName: string }[]).find(
+    const corrected = {
+      note: 'Weekend rush',
+      items: [
+        { productId: serum, qty: '5' },
+        { productId: toner, qty: '10', note: 'Big bottles' },
+      ],
+    };
+    expect(
+      (
+        await as(lahoreAdmin, 'patch', `/branch/stock-requests/${requestId}`).send({
+          items: [{ productId: serum, qty: '500' }],
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (await as(keeper, 'patch', `/branch/stock-requests/${requestId}`, lahoreId).send(corrected)).status,
+    ).toBe(403);
+    const fixed = await as(lahoreAdmin, 'patch', `/branch/stock-requests/${requestId}`).send(corrected);
+    expect(fixed.status).toBe(200);
+    expect(fixed.body.data).toMatchObject({
+      requestNo: 'LHR-SR-000001',
+      status: 'pending',
+      note: 'Weekend rush',
+    });
+    expect(fixed.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ productName: 'Vitamin C Serum', qty: '5.000' }),
+        expect.objectContaining({ productName: 'Rose Toner', qty: '10.000', note: 'Big bottles' }),
+      ]),
+    );
+    const tonerLine = (fixed.body.data.items as { id: string; productName: string }[]).find(
       (i) => i.productName === 'Rose Toner',
     )!;
 
@@ -132,6 +159,9 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       items: [{ id: tonerLine.id, approvedQty: '6' }],
     });
     expect(approved.status).toBe(200);
+    expect(
+      (await as(lahoreAdmin, 'patch', `/branch/stock-requests/${requestId}`).send(corrected)).status,
+    ).toBe(409);
     expect(approved.body.data.status).toBe('approved');
     expect(approved.body.data.items).toEqual(
       expect.arrayContaining([
@@ -139,19 +169,6 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
         expect.objectContaining({ productName: 'Vitamin C Serum', approvedQty: '5.000' }),
       ]),
     );
-    const editApproval = (who: { id: string }, approvedQty: string) =>
-      as(who, 'post', `/admin/stock-requests/${requestId}/edit`).send({
-        note: `Toner ${approvedQty}`,
-        items: [{ id: tonerLine.id, approvedQty }],
-      });
-    expect((await editApproval(lahoreAdmin, '4')).status).toBe(403);
-    const lowered = await editApproval(superAdmin, '4');
-    expect(lowered.status).toBe(200);
-    expect(lowered.body.data).toMatchObject({ status: 'approved', decisionNote: 'Toner 4' });
-    expect(lowered.body.data.items).toEqual(
-      expect.arrayContaining([expect.objectContaining({ productName: 'Rose Toner', approvedQty: '4.000' })]),
-    );
-    expect((await editApproval(superAdmin, '6')).status).toBe(200);
 
     const bySuperAdmin = await as(superAdmin, 'post', '/branch/stock-outs', warehouseId).send({
       date: '2026-10-02',
@@ -190,10 +207,6 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
       ],
     });
     expect(sent.status).toBe(201);
-    const belowSent = await editApproval(superAdmin, '5');
-    expect(belowSent.status).toBe(422);
-    expect(belowSent.body.error.message).toContain('6 is already sent');
-    expect((await editApproval(superAdmin, '6')).status).toBe(200);
     const transferNo = sent.body.data[0].transferNo as string;
     expect(transferNo).toBe('MAINWH-TR-000001');
     const onTheWay = (await as(lahoreAdmin, 'get', `/branch/stock-requests/${requestId}`)).body.data;
