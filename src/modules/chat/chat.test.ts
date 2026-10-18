@@ -213,6 +213,31 @@ describe('patient and doctor chat', () => {
     expect((await patient('get', '/patient/chats/unread')).body.data).toEqual({ unread: 0 });
   });
 
+  it('lets the doctor send a voice note that the patient can play', async () => {
+    const pushed = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async () => new Response('{}', { status: 200 }));
+    try {
+      const voice = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser).attach(
+        'file',
+        Buffer.from('fakeopus'),
+        { filename: 'voice.webm', contentType: 'audio/webm' },
+      );
+      expect(voice.status).toBe(201);
+      expect(voice.body.data).toMatchObject({
+        sender: 'doctor',
+        file: { name: 'voice.webm', type: 'audio/webm', size: 8 },
+      });
+      const played = await patient('get', `/patient/chats/${doctorId}/messages/${voice.body.data.id}/file`);
+      expect(played.status).toBe(200);
+      expect((await patient('get', '/patient/chats')).body.data[0]).toMatchObject({
+        lastMessage: 'Voice message',
+      });
+    } finally {
+      pushed.mockRestore();
+    }
+  });
+
   it('forgets the push token when the patient logs out', async () => {
     expect((await patient('post', '/patient/auth/logout')).status).toBe(204);
     const rows = (await AppDataSource.query(`SELECT 1 FROM patient_push_tokens WHERE patient_id = $1`, [

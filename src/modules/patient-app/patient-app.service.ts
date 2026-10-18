@@ -156,6 +156,8 @@ export const patientAppService = {
       dateOfBirth: patient.dateOfBirth,
       city: patient.city,
       country: patient.country,
+      weightKg: patient.weightKg === null ? null : Number(patient.weightKg),
+      heightCm: patient.heightCm === null ? null : Number(patient.heightCm),
       clinic: company ? { name: company.name, phone: company.phone, address: company.address } : null,
     };
   },
@@ -168,6 +170,8 @@ export const patientAppService = {
       country?: string | null;
       age?: number | null;
       dateOfBirth?: string | null;
+      weightKg?: number | null;
+      heightCm?: number | null;
     },
   ) {
     const patients = repo(Patient);
@@ -179,8 +183,17 @@ export const patientAppService = {
       country: patient.country,
       age: patient.age,
       dateOfBirth: patient.dateOfBirth,
+      weightKg: patient.weightKg,
+      heightCm: patient.heightCm,
     };
-    const changes = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+    const changes = Object.fromEntries(
+      Object.entries(input)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [
+          k,
+          typeof v === 'number' && (k === 'weightKg' || k === 'heightCm') ? v.toFixed(1) : v,
+        ]),
+    );
     await patients.update({ id: patientId }, { ...changes, appUpdatedAt: new Date() });
     await auditService.record({
       actor: null,

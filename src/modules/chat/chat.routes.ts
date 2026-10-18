@@ -13,7 +13,7 @@ import {
 } from '../../lib/http';
 import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
-import { documentUpload, patientChatUpload } from '../../lib/upload';
+import { doctorChatUpload, patientChatUpload } from '../../lib/upload';
 import { authenticate } from '../../middleware/auth';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import { authenticatePatient, patientOf } from '../patient-app/patient-auth';
@@ -68,7 +68,8 @@ const ok = (description: string, schema: z.ZodType) => ({
   200: { description, ...jsonContent(dataEnvelope(schema)) },
   ...errorResponses,
 });
-const upload = 'Send text in "body" and/or one PDF or photo (JPG, PNG, WebP, 10 MB) in "file" (multipart).';
+const upload =
+  'Send text in "body" and/or one PDF, photo (JPG, PNG, WebP) or voice note (M4A, AAC, MP3, WebM, OGG) up to 10 MB in "file" (multipart).';
 const patientUpload =
   'Send text in "body" and/or one photo (JPG, PNG, WebP) or voice note (M4A, AAC, MP3, WebM, OGG) up to 10 MB in "file" (multipart).';
 
@@ -289,7 +290,7 @@ chatRouter.post(
   '/branch/chats/:conversationId/messages',
   authenticate,
   doctorOnly,
-  documentUpload('file'),
+  doctorChatUpload('file'),
   validate({ params: conversationParams, body: messageBody }),
   async (req, res) => {
     const { conversationId } = validParams(req, conversationParams);

@@ -80,6 +80,14 @@ export const patientSchema = registry.register(
     dateOfBirth: z.iso.date().nullable(),
     country: z.string().nullable(),
     address: z.string().nullable(),
+    weightKg: z
+      .string()
+      .nullable()
+      .openapi({ description: 'Weight in kg, entered by the patient in the app' }),
+    heightCm: z
+      .string()
+      .nullable()
+      .openapi({ description: 'Height in cm, entered by the patient in the app' }),
     appUpdatedAt: z.iso
       .datetime()
       .nullable()

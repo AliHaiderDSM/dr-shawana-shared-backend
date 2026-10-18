@@ -32,6 +32,9 @@ export const reportFieldsUpload = (fields: { name: string; maxCount: number }[])
 export const patientChatUpload = (field: string): RequestHandler =>
   upload([...IMAGE_TYPES, ...AUDIO_TYPES], 10 * MB).single(field);
 
+export const doctorChatUpload = (field: string): RequestHandler =>
+  upload([...DOCUMENT_TYPES, ...AUDIO_TYPES], 10 * MB).single(field);
+
 export const documentUpload = (field: string): RequestHandler =>
   upload(DOCUMENT_TYPES, 10 * MB).single(field);
 

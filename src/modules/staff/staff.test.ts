@@ -40,6 +40,41 @@ describe('branch staff', () => {
     islamabadDesk = await createStaff(fake, { role: 'front_desk', branchId: islamabadId });
   });
 
+  describe('doctor employees', () => {
+    it('get a doctor profile so they can be booked', async () => {
+      const body = staffBody('doctor');
+      const created = await request(app).post('/api/v1/branch/staff').set(bearer(lahoreAdmin)).send(body);
+      expect(created.status).toBe(201);
+
+      const desk = await request(app)
+        .post('/api/v1/branch/staff')
+        .set(bearer(lahoreAdmin))
+        .send(staffBody('front_desk'));
+      await request(app)
+        .patch(`/api/v1/branch/staff/${desk.body.data.id}`)
+        .set(bearer(lahoreAdmin))
+        .send({ role: 'doctor' })
+        .expect(200);
+
+      const options = await request(app).get('/api/v1/branch/doctors/options').set(bearer(lahoreAdmin));
+      expect(options.status).toBe(200);
+      const names = (options.body.data as { name: string }[]).map((d) => d.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          `${body.firstName} ${body.lastName}`,
+          `${desk.body.data.firstName} ${desk.body.data.lastName}`,
+        ]),
+      );
+
+      const list = await request(app).get('/api/v1/branch/doctors').set(bearer(lahoreAdmin));
+      expect(
+        (list.body.data as { staff: { id: string } | null }[]).filter(
+          (d) => d.staff?.id === created.body.data.id,
+        ),
+      ).toHaveLength(1);
+    });
+  });
+
   describe('branch admin in their own branch', () => {
     it('creates staff for every branch role except admins', async () => {
       for (const role of [

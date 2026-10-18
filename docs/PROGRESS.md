@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Doctor employees, doctor voice notes, patient weight and height (2026-10-18)
+
+- A staff member created (or changed) to the doctor role from Employees now gets a doctor profile, so they show in Doctors and in booking. Migration `1793400000000-DoctorProfilesForDoctorStaff` adds the missing profiles for existing doctor employees.
+- `POST /branch/chats/:conversationId/messages` also takes voice notes (same audio types as the patient side).
+- Migration `1793500000000-PatientWeightHeight` adds `weight_kg` and `height_cm` to patients. `PATCH /patient/me` accepts `weightKg` and `heightCm`; the staff patient record shows them.
+- The push test clears the push keys while it runs. Suite: 264 passed.
+
 ## Web Push for staff (2026-10-18)
 
 - Migration `1793300000000-StaffPushSubscriptions` adds `staff_push_subscriptions` (one row per browser, `last_counts` holds the badge counts last pushed).

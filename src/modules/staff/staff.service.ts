@@ -6,6 +6,7 @@ import { logger } from '../../lib/logger';
 import { canManageRole, DISPATCH_ROLES, WAREHOUSE_ROLES, type Role } from '../../lib/permissions';
 import { auditService } from '../audit/audit.service';
 import { branchesRepository } from '../branches/branches.repository';
+import { Doctor } from '../doctors/doctor.entity';
 import { type StaffProfile, type StaffStatus } from './staff-profile.entity';
 import { staffAccounts } from './staff-accounts';
 import { staffRepository, type StaffListQuery } from './staff.repository';
@@ -95,6 +96,33 @@ async function assertUnique(email: string, username: string, excludeId?: string)
   if (conflicts.some((c) => c.username === username)) throw AppError.conflict('Username is already taken');
 }
 
+async function ensureDoctorProfile(manager: EntityManager, actor: Actor, profile: StaffProfile) {
+  if (profile.role !== 'doctor' || !profile.branchId) return;
+  const doctors = manager.getRepository(Doctor);
+  if (await doctors.findOneBy({ staffId: profile.id })) return;
+  const doctor = await doctors.save(
+    doctors.create({
+      branchId: profile.branchId,
+      staffId: profile.id,
+      displayName: `${profile.firstName} ${profile.lastName}`.trim(),
+      phone: profile.phone,
+      email: profile.email,
+      createdBy: actor.userId,
+    }),
+  );
+  await auditService.record(
+    {
+      actor,
+      branchId: profile.branchId,
+      action: 'create',
+      entity: 'doctor',
+      entityId: doctor.id,
+      after: { staffId: profile.id, displayName: doctor.displayName },
+    },
+    manager,
+  );
+}
+
 export async function getInBranch(branchId: string, id: string, manager?: EntityManager) {
   const profile = await staffRepository.findInBranch(branchId, id, manager);
   if (!profile) throw AppError.notFound('Staff member');
@@ -162,7 +190,11 @@ export const staffService = {
     assertCanManage(actor, input.role);
     const branch = await ensureBranchExists(branchId);
     assertRoleFitsBranch(branch.kind, input.role);
-    return toStaffDto(await this.createAccount(actor, branchId, input));
+    return toStaffDto(
+      await this.createAccount(actor, branchId, input, (em, profile) =>
+        ensureDoctorProfile(em, actor, profile),
+      ),
+    );
   },
 
   async list(branchId: string | null, query: StaffListQuery) {
@@ -194,6 +226,7 @@ export const staffService = {
       const emailChanged = email !== profile.email;
       Object.assign(profile, input, { updatedBy: actor.userId });
       const saved = await staffRepository.save(profile, em);
+      await ensureDoctorProfile(em, actor, saved);
       await auditService.record(
         {
           actor,

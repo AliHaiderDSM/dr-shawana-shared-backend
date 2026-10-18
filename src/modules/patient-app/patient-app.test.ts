@@ -131,12 +131,27 @@ describe('patient app', () => {
       name: 'Ayesha Khan',
       city: 'Karachi',
       age: 46,
+      weightKg: 68.5,
+      heightCm: 162,
       phone: '03009999999',
     });
     expect(edited.status).toBe(200);
-    expect(edited.body.data).toMatchObject({ name: 'Ayesha Khan', city: 'Karachi', age: 46 });
+    expect(edited.body.data).toMatchObject({
+      name: 'Ayesha Khan',
+      city: 'Karachi',
+      age: 46,
+      weightKg: 68.5,
+      heightCm: 162,
+    });
+    expect((await asPatient('patch', '/patient/me').send({ weightKg: 900 })).status).toBe(400);
     const seen = (await staff('get', `/branch/patients/${patientId}`, frontDesk)).body.data;
-    expect(seen).toMatchObject({ name: 'Ayesha Khan', city: 'Karachi', appUpdatedAt: expect.any(String) });
+    expect(seen).toMatchObject({
+      name: 'Ayesha Khan',
+      city: 'Karachi',
+      weightKg: '68.5',
+      heightCm: '162.0',
+      appUpdatedAt: expect.any(String),
+    });
     expect(seen.phone).not.toContain('9999999');
     await asPatient('patch', '/patient/me').send({ name: 'Ayesha', city: 'Lahore' });
   });

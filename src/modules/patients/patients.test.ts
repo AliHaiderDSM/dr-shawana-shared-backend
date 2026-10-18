@@ -99,7 +99,10 @@ describe('patients and doctors', () => {
     it('shares patients with every branch', async () => {
       const own = await api('get', '/branch/patients', admin);
       expect(own.body.data.map((p: { id: string }) => p.id)).toEqual([patientId]);
-      expect(own.body.data[0].enteredBy).toMatchObject({ role: expect.any(String), name: expect.any(String) });
+      expect(own.body.data[0].enteredBy).toMatchObject({
+        role: expect.any(String),
+        name: expect.any(String),
+      });
 
       const other = await api('get', '/branch/patients', islamabadAdmin);
       expect(other.body.data.map((p: { id: string }) => p.id)).toEqual([patientId]);

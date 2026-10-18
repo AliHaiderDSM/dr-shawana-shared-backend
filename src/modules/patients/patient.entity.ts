@@ -8,6 +8,8 @@ export type BhrtStatus = (typeof BHRT_STATUSES)[number];
 @Entity('patients')
 @Index('UQ_patients_phone_last9', ['phoneLast9'], { unique: true, where: `"deleted_at" IS NULL` })
 @Check('CHK_patients_age', `"age" IS NULL OR ("age" >= 0 AND "age" <= 150)`)
+@Check('CHK_patients_weight', `"weight_kg" IS NULL OR ("weight_kg" > 0 AND "weight_kg" <= 400)`)
+@Check('CHK_patients_height', `"height_cm" IS NULL OR ("height_cm" > 0 AND "height_cm" <= 260)`)
 export class Patient extends BaseEntity {
   @Index()
   @Column({ type: 'varchar', length: 150 })
@@ -35,6 +37,12 @@ export class Patient extends BaseEntity {
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   country: string | null;
+
+  @Column({ name: 'weight_kg', type: 'numeric', precision: 5, scale: 1, nullable: true })
+  weightKg: string | null;
+
+  @Column({ name: 'height_cm', type: 'numeric', precision: 5, scale: 1, nullable: true })
+  heightCm: string | null;
 
   @Column({ type: 'text', nullable: true })
   address: string | null;

@@ -2,6 +2,7 @@ import request from 'supertest';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { env } from '../../config/env';
 import { AppDataSource } from '../../database/data-source';
 import { staffPush, ExpiredSubscriptionError, type PushMessage, type PushTarget } from './push.service';
 
@@ -21,7 +22,16 @@ describe('staff web push', () => {
     keys: { p256dh: 'BPublicKeyOfTheBrowser', auth: 'AuthSecret' },
   });
 
+  const keys = { publicKey: env.WEB_PUSH_PUBLIC_KEY, privateKey: env.WEB_PUSH_PRIVATE_KEY };
+
+  afterAll(() => {
+    env.WEB_PUSH_PUBLIC_KEY = keys.publicKey;
+    env.WEB_PUSH_PRIVATE_KEY = keys.privateKey;
+  });
+
   beforeAll(async () => {
+    env.WEB_PUSH_PUBLIC_KEY = undefined;
+    env.WEB_PUSH_PRIVATE_KEY = undefined;
     lahoreId = (await createBranch({ code: 'LHR', city: 'Lahore' })).id;
     owner = await createStaff(fake, { role: 'super_admin', branchId: null });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahoreId });

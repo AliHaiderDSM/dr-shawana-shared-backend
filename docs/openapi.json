@@ -4742,6 +4742,20 @@
               "null"
             ]
           },
+          "weightKg": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Weight in kg, entered by the patient in the app"
+          },
+          "heightCm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Height in cm, entered by the patient in the app"
+          },
           "appUpdatedAt": {
             "type": [
               "string",
@@ -4823,6 +4837,8 @@
           "dateOfBirth",
           "country",
           "address",
+          "weightKg",
+          "heightCm",
           "appUpdatedAt",
           "bhrtStatus",
           "createdInBranchId",
@@ -6951,6 +6967,22 @@
               "null"
             ],
             "format": "date"
+          },
+          "weightKg": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 400
+          },
+          "heightCm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0,
+            "maximum": 260
           }
         }
       },
@@ -35962,7 +35994,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "The patient edits name, city, country, age or date of birth (not the phone). Marks the patient as updated from the app.",
+        "summary": "The patient edits name, city, country, age, date of birth, weight (kg) or height (cm) (not the phone). Marks the patient as updated from the app.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -38725,7 +38757,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Doctor only: reply to the patient, who gets a push notification. Send text in \"body\" and/or one PDF or photo (JPG, PNG, WebP, 10 MB) in \"file\" (multipart).",
+        "summary": "Doctor only: reply to the patient, who gets a push notification. Send text in \"body\" and/or one PDF, photo (JPG, PNG, WebP) or voice note (M4A, AAC, MP3, WebM, OGG) up to 10 MB in \"file\" (multipart).",
         "parameters": [
           {
             "schema": {

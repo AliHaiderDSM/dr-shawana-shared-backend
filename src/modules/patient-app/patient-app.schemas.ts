@@ -39,6 +39,8 @@ export const updatePatientProfileSchema = registry.register(
       country: z.string().trim().max(100).nullable().optional(),
       age: z.number().int().min(1).max(120).nullable().optional(),
       dateOfBirth: z.iso.date().nullable().optional(),
+      weightKg: z.number().positive().max(400).nullable().optional(),
+      heightCm: z.number().positive().max(260).nullable().optional(),
     })
     .refine((v) => Object.values(v).some((x) => x !== undefined), 'Change at least one field'),
 );
@@ -158,7 +160,7 @@ registry.registerPath({
   method: 'patch',
   path: '/patient/me',
   summary:
-    'The patient edits name, city, country, age or date of birth (not the phone). Marks the patient as updated from the app.',
+    'The patient edits name, city, country, age, date of birth, weight (kg) or height (cm) (not the phone). Marks the patient as updated from the app.',
   request: jsonBody(updatePatientProfileSchema),
   responses: ok('Profile'),
 });
