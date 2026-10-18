@@ -194,6 +194,12 @@ describe('patient and doctor chat', () => {
       expect(String(url)).toContain('exp.host');
       expect(String(init?.body)).toContain('ExponentPushToken[abc123]');
       expect(String(init?.body)).not.toContain('Continue the same dose');
+      expect(JSON.parse(String(init?.body))[0]).toMatchObject({
+        title: 'Dr. Shawana',
+        priority: 'high',
+        channelId: 'messages',
+        data: { type: 'chat', doctorId },
+      });
     } finally {
       pushed.mockRestore();
       pinged.mockRestore();
@@ -214,9 +220,23 @@ describe('patient and doctor chat', () => {
   });
 
   it('lets the doctor send a voice note that the patient can play', async () => {
-    const pushed = jest
-      .spyOn(global, 'fetch')
-      .mockImplementation(async () => new Response('{}', { status: 200 }));
+    await AppDataSource.query(
+      `INSERT INTO patient_push_tokens (patient_id, token, platform) VALUES ($1, 'ExponentPushToken[old]', 'android')`,
+      [patientId],
+    );
+    const pushed = jest.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      const sent = JSON.parse(String(init?.body)) as { to: string; body: string }[];
+      return new Response(
+        JSON.stringify({
+          data: sent.map((m) =>
+            m.to === 'ExponentPushToken[old]'
+              ? { status: 'error', details: { error: 'DeviceNotRegistered' } }
+              : { status: 'ok', id: 'x' },
+          ),
+        }),
+        { status: 200 },
+      );
+    });
     try {
       const voice = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser).attach(
         'file',
@@ -233,6 +253,12 @@ describe('patient and doctor chat', () => {
       expect((await patient('get', '/patient/chats')).body.data[0]).toMatchObject({
         lastMessage: 'Voice message',
       });
+      expect(String(pushed.mock.calls[0]?.[1]?.body)).toContain('Sent you a voice message.');
+      const left = (await AppDataSource.query(
+        `SELECT token FROM patient_push_tokens WHERE patient_id = $1 ORDER BY token`,
+        [patientId],
+      )) as { token: string }[];
+      expect(left.map((r) => r.token)).toEqual(['ExponentPushToken[abc123]']);
     } finally {
       pushed.mockRestore();
     }

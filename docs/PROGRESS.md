@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient app push for doctor replies (2026-10-18)
+
+- Expo push now goes out with priority high on the Android `messages` channel, titled with the doctor's name, and carries `doctorId` so a tap opens that chat. Tokens Expo reports as DeviceNotRegistered are deleted.
+- Push needs a real app build (EAS); Expo Go on Android cannot receive remote push.
+
 ## Patient app passwords and editing stock requests (2026-10-18)
 
 - Patients can make an app password after a code login: `POST /patient/me/password` (changing needs the current one), `POST /patient/auth/password-login`, and Forgot password with a fresh clinic code: `POST /patient/auth/reset-password` (signs out other phones). Passwords are scrypt-hashed in the existing `patient_accounts.password_hash`; ten wrong tries lock password login for 15 minutes (`failed_attempts`, `locked_until`).

@@ -309,14 +309,21 @@ export const doctorChat = {
     const tokens = (await AppDataSource.query(`SELECT token FROM patient_push_tokens WHERE patient_id = $1`, [
       conversation.patientId,
     ])) as { token: string }[];
-    await sendExpoPush(
+    const [doctor] = (await AppDataSource.query(`SELECT display_name AS name FROM doctors WHERE id = $1`, [
+      conversation.doctorId,
+    ])) as { name: string }[];
+    const gone = await sendExpoPush(
       tokens.map((t) => t.token),
       {
-        title: 'DSM Clinic',
-        body: 'You have a new message from your doctor.',
-        data: { type: 'chat' },
+        title: doctor?.name ?? 'DSM Clinic',
+        body: file?.mimetype.startsWith('audio/')
+          ? 'Sent you a voice message.'
+          : 'You have a new message from your doctor.',
+        data: { type: 'chat', doctorId: conversation.doctorId },
       },
     );
+    if (gone.length)
+      await AppDataSource.query(`DELETE FROM patient_push_tokens WHERE token = ANY($1::text[])`, [gone]);
     return message;
   },
 
