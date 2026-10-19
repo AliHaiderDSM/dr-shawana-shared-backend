@@ -229,6 +229,22 @@ export const medicalHistorySchema = z
     familyRelatives: flags(FAMILY_RELATIVES),
     familyConditions: flags(FAMILY_CONDITIONS),
     familyOther: text(500),
+    familyHistory: z
+      .array(
+        z.object({
+          relative: z.enum(FAMILY_RELATIVES),
+          who: text(100),
+          conditions: flags(FAMILY_CONDITIONS),
+          other: text(500),
+        }),
+      )
+      .max(FAMILY_RELATIVES.length)
+      .default([])
+      .refine(
+        (v) => new Set(v.map((e) => e.relative)).size === v.length,
+        'Each family member can be listed once',
+      )
+      .openapi({ description: 'Conditions per family member; close_family carries who it is' }),
     utiAntibiotics12m: yesNo,
     painMedication: yesNo,
     moodMedication: yesNo,
@@ -253,6 +269,17 @@ export const medicalHistorySchema = z
   })
   .transform((v) => ({
     ...v,
+    ...(v.familyHistory.length
+      ? {
+          familyRelatives: v.familyHistory.map((e) => e.relative),
+          familyConditions: [...new Set(v.familyHistory.flatMap((e) => e.conditions))],
+          familyOther:
+            v.familyHistory
+              .map((e) => e.other)
+              .filter(Boolean)
+              .join('; ') || null,
+        }
+      : {}),
     ...(v.havingPeriods === 'yes' ? {} : { lastPeriodDate: null, cycle: null, flow: null }),
     ...(v.cycle === 'irregular' ? {} : { dub: false, oligomenorrhea: false }),
     allergies: v.hasAllergies === 'yes' ? v.allergies : null,

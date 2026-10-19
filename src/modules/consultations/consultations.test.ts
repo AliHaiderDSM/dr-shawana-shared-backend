@@ -153,6 +153,10 @@ describe('consultations and clinical records', () => {
         ],
         hasAllergies: 'no',
         allergies: 'Penicillin',
+        familyHistory: [
+          { relative: 'mother', conditions: ['breast_cancer', 'osteoporosis'] },
+          { relative: 'close_family', who: 'Aunt', conditions: ['other'], other: 'Thyroid cancer' },
+        ],
       });
       expect(res.status).toBe(200);
       expect(res.body.data.section.data).toMatchObject({
@@ -166,6 +170,12 @@ describe('consultations and clinical records', () => {
         ],
         allergies: null,
         hormoneTherapy: null,
+        familyHistory: [
+          expect.objectContaining({ relative: 'mother', conditions: ['breast_cancer', 'osteoporosis'] }),
+          expect.objectContaining({ relative: 'close_family', who: 'Aunt', other: 'Thyroid cancer' }),
+        ],
+        familyRelatives: ['mother', 'close_family'],
+        familyConditions: ['breast_cancer', 'osteoporosis', 'other'],
       });
 
       const followup = await api(

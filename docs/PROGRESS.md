@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Family history per relative (2026-10-19)
+
+- Medical history takes `familyHistory` [{ relative, who, conditions, other }]; saving fills familyRelatives, familyConditions and familyOther from it so older readers keep working.
+
 ## Medical history: None per condition group, surgery year (2026-10-19)
 
 - `MEDICAL_CONDITIONS` adds no_cancer, no_hormonal, no_metabolic, no_musculoskeletal, no_cardiac, no_mental, no_neurological, no_autoimmune, no_liver_gi, no_genitourinary.
