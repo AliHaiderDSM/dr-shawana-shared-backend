@@ -1,5 +1,6 @@
 import request from 'supertest';
-import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
+import { bearer, createBranch, createStaff, TEST_PASSWORD } from '../../../tests/helpers/fixtures';
+import { AppDataSource } from '../../database/data-source';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 
@@ -171,5 +172,37 @@ describe('doctor app', () => {
         })
       ).status,
     ).toBe(204);
+  });
+
+  it('logs both sides in from one form and sends each to its own side', async () => {
+    const login = (identifier: string, password: string) =>
+      request(app).post('/api/v1/app/login').send({ identifier, password });
+    await request(app)
+      .post('/api/v1/patient/me/password')
+      .set({ Authorization: `Bearer ${patientToken}` })
+      .send({ password: 'Patient123' })
+      .expect(204);
+    const patient = await login('0300 5550101', 'Patient123');
+    expect(patient.status).toBe(200);
+    expect(patient.body.data).toMatchObject({ role: 'patient', accessToken: expect.any(String) });
+
+    const [doctorRow] = (await AppDataSource.query('SELECT email FROM staff_profiles WHERE id = $1', [
+      doctorUser.id,
+    ])) as { email: string }[];
+    const byEmail = await login(doctorRow!.email, TEST_PASSWORD);
+    expect(byEmail.status).toBe(200);
+    expect(byEmail.body.data).toMatchObject({ role: 'doctor', refreshToken: expect.any(String) });
+
+    await AppDataSource.query("UPDATE staff_profiles SET phone = '0321-7778899' WHERE id = $1", [
+      doctorUser.id,
+    ]);
+    expect((await login('+92 321 7778899', TEST_PASSWORD)).body.data).toMatchObject({ role: 'doctor' });
+
+    const [deskRow] = (await AppDataSource.query('SELECT email FROM staff_profiles WHERE id = $1', [
+      frontDesk.id,
+    ])) as { email: string }[];
+    expect((await login(deskRow!.email, TEST_PASSWORD)).status).toBe(403);
+    expect((await login('03005550101', 'wrong-pass')).status).toBe(401);
+    expect((await login(doctorRow!.email, 'wrong-pass')).status).toBe(401);
   });
 });

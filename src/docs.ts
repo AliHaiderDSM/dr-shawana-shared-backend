@@ -21,6 +21,7 @@ import './modules/patient-app/patient-app.schemas';
 import './modules/chat/chat.routes';
 import './modules/push/push.routes';
 import './modules/doctor-app/doctor-app.routes';
+import './modules/patient-app/app-login';
 import './modules/consultations/consultations.schemas';
 import './modules/clinical-records/clinical-records.schemas';
 import './modules/prescriptions/prescriptions.schemas';

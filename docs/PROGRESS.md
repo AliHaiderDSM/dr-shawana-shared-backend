@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## One app login (2026-10-19)
+
+- `POST /app/login` {identifier, password}: a phone number tries the patient password first, then an active doctor with that phone; an email or username logs in a doctor. Other staff get 403. The answer carries role so the app opens the right side. Suite: 274 passed.
+
 ## Doctor app API (2026-10-19)
 
 - `/doctor/*` (staff login, doctor role only): home (counts, schedule, latest chats), patients across every branch (unread first, search), patient file (appointments, prescriptions with medicines, clinical remarks, medical records), start a chat, record file links, write remarks of own consultations (PUT /doctor/consultations/:id/remarks keeps other clinical fields), push token save/remove.
