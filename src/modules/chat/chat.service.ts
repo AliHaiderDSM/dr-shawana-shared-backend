@@ -253,6 +253,24 @@ export const patientChat = {
     const conversationId = await conversationFor(patientId, doctorId);
     const message = await send(conversationId, 'patient', null, body, file, replyToId, durationMs);
     await realtime.publish('doctor', doctorId, 'message', { conversationId });
+    const [who] = (await AppDataSource.query(`SELECT name FROM patients WHERE id = $1`, [patientId])) as {
+      name: string;
+    }[];
+    const tokens = (await AppDataSource.query(
+      `SELECT t.token FROM staff_push_tokens t JOIN doctors d ON d.staff_id = t.staff_id
+        WHERE d.id = $1 AND d.deleted_at IS NULL`,
+      [doctorId],
+    )) as { token: string }[];
+    const gone = await sendExpoPush(
+      tokens.map((t) => t.token),
+      {
+        title: who?.name ?? 'Patient message',
+        body: file?.mimetype.startsWith('audio/') ? 'Sent you a voice message.' : 'Sent you a new message.',
+        data: { type: 'doctor_chat', conversationId, patientId },
+      },
+    );
+    if (gone.length)
+      await AppDataSource.query(`DELETE FROM staff_push_tokens WHERE token = ANY($1::text[])`, [gone]);
     return message;
   },
 

@@ -25,6 +25,7 @@ import { manufacturingRouter } from './modules/manufacturing/manufacturing.route
 import { patientLinksRouter } from './modules/patient-links/patient-links.routes';
 import { chatRouter } from './modules/chat/chat.routes';
 import { pushRouter } from './modules/push/push.routes';
+import { doctorAppRouter } from './modules/doctor-app/doctor-app.routes';
 import { patientAppRouter } from './modules/patient-app/patient-app.routes';
 import { patientsRouter } from './modules/patients/patients.routes';
 import { prescriptionsRouter } from './modules/prescriptions/prescriptions.routes';
@@ -62,6 +63,7 @@ apiRouter.use(doctorsRouter);
 apiRouter.use(patientLinksRouter);
 apiRouter.use(chatRouter);
 apiRouter.use(pushRouter);
+apiRouter.use(doctorAppRouter);
 apiRouter.use(patientAppRouter);
 apiRouter.use(appointmentsRouter);
 apiRouter.use(consultationsRouter);

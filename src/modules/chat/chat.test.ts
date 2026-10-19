@@ -101,7 +101,12 @@ describe('patient and doctor chat', () => {
       .field('body', 'New report')
       .attach('file', Buffer.from('fakejpeg'), { filename: 'tsh.jpg', contentType: 'image/jpeg' });
     expect(withFile.status).toBe(201);
-    expect(withFile.body.data.file).toEqual({ name: 'tsh.jpg', type: 'image/jpeg', size: 8, durationMs: null });
+    expect(withFile.body.data.file).toEqual({
+      name: 'tsh.jpg',
+      type: 'image/jpeg',
+      size: 8,
+      durationMs: null,
+    });
     const voice = await patient('post', `/patient/chats/${doctorId}/messages`).attach(
       'file',
       Buffer.from('fakeaudio'),

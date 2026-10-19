@@ -7832,6 +7832,797 @@
           "keys"
         ]
       },
+      "AddBloodWork": {
+        "type": "object",
+        "properties": {
+          "consultationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "test": {
+                  "type": "string",
+                  "enum": [
+                    "fsh",
+                    "estradiol",
+                    "testosterone_free",
+                    "testosterone_total",
+                    "dhea_s",
+                    "vit_d3",
+                    "tsh",
+                    "ferritin",
+                    "b12"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "testDate": {
+                  "type": "string",
+                  "format": "date",
+                  "example": "2026-09-30"
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20
+                }
+              },
+              "required": [
+                "test",
+                "value",
+                "testDate"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 27
+          }
+        },
+        "required": [
+          "results"
+        ]
+      },
+      "UpdateBloodWork": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "example": "10.000"
+          },
+          "testDate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          }
+        }
+      },
+      "AddBhrtStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "on",
+              "off",
+              "recommended",
+              "other"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20000
+          },
+          "appointmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "CreateMedicalRecord": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "medical_record",
+              "imaging"
+            ],
+            "default": "medical_record"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20000
+          },
+          "appointmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "UpdateMedicalRecord": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "medical_record",
+              "imaging"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20000
+          }
+        }
+      },
+      "BloodWork": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "patientId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "consultationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "test": {
+                  "type": "string",
+                  "enum": [
+                    "fsh",
+                    "estradiol",
+                    "testosterone_free",
+                    "testosterone_total",
+                    "dhea_s",
+                    "vit_d3",
+                    "tsh",
+                    "ferritin",
+                    "b12"
+                  ]
+                },
+                "value": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "testDate": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "createdBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "patientId",
+                "consultationId",
+                "test",
+                "value",
+                "unit",
+                "testDate",
+                "createdBy",
+                "createdAt"
+              ]
+            }
+          },
+          "dates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "test": {
+                  "type": "string",
+                  "enum": [
+                    "fsh",
+                    "estradiol",
+                    "testosterone_free",
+                    "testosterone_total",
+                    "dhea_s",
+                    "vit_d3",
+                    "tsh",
+                    "ferritin",
+                    "b12"
+                  ]
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "date": {
+                        "type": "string",
+                        "format": "date"
+                      },
+                      "value": {
+                        "type": "string",
+                        "example": "10.000"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "date",
+                      "value"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "test",
+                "unit",
+                "points"
+              ]
+            }
+          }
+        },
+        "required": [
+          "results",
+          "dates",
+          "tests"
+        ]
+      },
+      "BhrtStatusEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "on",
+              "off",
+              "recommended",
+              "other"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "patientId",
+          "appointmentId",
+          "date",
+          "status",
+          "note",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "MedicalRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "medical_record",
+              "imaging"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uploadedByPatient": {
+            "type": "boolean"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "originalName": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "originalName",
+                "contentType",
+                "sizeBytes",
+                "createdAt"
+              ]
+            }
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "patientId",
+          "appointmentId",
+          "type",
+          "date",
+          "note",
+          "uploadedByPatient",
+          "files",
+          "createdBy",
+          "createdAt"
+        ]
+      },
+      "LabReportSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "testDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                },
+                "recordFileId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "stored": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "index",
+                "name",
+                "contentType",
+                "sizeBytes",
+                "recordFileId",
+                "stored"
+              ]
+            },
+            "description": "Reports read for this summary. A saved record file opens by recordFileId; an uploaded one through the summary file link when stored."
+          },
+          "valuesFound": {
+            "type": "integer"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "patient": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "value"
+                  ]
+                }
+              },
+              "abnormal": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "test": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string"
+                    },
+                    "range": {
+                      "type": "string"
+                    },
+                    "flag": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "test",
+                    "value",
+                    "unit",
+                    "range",
+                    "flag"
+                  ]
+                }
+              },
+              "normal": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "tests": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "tests"
+                  ]
+                }
+              },
+              "overview": {
+                "type": "string"
+              },
+              "reviewPoints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unreadable": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "documents": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "date": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date"
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "date",
+                    "detail"
+                  ]
+                },
+                "description": "What each uploaded document holds"
+              }
+            },
+            "required": [
+              "patient",
+              "abnormal",
+              "normal",
+              "overview",
+              "reviewPoints",
+              "unreadable"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "testDate",
+          "fileName",
+          "files",
+          "valuesFound",
+          "model",
+          "createdAt",
+          "createdBy",
+          "summary"
+        ]
+      },
+      "ReadBloodReport": {
+        "type": "object",
+        "properties": {
+          "testDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "test": {
+                  "type": "string",
+                  "enum": [
+                    "fsh",
+                    "estradiol",
+                    "testosterone_free",
+                    "testosterone_total",
+                    "dhea_s",
+                    "vit_d3",
+                    "tsh",
+                    "ferritin",
+                    "b12"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "testDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date",
+                  "description": "Date of the document the value came from"
+                }
+              },
+              "required": [
+                "test",
+                "value",
+                "unit",
+                "testDate"
+              ]
+            }
+          },
+          "summary": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LabReportSummary"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "description": "AI summary of the whole report, saved on the patient"
+              }
+            ]
+          }
+        },
+        "required": [
+          "testDate",
+          "results",
+          "summary"
+        ]
+      },
+      "DoctorRemarks": {
+        "type": "object",
+        "properties": {
+          "remarks": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 50000,
+            "description": "Clinical remarks as HTML (bold, italic, lists), the same as the dashboard"
+          }
+        },
+        "required": [
+          "remarks"
+        ]
+      },
+      "DoctorPushToken": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 255
+          },
+          "platform": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "ios",
+              "android",
+              "web",
+              null
+            ]
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
       "ConsultationStatusChange": {
         "type": "object",
         "properties": {
@@ -11475,756 +12266,6 @@
           "visits",
           "prescriptions",
           "previousSymptoms"
-        ]
-      },
-      "AddBloodWork": {
-        "type": "object",
-        "properties": {
-          "consultationId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "results": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "test": {
-                  "type": "string",
-                  "enum": [
-                    "fsh",
-                    "estradiol",
-                    "testosterone_free",
-                    "testosterone_total",
-                    "dhea_s",
-                    "vit_d3",
-                    "tsh",
-                    "ferritin",
-                    "b12"
-                  ]
-                },
-                "value": {
-                  "type": "string",
-                  "example": "10.000"
-                },
-                "testDate": {
-                  "type": "string",
-                  "format": "date",
-                  "example": "2026-09-30"
-                },
-                "unit": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 20
-                }
-              },
-              "required": [
-                "test",
-                "value",
-                "testDate"
-              ]
-            },
-            "minItems": 1,
-            "maxItems": 27
-          }
-        },
-        "required": [
-          "results"
-        ]
-      },
-      "UpdateBloodWork": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "string",
-            "example": "10.000"
-          },
-          "testDate": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "unit": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 20
-          }
-        }
-      },
-      "AddBhrtStatus": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "on",
-              "off",
-              "recommended",
-              "other"
-            ]
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 20000
-          },
-          "appointmentId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "CreateMedicalRecord": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "medical_record",
-              "imaging"
-            ],
-            "default": "medical_record"
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 20000
-          },
-          "appointmentId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          }
-        }
-      },
-      "UpdateMedicalRecord": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "medical_record",
-              "imaging"
-            ]
-          },
-          "date": {
-            "type": "string",
-            "format": "date",
-            "example": "2026-09-30"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 20000
-          }
-        }
-      },
-      "BloodWork": {
-        "type": "object",
-        "properties": {
-          "results": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "patientId": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "consultationId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "uuid"
-                },
-                "test": {
-                  "type": "string",
-                  "enum": [
-                    "fsh",
-                    "estradiol",
-                    "testosterone_free",
-                    "testosterone_total",
-                    "dhea_s",
-                    "vit_d3",
-                    "tsh",
-                    "ferritin",
-                    "b12"
-                  ]
-                },
-                "value": {
-                  "type": "string",
-                  "example": "10.000"
-                },
-                "unit": {
-                  "type": "string"
-                },
-                "testDate": {
-                  "type": "string",
-                  "format": "date"
-                },
-                "createdBy": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "uuid"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              },
-              "required": [
-                "id",
-                "patientId",
-                "consultationId",
-                "test",
-                "value",
-                "unit",
-                "testDate",
-                "createdBy",
-                "createdAt"
-              ]
-            }
-          },
-          "dates": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          "tests": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "test": {
-                  "type": "string",
-                  "enum": [
-                    "fsh",
-                    "estradiol",
-                    "testosterone_free",
-                    "testosterone_total",
-                    "dhea_s",
-                    "vit_d3",
-                    "tsh",
-                    "ferritin",
-                    "b12"
-                  ]
-                },
-                "unit": {
-                  "type": "string"
-                },
-                "points": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "format": "uuid"
-                      },
-                      "date": {
-                        "type": "string",
-                        "format": "date"
-                      },
-                      "value": {
-                        "type": "string",
-                        "example": "10.000"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "date",
-                      "value"
-                    ]
-                  }
-                }
-              },
-              "required": [
-                "test",
-                "unit",
-                "points"
-              ]
-            }
-          }
-        },
-        "required": [
-          "results",
-          "dates",
-          "tests"
-        ]
-      },
-      "BhrtStatusEntry": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "appointmentId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "on",
-              "off",
-              "recommended",
-              "other"
-            ]
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdBy": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "patientId",
-          "appointmentId",
-          "date",
-          "status",
-          "note",
-          "createdBy",
-          "createdAt"
-        ]
-      },
-      "MedicalRecord": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "patientId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "appointmentId": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "medical_record",
-              "imaging"
-            ]
-          },
-          "date": {
-            "type": "string",
-            "format": "date"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "uploadedByPatient": {
-            "type": "boolean"
-          },
-          "files": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "originalName": {
-                  "type": "string"
-                },
-                "contentType": {
-                  "type": "string"
-                },
-                "sizeBytes": {
-                  "type": "integer"
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
-                }
-              },
-              "required": [
-                "id",
-                "originalName",
-                "contentType",
-                "sizeBytes",
-                "createdAt"
-              ]
-            }
-          },
-          "createdBy": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uuid"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "patientId",
-          "appointmentId",
-          "type",
-          "date",
-          "note",
-          "uploadedByPatient",
-          "files",
-          "createdBy",
-          "createdAt"
-        ]
-      },
-      "LabReportSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "testDate": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date"
-          },
-          "fileName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "files": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "index": {
-                  "type": "integer"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "contentType": {
-                  "type": "string"
-                },
-                "sizeBytes": {
-                  "type": "integer"
-                },
-                "recordFileId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "uuid"
-                },
-                "stored": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "index",
-                "name",
-                "contentType",
-                "sizeBytes",
-                "recordFileId",
-                "stored"
-              ]
-            },
-            "description": "Reports read for this summary. A saved record file opens by recordFileId; an uploaded one through the summary file link when stored."
-          },
-          "valuesFound": {
-            "type": "integer"
-          },
-          "model": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "createdBy": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "summary": {
-            "type": "object",
-            "properties": {
-              "patient": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "label": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "label",
-                    "value"
-                  ]
-                }
-              },
-              "abnormal": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "test": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    },
-                    "unit": {
-                      "type": "string"
-                    },
-                    "range": {
-                      "type": "string"
-                    },
-                    "flag": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "test",
-                    "value",
-                    "unit",
-                    "range",
-                    "flag"
-                  ]
-                }
-              },
-              "normal": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "category": {
-                      "type": "string"
-                    },
-                    "tests": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "category",
-                    "tests"
-                  ]
-                }
-              },
-              "overview": {
-                "type": "string"
-              },
-              "reviewPoints": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "unreadable": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "documents": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "date": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "format": "date"
-                    },
-                    "detail": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "name",
-                    "date",
-                    "detail"
-                  ]
-                },
-                "description": "What each uploaded document holds"
-              }
-            },
-            "required": [
-              "patient",
-              "abnormal",
-              "normal",
-              "overview",
-              "reviewPoints",
-              "unreadable"
-            ]
-          }
-        },
-        "required": [
-          "id",
-          "testDate",
-          "fileName",
-          "files",
-          "valuesFound",
-          "model",
-          "createdAt",
-          "createdBy",
-          "summary"
-        ]
-      },
-      "ReadBloodReport": {
-        "type": "object",
-        "properties": {
-          "testDate": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date"
-          },
-          "results": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "test": {
-                  "type": "string",
-                  "enum": [
-                    "fsh",
-                    "estradiol",
-                    "testosterone_free",
-                    "testosterone_total",
-                    "dhea_s",
-                    "vit_d3",
-                    "tsh",
-                    "ferritin",
-                    "b12"
-                  ]
-                },
-                "value": {
-                  "type": "string"
-                },
-                "unit": {
-                  "type": "string"
-                },
-                "testDate": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "date",
-                  "description": "Date of the document the value came from"
-                }
-              },
-              "required": [
-                "test",
-                "value",
-                "unit",
-                "testDate"
-              ]
-            }
-          },
-          "summary": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/LabReportSummary"
-              },
-              {
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "description": "AI summary of the whole report, saved on the patient"
-              }
-            ]
-          }
-        },
-        "required": [
-          "testDate",
-          "results",
-          "summary"
         ]
       },
       "CreatePrescriptionCatalogItem": {
@@ -41006,6 +41047,2632 @@
         }
       }
     },
+    "/branch/patients/{id}/blood-work": {
+      "get": {
+        "tags": [
+          "Blood work"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Blood work of the patient in this branch, as rows and as chart series",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Blood work",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/BloodWork"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Blood work"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add blood test results (one row per test; the unit defaults to the posSoft unit)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddBloodWork"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "patientId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "consultationId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "uuid"
+                          },
+                          "test": {
+                            "type": "string",
+                            "enum": [
+                              "fsh",
+                              "estradiol",
+                              "testosterone_free",
+                              "testosterone_total",
+                              "dhea_s",
+                              "vit_d3",
+                              "tsh",
+                              "ferritin",
+                              "b12"
+                            ]
+                          },
+                          "value": {
+                            "type": "string",
+                            "example": "10.000"
+                          },
+                          "unit": {
+                            "type": "string"
+                          },
+                          "testDate": {
+                            "type": "string",
+                            "format": "date"
+                          },
+                          "createdBy": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "patientId",
+                          "consultationId",
+                          "test",
+                          "value",
+                          "unit",
+                          "testDate",
+                          "createdBy",
+                          "createdAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/blood-work/{resultId}": {
+      "patch": {
+        "tags": [
+          "Blood work"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Correct one result",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "resultId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBloodWork"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "patientId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "consultationId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "uuid"
+                        },
+                        "test": {
+                          "type": "string",
+                          "enum": [
+                            "fsh",
+                            "estradiol",
+                            "testosterone_free",
+                            "testosterone_total",
+                            "dhea_s",
+                            "vit_d3",
+                            "tsh",
+                            "ferritin",
+                            "b12"
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "example": "10.000"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "testDate": {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        "createdBy": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "uuid"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "patientId",
+                        "consultationId",
+                        "test",
+                        "value",
+                        "unit",
+                        "testDate",
+                        "createdBy",
+                        "createdAt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Blood work"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove one result",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "resultId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/bhrt": {
+      "get": {
+        "tags": [
+          "BHRT"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "BHRT status history of the patient in this branch, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "History",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BhrtStatusEntry"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "BHRT"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Record a BHRT status; the newest entry sets the patient's BHRT status (other → none)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddBhrtStatus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/BhrtStatusEntry"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/medical-records": {
+      "get": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Medical records and imaging files of the patient in this branch",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "medical_record",
+                "imaging"
+              ]
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MedicalRecord"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a medical record. JSON, or multipart with \"data\" plus \"files\" (images/PDF, 10 MB each)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "JSON payload",
+                    "example": "{}"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                },
+                "required": [
+                  "data"
+                ]
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMedicalRecord"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MedicalRecord"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/medical-records/{recordId}": {
+      "patch": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Edit a medical record",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "recordId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMedicalRecord"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MedicalRecord"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove a medical record and its files",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "recordId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/medical-records/{recordId}/files": {
+      "post": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Attach files to a medical record (multipart \"files\")",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "recordId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MedicalRecord"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/medical-records/{recordId}/files/{fileId}": {
+      "delete": {
+        "tags": [
+          "Medical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove one file of a medical record",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "recordId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/report-summaries": {
+      "get": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "AI summaries of the lab reports read for this patient, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabReportSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/report-summaries/{summaryId}/files/{index}/url": {
+      "get": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Short-lived link to a report uploaded with an AI summary",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "summaryId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 9
+            },
+            "required": false,
+            "name": "index",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "expiresIn": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresIn"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/report-summaries/{summaryId}": {
+      "delete": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Remove one AI report summary",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "summaryId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/blood-work/read-report": {
+      "post": {
+        "tags": [
+          "Clinical records"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Read blood work values with AI from up to 5 reports: uploaded ones (multipart \"files\": PDFs or images) and saved medical record files (\"recordFileIds\"). One clinical summary of all of them is saved on the patient with the uploaded files kept beside it. The values are not saved (the caller saves them).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Values found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ReadBloodReport"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/home": {
+      "get": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Doctor app home: counts, upcoming schedule and latest chats (every branch)",
+        "responses": {
+          "200": {
+            "description": "Home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/patients": {
+      "get": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Every patient seen by or chatting with this doctor in any branch, unread first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/patients/{patientId}": {
+      "get": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Patient file for the doctor: appointments, prescriptions with medicines, clinical remarks and medical records, newest first. Only the doctor’s own patients.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Patient file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/patients/{patientId}/chat": {
+      "post": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Open (or start) the chat with one of the doctor’s patients; returns the conversation id",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/patients/{patientId}/files/{fileId}/url": {
+      "get": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Ten-minute link to a medical record file of the doctor’s patient",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/consultations/{consultationId}/remarks": {
+      "put": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Write the clinical remarks of the doctor’s own consultation (other clinical fields stay)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "consultationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorRemarks"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/push-token": {
+      "post": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Save the Expo push token of the doctor’s phone (patient messages notify it)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorPushToken"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Saved"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/push-token/remove": {
+      "post": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Forget a push token when the doctor logs out on that phone",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 255
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/appointments/{id}/consultation": {
       "post": {
         "tags": [
@@ -43102,1927 +45769,6 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/ConsultationHistory"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/blood-work": {
-      "get": {
-        "tags": [
-          "Blood work"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Blood work of the patient in this branch, as rows and as chart series",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Blood work",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/BloodWork"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Blood work"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Add blood test results (one row per test; the unit defaults to the posSoft unit)",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddBloodWork"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Added",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "patientId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "consultationId": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
-                            "format": "uuid"
-                          },
-                          "test": {
-                            "type": "string",
-                            "enum": [
-                              "fsh",
-                              "estradiol",
-                              "testosterone_free",
-                              "testosterone_total",
-                              "dhea_s",
-                              "vit_d3",
-                              "tsh",
-                              "ferritin",
-                              "b12"
-                            ]
-                          },
-                          "value": {
-                            "type": "string",
-                            "example": "10.000"
-                          },
-                          "unit": {
-                            "type": "string"
-                          },
-                          "testDate": {
-                            "type": "string",
-                            "format": "date"
-                          },
-                          "createdBy": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
-                            "format": "uuid"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "patientId",
-                          "consultationId",
-                          "test",
-                          "value",
-                          "unit",
-                          "testDate",
-                          "createdBy",
-                          "createdAt"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/blood-work/{resultId}": {
-      "patch": {
-        "tags": [
-          "Blood work"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Correct one result",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "resultId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateBloodWork"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "patientId": {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        "consultationId": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "format": "uuid"
-                        },
-                        "test": {
-                          "type": "string",
-                          "enum": [
-                            "fsh",
-                            "estradiol",
-                            "testosterone_free",
-                            "testosterone_total",
-                            "dhea_s",
-                            "vit_d3",
-                            "tsh",
-                            "ferritin",
-                            "b12"
-                          ]
-                        },
-                        "value": {
-                          "type": "string",
-                          "example": "10.000"
-                        },
-                        "unit": {
-                          "type": "string"
-                        },
-                        "testDate": {
-                          "type": "string",
-                          "format": "date"
-                        },
-                        "createdBy": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "format": "uuid"
-                        },
-                        "createdAt": {
-                          "type": "string",
-                          "format": "date-time"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "patientId",
-                        "consultationId",
-                        "test",
-                        "value",
-                        "unit",
-                        "testDate",
-                        "createdBy",
-                        "createdAt"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Blood work"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Remove one result",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "resultId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Removed"
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/bhrt": {
-      "get": {
-        "tags": [
-          "BHRT"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "BHRT status history of the patient in this branch, newest first",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "History",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/BhrtStatusEntry"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "BHRT"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Record a BHRT status; the newest entry sets the patient's BHRT status (other → none)",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddBhrtStatus"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Recorded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/BhrtStatusEntry"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/medical-records": {
-      "get": {
-        "tags": [
-          "Medical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Medical records and imaging files of the patient in this branch",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "medical_record",
-                "imaging"
-              ]
-            },
-            "required": false,
-            "name": "type",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Records",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/MedicalRecord"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Medical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Add a medical record. JSON, or multipart with \"data\" plus \"files\" (images/PDF, 10 MB each)",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "data": {
-                    "type": "string",
-                    "description": "JSON payload",
-                    "example": "{}"
-                  },
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "format": "binary"
-                    }
-                  }
-                },
-                "required": [
-                  "data"
-                ]
-              }
-            },
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateMedicalRecord"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Added",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/MedicalRecord"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/medical-records/{recordId}": {
-      "patch": {
-        "tags": [
-          "Medical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Edit a medical record",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "recordId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateMedicalRecord"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/MedicalRecord"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Medical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Remove a medical record and its files",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "recordId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Removed"
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/medical-records/{recordId}/files": {
-      "post": {
-        "tags": [
-          "Medical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Attach files to a medical record (multipart \"files\")",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "recordId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "format": "binary"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/MedicalRecord"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/medical-records/{recordId}/files/{fileId}": {
-      "delete": {
-        "tags": [
-          "Medical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Remove one file of a medical record",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "recordId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "fileId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Removed"
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/report-summaries": {
-      "get": {
-        "tags": [
-          "Clinical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "AI summaries of the lab reports read for this patient, newest first",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Summaries",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/LabReportSummary"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/report-summaries/{summaryId}/files/{index}/url": {
-      "get": {
-        "tags": [
-          "Clinical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Short-lived link to a report uploaded with an AI summary",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "summaryId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
-              "minimum": 0,
-              "maximum": 9
-            },
-            "required": false,
-            "name": "index",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Signed URL",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "url": {
-                          "type": "string"
-                        },
-                        "expiresIn": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "url",
-                        "expiresIn"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/report-summaries/{summaryId}": {
-      "delete": {
-        "tags": [
-          "Clinical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Remove one AI report summary",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "summaryId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Removed"
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/patients/{id}/blood-work/read-report": {
-      "post": {
-        "tags": [
-          "Clinical records"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Read blood work values with AI from up to 5 reports: uploaded ones (multipart \"files\": PDFs or images) and saved medical record files (\"recordFileIds\"). One clinical summary of all of them is saved on the patient with the uploaded files kept beside it. The values are not saved (the caller saves them).",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Values found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/ReadBloodReport"
                     }
                   },
                   "required": [

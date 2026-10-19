@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Doctor app API (2026-10-19)
+
+- `/doctor/*` (staff login, doctor role only): home (counts, schedule, latest chats), patients across every branch (unread first, search), patient file (appointments, prescriptions with medicines, clinical remarks, medical records), start a chat, record file links, write remarks of own consultations (PUT /doctor/consultations/:id/remarks keeps other clinical fields), push token save/remove.
+- Migration `1794000000000-StaffPushTokens`: `staff_push_tokens`. A patient message pushes to the doctor phone (type doctor_chat) and drops dead tokens.
+- Suite: 273 passed.
+
 ## Patient history report (2026-10-19)
 
 - `GET /branch/consultations/report` (same filters as the list) adds per visit: age, city, country, BMI, menopause stage/type, age at menopause, the 11 MRS items and scores, FSH / estradiol / total testosterone saved for that consultation, BHRT treatments of its prescription (Serenogest, Estradiol BHRT, vaginal creams, Testofeme) and still on treatment (hormone therapy = currently using). Suite: 269 passed.
