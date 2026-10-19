@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Earlier visits per section (2026-10-19)
+
+- `GET /branch/consultations/:id/previous` returns saved sections of earlier visits (up to this visit date), newest first, 20 per section; medical history carries the shared topics.
+
 ## Family history per relative (2026-10-19)
 
 - Medical history takes `familyHistory` [{ relative, who, conditions, other }]; saving fills familyRelatives, familyConditions and familyOther from it so older readers keep working.

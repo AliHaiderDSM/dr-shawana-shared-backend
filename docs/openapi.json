@@ -9179,10 +9179,20 @@
                 "h_pylori",
                 "recurrent_uti",
                 "vaginal_infections",
-                "std"
+                "std",
+                "no_cancer",
+                "no_hormonal",
+                "no_metabolic",
+                "no_musculoskeletal",
+                "no_cardiac",
+                "no_mental",
+                "no_neurological",
+                "no_autoimmune",
+                "no_liver_gi",
+                "no_genitourinary"
               ]
             },
-            "maxItems": 45,
+            "maxItems": 55,
             "default": []
           },
           "otherConditions": {
@@ -9220,6 +9230,15 @@
                   "format": "date",
                   "default": null,
                   "example": "2026-09-30"
+                },
+                "year": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1900,
+                  "maximum": 2100,
+                  "default": null
                 }
               },
               "required": [
@@ -9278,6 +9297,65 @@
             ],
             "maxLength": 500,
             "default": null
+          },
+          "familyHistory": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "relative": {
+                  "type": "string",
+                  "enum": [
+                    "mother",
+                    "father",
+                    "sister",
+                    "close_family"
+                  ]
+                },
+                "who": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 100,
+                  "default": null
+                },
+                "conditions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "breast_cancer",
+                      "ovarian_cancer",
+                      "endometrial_cancer",
+                      "osteoporosis",
+                      "hip_fracture",
+                      "heart_disease",
+                      "diabetes",
+                      "early_menopause",
+                      "dementia",
+                      "other"
+                    ]
+                  },
+                  "maxItems": 10,
+                  "default": []
+                },
+                "other": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500,
+                  "default": null
+                }
+              },
+              "required": [
+                "relative"
+              ]
+            },
+            "maxItems": 4,
+            "default": [],
+            "description": "Conditions per family member; close_family carries who it is"
           },
           "utiAntibiotics12m": {
             "type": [
@@ -42037,6 +42115,371 @@
                           "otherSymptoms"
                         ]
                       }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/consultations/{id}/previous": {
+      "get": {
+        "tags": [
+          "Consultations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Saved sections of the patient’s earlier visits (up to this visit date), newest first, per section key. Used to start a new visit from the last values and to show each field’s history.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Earlier sections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sections": {
+                          "type": "object",
+                          "properties": {
+                            "basic_info": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "follow_up": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "medical_history": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "mrs_scale": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "additional_symptoms": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "imaging_results": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "clinical_assessment": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "referral": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            },
+                            "plans": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "consultationId": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "appointmentNo": {
+                                    "type": "integer"
+                                  },
+                                  "date": {
+                                    "type": "string"
+                                  },
+                                  "data": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                  }
+                                },
+                                "required": [
+                                  "consultationId",
+                                  "appointmentNo",
+                                  "date",
+                                  "data"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "sections"
+                      ]
                     }
                   },
                   "required": [

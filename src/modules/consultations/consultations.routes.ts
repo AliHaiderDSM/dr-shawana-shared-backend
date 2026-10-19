@@ -73,6 +73,10 @@ consultationsRouter.get(
   },
 );
 
+consultationsRouter.get(`${path}/:id/previous`, can('view'), byId, async (req, res) => {
+  sendOk(res, await consultationsService.previous(await viewerOf(req), idOf(req)));
+});
+
 consultationsRouter.get(`${path}/:id/history`, can('view'), byId, async (req, res) => {
   sendOk(res, await consultationsService.history(await viewerOf(req), idOf(req)));
 });

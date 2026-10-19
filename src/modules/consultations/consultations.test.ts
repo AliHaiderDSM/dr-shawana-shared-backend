@@ -184,6 +184,16 @@ describe('consultations and clinical records', () => {
         doctorUser,
       );
       followupConsultationId = followup.body.data.id;
+      const earlier = await api('get', `/branch/consultations/${followupConsultationId}/previous`, doctorUser);
+      expect(earlier.status).toBe(200);
+      expect(earlier.body.data.sections.medical_history[0]).toMatchObject({
+        consultationId,
+        data: expect.objectContaining({ majorComplaint: 'Hot flushes', havingPeriods: 'no' }),
+      });
+      expect(
+        (await api('get', `/branch/consultations/${consultationId}/previous`, doctorUser)).body.data.sections
+          .medical_history,
+      ).toBeUndefined();
       expect(followup.body.data.availableSections).toContain('follow_up');
       const saved = await section(
         'follow_up',

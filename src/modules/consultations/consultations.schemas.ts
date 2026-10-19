@@ -287,6 +287,33 @@ export const consultationHistorySchema = registry.register(
   }),
 );
 
+const previousEntrySchema = z.object({
+  consultationId: z.uuid(),
+  appointmentNo: z.number().int(),
+  date: z.string(),
+  data: z.record(z.string(), z.unknown()),
+});
+
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/consultations/{id}/previous',
+  summary:
+    'Saved sections of the patient’s earlier visits (up to this visit date), newest first, per section key. Used to start a new visit from the last values and to show each field’s history.',
+  request: byId,
+  responses: {
+    200: {
+      description: 'Earlier sections',
+      ...jsonContent(
+        dataEnvelope(
+          z.object({ sections: z.partialRecord(z.enum(SECTION_KEYS), z.array(previousEntrySchema)) }),
+        ),
+      ),
+    },
+    ...errorResponses,
+  },
+});
+
 registry.registerPath({
   ...common,
   method: 'get',

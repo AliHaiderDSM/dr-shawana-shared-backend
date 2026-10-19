@@ -224,6 +224,53 @@ export const consultationsService = {
     };
   },
 
+  async previous(viewer: Viewer, id: string) {
+    const consultation = await getConsultation(viewer, id);
+    const date = consultation.appointment?.date ?? null;
+    const rows = (await AppDataSource.query(
+      `SELECT cs.section_key AS key, cs.data, c.id AS "consultationId", a.appointment_no AS "appointmentNo",
+              to_char(a.date, 'YYYY-MM-DD') AS date, c.discuss_topics AS "discussTopics",
+              c.major_complaint AS "majorComplaint", c.current_medications AS "currentMedications"
+         FROM consultation_sections cs
+         JOIN consultations c ON c.id = cs.consultation_id AND c.deleted_at IS NULL
+         JOIN appointments a ON a.id = c.appointment_id AND a.deleted_at IS NULL
+        WHERE c.patient_id = $1 AND c.id <> $2 AND cs.deleted_at IS NULL
+          AND ($3::date IS NULL OR a.date <= $3::date)
+        ORDER BY a.date DESC, a.time_from DESC
+        LIMIT 300`,
+      [consultation.patientId, id, date],
+    )) as {
+      key: SectionKey;
+      data: Record<string, unknown>;
+      consultationId: string;
+      appointmentNo: number;
+      date: string;
+      discussTopics: string | null;
+      majorComplaint: string | null;
+      currentMedications: string | null;
+    }[];
+    const sections: Partial<Record<SectionKey, unknown[]>> = {};
+    for (const row of rows) {
+      const list = (sections[row.key] ??= []);
+      if (list.length >= 20) continue;
+      const shared =
+        row.key === 'medical_history' || row.key === 'follow_up'
+          ? {
+              discussTopics: row.discussTopics,
+              majorComplaint: row.majorComplaint,
+              currentMedications: row.currentMedications,
+            }
+          : {};
+      list.push({
+        consultationId: row.consultationId,
+        appointmentNo: row.appointmentNo,
+        date: row.date,
+        data: { ...row.data, ...shared },
+      });
+    }
+    return { sections };
+  },
+
   async open(actor: Actor, viewer: Viewer, appointmentId: string) {
     return withTransaction(async (em) => {
       const appointment = await getAppointmentRecord(viewer, appointmentId, em);
