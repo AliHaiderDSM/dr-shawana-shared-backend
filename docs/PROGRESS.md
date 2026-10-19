@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## App reports, chat replies and voice length (2026-10-19)
+
+- `POST /patient/documents` takes `type` (medical_record for lab reports, imaging for scans). `DELETE /patient/documents/:id` deletes a report the patient uploaded; clinic records give 403.
+- Migration `1793900000000-ChatReplies`: `chat_messages.reply_to_id` and `duration_ms`. Both chat send routes take `replyToId` (same chat only) and `durationMs` for voice notes; messages carry `replyTo` and `file.durationMs`.
+- Suite: 268 passed.
+
 ## Online sales per branch, 45-day shelf life, GDN and smaller fixes (2026-10-19)
 
 - Migration `1793700000000-BranchOnlineSales`: `branches.online_sales` (on for LHR-001 and ISB-002). A branch without it gets 403 on an online sale; branch DTO, options and `me.branch` carry `onlineSales`.

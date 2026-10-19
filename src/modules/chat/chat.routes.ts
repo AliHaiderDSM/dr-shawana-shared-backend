@@ -24,7 +24,17 @@ const conversationParams = z.object({ conversationId: z.uuid() });
 const doctorFileParams = doctorParams.extend({ messageId: z.uuid() });
 const conversationFileParams = conversationParams.extend({ messageId: z.uuid() });
 const pageQuery = z.object({ before: z.iso.datetime({ offset: true }).optional() });
-const messageBody = z.object({ body: z.string().trim().max(4000).optional() });
+const messageBody = z.object({
+  body: z.string().trim().max(4000).optional(),
+  replyToId: z.uuid().optional().openapi({ description: 'The message this one replies to (same chat)' }),
+  durationMs: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(600_000)
+    .optional()
+    .openapi({ description: 'Length of a voice note in milliseconds, as recorded' }),
+});
 const pushTokenBody = registry.register(
   'PatientPushToken',
   z.object({
@@ -39,7 +49,23 @@ const message = registry.register(
     id: z.uuid(),
     sender: z.enum(['patient', 'doctor']),
     body: z.string().nullable(),
-    file: z.object({ name: z.string(), type: z.string(), size: z.number().int() }).nullable(),
+    file: z
+      .object({
+        name: z.string(),
+        type: z.string(),
+        size: z.number().int(),
+        durationMs: z.number().int().nullable().openapi({ description: 'Voice note length, when known' }),
+      })
+      .nullable(),
+    replyTo: z
+      .object({
+        id: z.uuid(),
+        sender: z.enum(['patient', 'doctor']),
+        body: z.string().nullable(),
+        file: z.object({ name: z.string(), type: z.string() }).nullable(),
+      })
+      .nullable()
+      .openapi({ description: 'The quoted message when this one is a reply' }),
     createdAt: z.string(),
   }),
 );
@@ -224,6 +250,8 @@ chatRouter.post(
         doctorId,
         validBody(req, messageBody).body ?? null,
         req.file,
+        validBody(req, messageBody).replyToId ?? null,
+        validBody(req, messageBody).durationMs ?? null,
       ),
     );
   },
@@ -301,6 +329,8 @@ chatRouter.post(
         conversationId,
         validBody(req, messageBody).body ?? null,
         req.file,
+        validBody(req, messageBody).replyToId ?? null,
+        validBody(req, messageBody).durationMs ?? null,
       ),
     );
   },

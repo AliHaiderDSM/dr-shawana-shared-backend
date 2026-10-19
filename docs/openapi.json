@@ -7431,13 +7431,71 @@
               },
               "size": {
                 "type": "integer"
+              },
+              "durationMs": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Voice note length, when known"
               }
             },
             "required": [
               "name",
               "type",
-              "size"
+              "size",
+              "durationMs"
             ]
+          },
+          "replyTo": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "sender": {
+                "type": "string",
+                "enum": [
+                  "patient",
+                  "doctor"
+                ]
+              },
+              "body": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "file": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "sender",
+              "body",
+              "file"
+            ],
+            "description": "The quoted message when this one is a reply"
           },
           "createdAt": {
             "type": "string"
@@ -7448,6 +7506,7 @@
           "sender",
           "body",
           "file",
+          "replyTo",
           "createdAt"
         ]
       },
@@ -37567,7 +37626,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Upload up to 5 reports (multipart \"files\": PDF, JPG, PNG or WebP, 10 MB each) with an optional \"title\". They are added to the medical records as uploaded by the patient.",
+        "summary": "Upload up to 5 reports (multipart \"files\": PDF, JPG, PNG or WebP, 10 MB each) with an optional \"title\" and \"type\" (medical_record for lab reports, imaging for scans). They are added to the medical records as uploaded by the patient.",
         "responses": {
           "201": {
             "description": "Saved",
@@ -38011,6 +38070,85 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/patient/documents/{id}": {
+      "delete": {
+        "tags": [
+          "Patient app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a report the patient uploaded (reports from the clinic cannot be deleted here)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
           },
           "400": {
             "description": "Validation error",

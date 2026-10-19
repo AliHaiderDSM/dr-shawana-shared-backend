@@ -143,13 +143,18 @@ patientAppRouter.post(
   documentsUpload('files'),
   validate({ body: uploadDocumentFieldsSchema }),
   async (req, res) => {
-    const { title } = validBody(req, uploadDocumentFieldsSchema);
+    const { title, type } = validBody(req, uploadDocumentFieldsSchema);
     sendCreated(
       res,
-      await patientAppService.uploadDocuments(patientId(req), title || null, uploadedFiles(req)),
+      await patientAppService.uploadDocuments(patientId(req), title || null, uploadedFiles(req), type),
     );
   },
 );
+
+patientAppRouter.delete('/patient/documents/:id', byId, async (req, res) => {
+  await patientAppService.removeDocument(patientId(req), idOf(req));
+  sendNoContent(res);
+});
 
 patientAppRouter.get(
   '/patient/documents/files/:fileId/url',

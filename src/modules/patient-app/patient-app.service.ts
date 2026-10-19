@@ -313,11 +313,20 @@ export const patientAppService = {
 
   documents,
 
-  async uploadDocuments(patientId: string, title: string | null, files: Express.Multer.File[]) {
+  async uploadDocuments(
+    patientId: string,
+    title: string | null,
+    files: Express.Multer.File[],
+    type: 'medical_record' | 'imaging' = 'medical_record',
+  ) {
     if (files.length === 0) throw AppError.badRequest('Choose at least one file');
     const branchId = await patientRequestsService.homeBranchOf(patientId);
-    const record = await medicalRecordsService.createFromPatient(branchId, patientId, title, files);
+    const record = await medicalRecordsService.createFromPatient(branchId, patientId, title, files, type);
     return (await documents(patientId)).find((d) => d.id === record.id) ?? null;
+  },
+
+  async removeDocument(patientId: string, id: string) {
+    await medicalRecordsService.removeFromPatient(patientId, id);
   },
 
   async documentUrl(patientId: string, fileId: string) {

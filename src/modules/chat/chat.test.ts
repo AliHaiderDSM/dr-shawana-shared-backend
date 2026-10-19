@@ -101,7 +101,7 @@ describe('patient and doctor chat', () => {
       .field('body', 'New report')
       .attach('file', Buffer.from('fakejpeg'), { filename: 'tsh.jpg', contentType: 'image/jpeg' });
     expect(withFile.status).toBe(201);
-    expect(withFile.body.data.file).toEqual({ name: 'tsh.jpg', type: 'image/jpeg', size: 8 });
+    expect(withFile.body.data.file).toEqual({ name: 'tsh.jpg', type: 'image/jpeg', size: 8, durationMs: null });
     const voice = await patient('post', `/patient/chats/${doctorId}/messages`).attach(
       'file',
       Buffer.from('fakeaudio'),
@@ -238,15 +238,13 @@ describe('patient and doctor chat', () => {
       );
     });
     try {
-      const voice = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser).attach(
-        'file',
-        Buffer.from('fakeopus'),
-        { filename: 'voice.webm', contentType: 'audio/webm' },
-      );
+      const voice = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser)
+        .attach('file', Buffer.from('fakeopus'), { filename: 'voice.webm', contentType: 'audio/webm' })
+        .field('durationMs', '7300');
       expect(voice.status).toBe(201);
       expect(voice.body.data).toMatchObject({
         sender: 'doctor',
-        file: { name: 'voice.webm', type: 'audio/webm', size: 8 },
+        file: { name: 'voice.webm', type: 'audio/webm', size: 8, durationMs: 7300 },
       });
       const played = await patient('get', `/patient/chats/${doctorId}/messages/${voice.body.data.id}/file`);
       expect(played.status).toBe(200);
@@ -259,6 +257,45 @@ describe('patient and doctor chat', () => {
         [patientId],
       )) as { token: string }[];
       expect(left.map((r) => r.token)).toEqual(['ExponentPushToken[abc123]']);
+    } finally {
+      pushed.mockRestore();
+    }
+  });
+
+  it('keeps the quoted message when either side replies', async () => {
+    const pushed = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async () => new Response('{}', { status: 200 }));
+    try {
+      const thread = (await patient('get', `/patient/chats/${doctorId}/messages`)).body.data.items as {
+        id: string;
+        sender: string;
+        body: string | null;
+      }[];
+      const fromDoctor = thread.find((m) => m.sender === 'doctor' && m.body)!;
+      const reply = await patient('post', `/patient/chats/${doctorId}/messages`).send({
+        body: 'Yes, twice a day?',
+        replyToId: fromDoctor.id,
+      });
+      expect(reply.status).toBe(201);
+      expect(reply.body.data.replyTo).toMatchObject({
+        id: fromDoctor.id,
+        sender: 'doctor',
+        body: fromDoctor.body,
+      });
+      const back = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser).send({
+        body: 'Yes',
+        replyToId: reply.body.data.id,
+      });
+      expect(back.body.data.replyTo).toMatchObject({ sender: 'patient', body: 'Yes, twice a day?' });
+      const seen = (await staff('get', `/branch/chats/${conversationId}/messages`, doctorUser)).body.data
+        .items;
+      expect(seen.at(-1)).toMatchObject({ body: 'Yes', replyTo: { id: reply.body.data.id } });
+      const elsewhere = await staff('post', `/branch/chats/${conversationId}/messages`, doctorUser).send({
+        body: 'x',
+        replyToId: '00000000-0000-4000-8000-000000000000',
+      });
+      expect(elsewhere.status).toBe(400);
     } finally {
       pushed.mockRestore();
     }

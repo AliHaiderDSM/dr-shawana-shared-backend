@@ -17,17 +17,35 @@ interface MessageRow {
   fileName: string | null;
   fileType: string | null;
   fileSize: number | null;
+  durationMs: number | null;
   createdAt: Date;
+  replyId: string | null;
+  replySender: Sender | null;
+  replyBody: string | null;
+  replyFileName: string | null;
+  replyFileType: string | null;
 }
 
 const MESSAGE_SELECT = `SELECT m.id, m.sender, m.body, m.file_name AS "fileName", m.file_type AS "fileType",
-  m.file_size AS "fileSize", m.created_at AS "createdAt" FROM chat_messages m`;
+  m.file_size AS "fileSize", m.duration_ms AS "durationMs", m.created_at AS "createdAt", r.id AS "replyId", r.sender AS "replySender",
+  LEFT(r.body, 200) AS "replyBody", r.file_name AS "replyFileName", r.file_type AS "replyFileType"
+  FROM chat_messages m LEFT JOIN chat_messages r ON r.id = m.reply_to_id`;
 
 const toMessage = (m: MessageRow) => ({
   id: m.id,
   sender: m.sender,
   body: m.body,
-  file: m.fileName ? { name: m.fileName, type: m.fileType ?? '', size: m.fileSize ?? 0 } : null,
+  file: m.fileName
+    ? { name: m.fileName, type: m.fileType ?? '', size: m.fileSize ?? 0, durationMs: m.durationMs }
+    : null,
+  replyTo: m.replyId
+    ? {
+        id: m.replyId,
+        sender: m.replySender as Sender,
+        body: m.replyBody,
+        file: m.replyFileName ? { name: m.replyFileName, type: m.replyFileType ?? '' } : null,
+      }
+    : null,
   createdAt: m.createdAt.toISOString(),
 });
 
@@ -102,9 +120,18 @@ async function send(
   staffId: string | null,
   body: string | null,
   file: Express.Multer.File | undefined,
+  replyToId: string | null = null,
+  durationMs: number | null = null,
 ) {
   const text = body?.trim() || null;
   if (!text && !file) throw AppError.badRequest('Write a message or attach a file');
+  if (replyToId) {
+    const [quoted] = (await AppDataSource.query(
+      `SELECT 1 FROM chat_messages WHERE id = $1 AND conversation_id = $2`,
+      [replyToId, conversationId],
+    )) as unknown[];
+    if (!quoted) throw AppError.badRequest('The message you reply to is not in this chat');
+  }
   const uploaded = !file
     ? []
     : isVoice(file.mimetype)
@@ -114,10 +141,9 @@ async function send(
   try {
     const row = await withTransaction(async (em) => {
       const [created] = (await em.query(
-        `INSERT INTO chat_messages (conversation_id, sender, sender_staff_id, body, file_path, file_name, file_type, file_size)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id, sender, body, file_name AS "fileName", file_type AS "fileType", file_size AS "fileSize",
-                   created_at AS "createdAt"`,
+        `INSERT INTO chat_messages (conversation_id, sender, sender_staff_id, body, file_path, file_name, file_type, file_size, reply_to_id, duration_ms)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING id`,
         [
           conversationId,
           sender,
@@ -127,15 +153,18 @@ async function send(
           stored?.originalName ?? null,
           stored?.contentType ?? null,
           stored?.sizeBytes ?? null,
+          replyToId,
+          file && isVoice(file.mimetype) ? durationMs : null,
         ],
-      )) as MessageRow[];
+      )) as { id: string }[];
       await em.query(
         `UPDATE chat_conversations SET last_message_at = now(), last_message_preview = $2, updated_at = now(),
            ${sender === 'patient' ? 'doctor_unread = doctor_unread + 1' : 'patient_unread = patient_unread + 1'}
          WHERE id = $1`,
         [conversationId, preview(text, stored?.originalName ?? null, stored?.contentType ?? null)],
       );
-      return created!;
+      const [full] = (await em.query(`${MESSAGE_SELECT} WHERE m.id = $1`, [created!.id])) as MessageRow[];
+      return full!;
     });
     return toMessage(row);
   } catch (err) {
@@ -212,10 +241,17 @@ export const patientChat = {
     return messages(conversation.id, before);
   },
 
-  async send(patientId: string, doctorId: string, body: string | null, file?: Express.Multer.File) {
+  async send(
+    patientId: string,
+    doctorId: string,
+    body: string | null,
+    file?: Express.Multer.File,
+    replyToId: string | null = null,
+    durationMs: number | null = null,
+  ) {
     if (!(await patientHasDoctor(patientId, doctorId))) throw AppError.notFound('Doctor');
     const conversationId = await conversationFor(patientId, doctorId);
-    const message = await send(conversationId, 'patient', null, body, file);
+    const message = await send(conversationId, 'patient', null, body, file, replyToId, durationMs);
     await realtime.publish('doctor', doctorId, 'message', { conversationId });
     return message;
   },
@@ -302,9 +338,16 @@ export const doctorChat = {
     return messages(conversation.id, before);
   },
 
-  async send(staffId: string, conversationId: string, body: string | null, file?: Express.Multer.File) {
+  async send(
+    staffId: string,
+    conversationId: string,
+    body: string | null,
+    file?: Express.Multer.File,
+    replyToId: string | null = null,
+    durationMs: number | null = null,
+  ) {
     const conversation = await doctorConversation(staffId, conversationId);
-    const message = await send(conversation.id, 'doctor', staffId, body, file);
+    const message = await send(conversation.id, 'doctor', staffId, body, file, replyToId, durationMs);
     await realtime.publish('patient', conversation.patientId, 'message', { doctorId: conversation.doctorId });
     const tokens = (await AppDataSource.query(`SELECT token FROM patient_push_tokens WHERE patient_id = $1`, [
       conversation.patientId,

@@ -22,7 +22,7 @@ describe('patient app', () => {
 
   const staff = (method: 'get' | 'post' | 'patch', path: string, who: { id: string }) =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
-  const asPatient = (method: 'get' | 'post' | 'patch', path: string, token = session.accessToken) =>
+  const asPatient = (method: 'get' | 'post' | 'patch' | 'delete', path: string, token = session.accessToken) =>
     request(app)
       [method](`/api/v1${path}`)
       .set({ Authorization: `Bearer ${token}` });
@@ -262,6 +262,29 @@ describe('patient app', () => {
     expect((await asPatient('get', `/patient/documents/files/${fileId}/url`, other.accessToken)).status).toBe(
       404,
     );
+    expect(
+      (await asPatient('delete', `/patient/documents/${upload.body.data.id}`, other.accessToken)).status,
+    ).toBe(404);
+  });
+
+  it('keeps imaging apart and lets the patient delete only own uploads', async () => {
+    const scan = await asPatient('post', '/patient/documents')
+      .field('title', 'Pelvic scan')
+      .field('type', 'imaging')
+      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'scan.pdf', contentType: 'application/pdf' });
+    expect(scan.status).toBe(201);
+    expect(scan.body.data).toMatchObject({ type: 'imaging', title: 'Pelvic scan' });
+
+    const byClinic = await staff('post', `/branch/patients/${patientId}/medical-records`, frontDesk)
+      .field('data', JSON.stringify({ type: 'medical_record', date: '2026-10-01', note: 'Lab' }))
+      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'lab.pdf', contentType: 'application/pdf' });
+    expect(byClinic.status).toBe(201);
+    expect((await asPatient('delete', `/patient/documents/${byClinic.body.data.id}`)).status).toBe(403);
+
+    expect((await asPatient('delete', `/patient/documents/${scan.body.data.id}`)).status).toBe(204);
+    const left = (await asPatient('get', '/patient/documents')).body.data as { id: string }[];
+    expect(left.map((d) => d.id)).not.toContain(scan.body.data.id);
+    expect(left.map((d) => d.id)).toContain(byClinic.body.data.id);
   });
 
   it('sends requests to management and shows their replies', async () => {

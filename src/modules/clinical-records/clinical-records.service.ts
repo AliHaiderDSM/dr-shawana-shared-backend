@@ -335,6 +335,7 @@ export const medicalRecordsService = {
     patientId: string,
     title: string | null,
     files: Express.Multer.File[],
+    type: MedicalRecordType = 'medical_record',
   ) {
     const uploaded = await uploadMedicalFiles(branchId, files);
     return withUploads(uploaded, () =>
@@ -345,7 +346,7 @@ export const medicalRecordsService = {
             branchId,
             patientId,
             appointmentId: null,
-            type: 'medical_record',
+            type,
             date: today(),
             note: title,
             uploadedByPatient: true,
@@ -373,7 +374,7 @@ export const medicalRecordsService = {
             action: 'create',
             entity: 'medical_record',
             entityId: record.id,
-            after: { patientId, uploadedByPatient: true, files: uploaded.length },
+            after: { patientId, type, uploadedByPatient: true, files: uploaded.length },
           },
           em,
         );
@@ -417,6 +418,36 @@ export const medicalRecordsService = {
           entity: 'medical_record',
           entityId: id,
           before: toRecordDto(record),
+        },
+        em,
+      );
+    });
+  },
+
+  async removeFromPatient(patientId: string, id: string) {
+    await withTransaction(async (em) => {
+      const [record] = (await em.query(
+        `SELECT id, branch_id AS "branchId", uploaded_by_patient AS "uploadedByPatient" FROM medical_records
+          WHERE id = $1 AND patient_id = $2 AND deleted_at IS NULL`,
+        [id, patientId],
+      )) as { id: string; branchId: string; uploadedByPatient: boolean }[];
+      if (!record) throw AppError.notFound('Document');
+      if (!record.uploadedByPatient) {
+        throw AppError.forbidden('Only reports you uploaded can be deleted. Ask the clinic about this one.');
+      }
+      await em.query(
+        `UPDATE medical_record_files SET deleted_at = now() WHERE medical_record_id = $1 AND deleted_at IS NULL`,
+        [id],
+      );
+      await em.query(`UPDATE medical_records SET deleted_at = now() WHERE id = $1`, [id]);
+      await auditService.record(
+        {
+          actor: null,
+          branchId: record.branchId,
+          action: 'delete_from_app',
+          entity: 'medical_record',
+          entityId: id,
+          before: { patientId },
         },
         em,
       );
