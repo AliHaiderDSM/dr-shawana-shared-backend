@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Medical history: None per condition group, surgery year (2026-10-19)
+
+- `MEDICAL_CONDITIONS` adds no_cancer, no_hormonal, no_metabolic, no_musculoskeletal, no_cardiac, no_mental, no_neurological, no_autoimmune, no_liver_gi, no_genitourinary.
+- Surgeries take `year` (date still accepted for older entries). Removed form questions stay optional in the schema so older visits keep saving.
+
 ## App reports, chat replies and voice length (2026-10-19)
 
 - `POST /patient/documents` takes `type` (medical_record for lab reports, imaging for scans). `DELETE /patient/documents/:id` deletes a report the patient uploaded; clinic records give 403.

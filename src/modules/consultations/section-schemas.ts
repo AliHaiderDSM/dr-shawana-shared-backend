@@ -157,6 +157,16 @@ export const MEDICAL_CONDITIONS = [
   'recurrent_uti',
   'vaginal_infections',
   'std',
+  'no_cancer',
+  'no_hormonal',
+  'no_metabolic',
+  'no_musculoskeletal',
+  'no_cardiac',
+  'no_mental',
+  'no_neurological',
+  'no_autoimmune',
+  'no_liver_gi',
+  'no_genitourinary',
 ] as const;
 
 export const SURGERIES = [
@@ -205,7 +215,13 @@ export const medicalHistorySchema = z
     conditions: flags(MEDICAL_CONDITIONS),
     otherConditions: text(),
     surgeries: z
-      .array(z.object({ type: z.enum(SURGERIES), date }))
+      .array(
+        z.object({
+          type: z.enum(SURGERIES),
+          date,
+          year: z.coerce.number().int().min(1900).max(2100).nullable().default(null),
+        }),
+      )
       .max(SURGERIES.length)
       .default([])
       .refine((v) => new Set(v.map((s) => s.type)).size === v.length, 'Each surgery can be listed once'),

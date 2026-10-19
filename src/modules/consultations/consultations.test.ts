@@ -146,8 +146,11 @@ describe('consultations and clinical records', () => {
         havingPeriods: 'no',
         lastPeriodDate: '2026-01-01',
         dub: true,
-        conditions: ['hypertension', 'hypertension', 'pcos'],
-        surgeries: [{ type: 'c_section', date: '2015-05-01' }],
+        conditions: ['hypertension', 'hypertension', 'pcos', 'no_cancer'],
+        surgeries: [
+          { type: 'c_section', date: '2015-05-01' },
+          { type: 'hysterectomy', year: '2019' },
+        ],
         hasAllergies: 'no',
         allergies: 'Penicillin',
       });
@@ -156,7 +159,11 @@ describe('consultations and clinical records', () => {
         majorComplaint: 'Hot flushes',
         lastPeriodDate: null,
         dub: false,
-        conditions: ['hypertension', 'pcos'],
+        conditions: ['hypertension', 'pcos', 'no_cancer'],
+        surgeries: [
+          { type: 'c_section', date: '2015-05-01', year: null },
+          { type: 'hysterectomy', date: null, year: 2019 },
+        ],
         allergies: null,
         hormoneTherapy: null,
       });
