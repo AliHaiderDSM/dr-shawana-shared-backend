@@ -25,6 +25,10 @@ const branchFields = z.object({
   phone: optionalText(30),
   email: optionalEmailInput,
   logoPath: optionalText(500),
+  onlineSales: z
+    .boolean()
+    .optional()
+    .openapi({ description: 'The branch may book online orders (shipped by the Dispatch Department)' }),
 });
 
 export const createBranchSchema = registry.register(
@@ -62,6 +66,7 @@ export const branchSchema = registry.register(
         'warehouse: the Super Admin stock (Super Admin only); branch: a selling branch; dispatch: the Dispatch Department that ships online orders',
     }),
     status: z.enum(BRANCH_STATUSES),
+    onlineSales: z.boolean(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   }),
@@ -74,6 +79,7 @@ const branchOptionSchema = branchSchema.pick({
   city: true,
   status: true,
   kind: true,
+  onlineSales: true,
 });
 
 export type CreateBranchInput = z.output<typeof createBranchSchema>;

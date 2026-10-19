@@ -10,6 +10,14 @@ export const TEST_PASSWORD = 'Passw0rd!';
 let sequence = 0;
 const next = () => (sequence += 1);
 
+export async function ageBatch(batchNo: string, expiryDate: string) {
+  await AppDataSource.query(`UPDATE product_batches SET expiry_date = $2 WHERE batch_no = $1`, [
+    batchNo,
+    expiryDate,
+  ]);
+  await AppDataSource.query(`UPDATE stock_ins SET expiry_date = $2 WHERE batch = $1`, [batchNo, expiryDate]);
+}
+
 export async function createBranch(overrides: Partial<Branch> & { status?: BranchStatus } = {}) {
   const n = next();
   const branches = AppDataSource.getRepository(Branch);
@@ -19,6 +27,7 @@ export async function createBranch(overrides: Partial<Branch> & { status?: Branc
       code: `B${n}`,
       city: 'Lahore',
       status: 'active',
+      onlineSales: true,
       ...overrides,
     }),
   );

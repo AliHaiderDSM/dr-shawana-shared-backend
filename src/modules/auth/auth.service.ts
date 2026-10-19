@@ -33,7 +33,14 @@ async function toMe(profile: StaffProfile) {
     profile: toStaffDto(profile),
     role: profile.role,
     branch: branch
-      ? { id: branch.id, name: branch.name, code: branch.code, city: branch.city, kind: branch.kind }
+      ? {
+          id: branch.id,
+          name: branch.name,
+          code: branch.code,
+          city: branch.city,
+          kind: branch.kind,
+          onlineSales: branch.onlineSales,
+        }
       : null,
     permissions: permissionsFor(profile.role),
     dispatchDepartmentId: dispatch?.id ?? null,

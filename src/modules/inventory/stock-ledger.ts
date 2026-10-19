@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { In, type EntityManager } from 'typeorm';
 import { AppError } from '../../lib/errors';
 import { Product } from '../products/product.entity';
+import { MIN_SHELF_DAYS, tooShortToUse } from './shelf-life';
 import { StockMovement, type StockMovementType } from './stock-movement.entity';
 
 export interface StockSource {
@@ -65,7 +66,7 @@ function fefo(a: Lot, b: Lot) {
   );
 }
 
-const isExpired = (lot: Lot, date: string) => lot.expiryDate !== null && lot.expiryDate < date;
+const isExpired = (lot: Lot, date: string) => tooShortToUse(lot.expiryDate, date);
 
 async function lockProducts(manager: EntityManager, branchId: string, productIds: string[]) {
   if (productIds.length === 0) return [];
@@ -291,7 +292,18 @@ async function resolvePostings(
   }
 
   if (shortages.size > 0) {
-    throw AppError.unprocessable('Not enough stock for this change', { shortages: [...shortages.values()] });
+    const list = [...shortages.values()];
+    const nearExpiry = list.filter((s) => s.expired);
+    throw AppError.unprocessable(
+      nearExpiry.length
+        ? `Not enough stock for this change. ${nearExpiry
+            .map((s) => `${s.productName}: ${s.expired} expire within ${MIN_SHELF_DAYS} days`)
+            .join(
+              '; ',
+            )}. Stock with less than ${MIN_SHELF_DAYS} days to expiry cannot be sent, sold or dispatched.`
+        : 'Not enough stock for this change',
+      { shortages: list },
+    );
   }
   return resolved;
 }

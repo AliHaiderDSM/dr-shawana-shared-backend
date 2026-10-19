@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
+import { ageBatch, bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 
@@ -171,11 +171,19 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     expect(allocations(detail.body.data.batches)).toEqual({ 'BATCH-002': '1.000' });
   });
 
+  it('refuses stock that expires within 45 days', async () => {
+    const soon = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
+    const refused = await stockIn([{ productId: cream, qty: '1', batch: 'SHORT', expiryDate: soon }]);
+    expect(refused.status).toBe(422);
+    expect(refused.body.error.message).toContain('less than 45 days');
+  });
+
   it('never sells an expired batch and lets it be written off', async () => {
     await stockIn([
-      { productId: cream, qty: '5', batch: 'OLD', manufacturingDate: '2025-01-01', expiryDate: '2026-06-30' },
+      { productId: cream, qty: '5', batch: 'OLD', manufacturingDate: '2025-01-01', expiryDate: '2027-01-31' },
       { productId: cream, qty: '2', batch: 'NEW', expiryDate: '2027-06-30' },
     ]);
+    await ageBatch('OLD', '2026-06-30');
     const stock = await api('get', '/branch/inventory/stock?pageSize=100');
     expect(stock.body.data.find((r: { productId: string }) => r.productId === cream)).toMatchObject({
       quantity: '7.000',
@@ -236,7 +244,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
   it('holds a return for inspection, quarantines it, then restocks into the sold batch', async () => {
     const ret = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       items: [{ productId: serum, qty: '1' }],
     });
     expect(ret.status).toBe(201);
@@ -274,7 +282,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     const sale = await sell(serum, '2');
     const ret = await api('post', '/branch/returns', frontDesk).send({
       saleId: sale.body.data.id,
-      reason: 'expired',
+      reason: 'other',
       items: [{ productId: serum, qty: '2' }],
     });
     const resolved = await api(

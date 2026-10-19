@@ -329,6 +329,14 @@ export const consultationsService = {
       delete consultation.doctor;
       delete consultation.appointment;
       await consultations.save(consultation, em);
+      if (consultation.appointmentId && before !== status) {
+        const [from, to] = status === 'completed' ? ['booked', 'completed'] : ['completed', 'booked'];
+        await em.query(
+          `UPDATE appointments SET status = $3, updated_by = $4, updated_at = now()
+            WHERE id = $1 AND status = $2 AND deleted_at IS NULL`,
+          [consultation.appointmentId, from, to, actor.userId],
+        );
+      }
       await auditService.record(
         {
           actor,

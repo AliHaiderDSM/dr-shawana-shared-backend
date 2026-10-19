@@ -203,6 +203,21 @@ describe('POS sales', () => {
 
   it('turns an underpayment into the discount with posSoft "Auto"', async () => {
     const before = await stock(serum);
+    const [lahoreBranch] = (await AppDataSource.query(`SELECT id FROM branches WHERE code = 'LHR'`)) as {
+      id: string;
+    }[];
+    const allowOnline = (onlineSales: boolean) =>
+      api('patch', `/admin/branches/${lahoreBranch!.id}`, owner).send({ onlineSales });
+    expect((await allowOnline(false)).body.data.onlineSales).toBe(false);
+    const refused = await api('post', '/branch/sales', admin).send({
+      patient: { name: 'Walk In', phone: '923331112222', city: 'Lahore' },
+      saleType: 'online',
+      items: [{ productId: serum, qty: '1' }],
+      payments: [{ method: 'cash', amount: '1000', accountSheetId: cashSheet }],
+    });
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.message).toContain('does not take online orders');
+    expect((await allowOnline(true)).body.data.onlineSales).toBe(true);
     const res = await api('post', '/branch/sales', admin).send({
       patient: { name: 'Walk In', phone: '923331112222', city: 'Lahore' },
       saleType: 'online',

@@ -19,6 +19,7 @@ import { stockRequestsService } from '../stock-requests/stock-requests.service';
 import { productBatchesService } from './product-batches.service';
 import { StockAttachment, type StockDocumentType } from './stock-attachment.entity';
 import { type StockIn } from './stock-in.entity';
+import { assertShelfLife } from './shelf-life';
 import { stockLedger } from './stock-ledger';
 import { type StockDocumentListQuery } from './stock-documents.schemas';
 import { type StockOut } from './stock-out.entity';
@@ -388,6 +389,14 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
     get: getDto,
 
     async create(actor: Actor, branchId: string, input: CreateInput, files: Express.Multer.File[] = []) {
+      if (config.kind === 'stock_in')
+        assertShelfLife(
+          input.items.map((i) => ({
+            batch: i.batch as string | null,
+            expiryDate: i.expiryDate as string | null,
+          })),
+          input.date,
+        );
       const uploaded = await uploadAll(branchId, config.kind, files);
       try {
         return await withTransaction(async (em) => {
@@ -508,6 +517,16 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           batch: (record as Partial<StockIn>).batch ?? null,
         };
         Object.assign(record, input, { updatedBy: actor.userId });
+        if (config.kind === 'stock_in' && ('expiryDate' in input || 'date' in input))
+          assertShelfLife(
+            [
+              {
+                batch: (record as Partial<StockIn>).batch,
+                expiryDate: (record as Partial<StockIn>).expiryDate,
+              },
+            ],
+            record.date,
+          );
         const tracked = await inventoryItemsService.trackedProducts(em, branchId, [
           previous.productId,
           record.productId,

@@ -31,7 +31,7 @@ export const branchesRepository = {
 
   options(manager?: EntityManager) {
     return repo(Branch, manager).find({
-      select: { id: true, name: true, code: true, city: true, status: true, kind: true },
+      select: { id: true, name: true, code: true, city: true, status: true, kind: true, onlineSales: true },
       order: { kind: 'DESC', name: 'ASC' },
     });
   },

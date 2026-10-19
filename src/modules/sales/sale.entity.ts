@@ -102,6 +102,10 @@ export class Sale extends BranchScopedEntity {
   @Column({ name: 'dispatched_by', type: 'uuid', nullable: true })
   dispatchedBy: string | null;
 
+  @Index('UQ_sales_gdn_no', { unique: true, where: '"gdn_no" IS NOT NULL' })
+  @Column({ name: 'gdn_no', type: 'varchar', length: 30, nullable: true })
+  gdnNo: string | null;
+
   @Column({ name: 'delivered_on', type: 'date', nullable: true })
   deliveredOn: string | null;
 

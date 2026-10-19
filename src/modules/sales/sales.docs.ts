@@ -231,6 +231,7 @@ export const deliveryOrderSchema = registry.register(
   z.object({
     id: z.uuid(),
     invoiceNo: z.string(),
+    gdnNo: z.string().nullable(),
     date: z.iso.date(),
     deliveryStatus: z.enum(DELIVERY_STATUSES).nullable(),
     dispatchedOn: z.iso.date().nullable(),

@@ -15,6 +15,7 @@ import {
   type LabelBatchListQuery,
   type RegisterLabelsInput,
 } from './inventory-items.schemas';
+import { MIN_SHELF_DAYS, tooShortToUse } from './shelf-life';
 import { type StockMovementInput } from './stock-ledger';
 import { type StockMovementType } from './stock-movement.entity';
 
@@ -305,8 +306,11 @@ export const inventoryItemsService = {
         problems.push({ serial, problem: 'was not sold on this sale' });
       } else if (!input.from.includes(item.status)) {
         problems.push({ serial, problem: STATUS_TEXT[item.status] });
-      } else if (input.sellableOnly && item.expiryDate && item.expiryDate < input.date) {
-        problems.push({ serial, problem: `expired on ${item.expiryDate}` });
+      } else if (input.sellableOnly && tooShortToUse(item.expiryDate, input.date)) {
+        problems.push({
+          serial,
+          problem: `expires on ${item.expiryDate}, less than ${MIN_SHELF_DAYS} days away, so it cannot go out`,
+        });
       }
     }
     failOn(problems);

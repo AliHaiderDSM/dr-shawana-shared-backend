@@ -49,6 +49,7 @@ const meBranchSchema = z.object({
   code: z.string(),
   city: z.string(),
   kind: z.enum(BRANCH_KINDS),
+  onlineSales: z.boolean(),
 });
 
 export const meSchema = registry.register(

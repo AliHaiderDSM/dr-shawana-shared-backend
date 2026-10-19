@@ -336,11 +336,15 @@ describe('consultations and clinical records', () => {
       expect(pdf.headers['content-type']).toContain('application/pdf');
     });
 
-    it('marks a consultation completed', async () => {
-      const res = await api('post', `/branch/consultations/${consultationId}/status`, doctorUser).send({
-        status: 'completed',
-      });
+    it('marks a consultation completed and completes its appointment with it', async () => {
+      const setStatus = (status: string) =>
+        api('post', `/branch/consultations/${consultationId}/status`, doctorUser).send({ status });
+      const res = await setStatus('completed');
       expect(res.body.data.status).toBe('completed');
+      expect(res.body.data.appointment.status).toBe('completed');
+      const reopened = await setStatus('open');
+      expect(reopened.body.data.appointment.status).toBe('booked');
+      expect((await setStatus('completed')).body.data.appointment.status).toBe('completed');
     });
   });
 

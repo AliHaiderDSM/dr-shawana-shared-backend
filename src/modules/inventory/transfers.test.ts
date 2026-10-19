@@ -369,7 +369,7 @@ describe('Main Warehouse transfers to branches', () => {
   });
 
   it('warns about batches that expire within three months, everywhere for the Super Admin', async () => {
-    const soon = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const soon = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
     await asAdmin('post', '/branch/stock-ins').send({
       date: '2026-10-04',
       items: [{ productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
@@ -394,7 +394,7 @@ describe('Main Warehouse transfers to branches', () => {
     expect(rows.map((r) => `${r.branchName}:${r.batchNo}:${r.quantity}`).sort()).toEqual([
       'Lahore:SOON-1:10.000',
     ]);
-    expect(rows[0]!.daysLeft).toBe(30);
+    expect(rows[0]!.daysLeft).toBe(60);
 
     const branch = await asBranch('get', '/branch/inventory/expiry-alerts');
     expect(branch.body.data.map((r: { branchName: string }) => r.branchName)).toEqual(['Lahore']);

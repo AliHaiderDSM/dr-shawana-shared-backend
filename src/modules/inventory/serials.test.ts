@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
+import { ageBatch, bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 import { AppDataSource } from '../../database/data-source';
@@ -199,14 +199,16 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
     expect(elsewhere.status).toBe(404);
   });
 
-  it('refuses to sell a piece of an expired batch', async () => {
+  it('refuses to sell a piece of a batch with less than 45 days left', async () => {
     const res = await stockIn([
-      { productId: serum, qty: '2', batch: 'OLD', expiryDate: '2026-06-30', labels: 'generate' },
+      { productId: serum, qty: '2', batch: 'OLD', expiryDate: '2027-06-30', labels: 'generate' },
     ]);
     const old = res.body.data[0].labels.firstSerial;
+    const soon = '2026-10-31';
+    await ageBatch('OLD', soon);
     const sale = await sell({ items: [{ productId: serum, qty: '1' }], serials: [old] });
     expect(sale.status).toBe(422);
-    expect(sale.body.error.message).toContain('expired');
+    expect(JSON.stringify(sale.body.error)).toContain('less than 45 days');
   });
 
   it('swaps pieces when a sale is edited and frees them when it is deleted', async () => {
@@ -244,20 +246,20 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
 
     const unscanned = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       items: [{ productId: serum, qty: '1' }],
     });
     expect(unscanned.status).toBe(422);
     const notOnSale = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       items: [{ productId: serum, qty: '1', serials: [serials[60]] }],
     });
     expect(notOnSale.status).toBe(422);
 
     const ret = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       items: [{ productId: serum, qty: '2', serials: [serials[20], serials[21]] }],
     });
     expect(ret.status).toBe(201);

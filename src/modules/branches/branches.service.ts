@@ -22,6 +22,7 @@ export function toBranchDto(branch: Branch) {
     logoPath: branch.logoPath,
     kind: branch.kind,
     status: branch.status,
+    onlineSales: branch.onlineSales,
     createdAt: branch.createdAt,
     updatedAt: branch.updatedAt,
   };

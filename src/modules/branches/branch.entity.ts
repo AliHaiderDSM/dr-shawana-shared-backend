@@ -45,4 +45,7 @@ export class Branch extends BaseEntity {
   @Index()
   @Column({ type: 'enum', enum: BRANCH_STATUSES, enumName: 'branch_status', default: 'active' })
   status: BranchStatus;
+
+  @Column({ name: 'online_sales', type: 'boolean', default: false })
+  onlineSales: boolean;
 }

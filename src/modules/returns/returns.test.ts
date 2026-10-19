@@ -108,14 +108,14 @@ describe('Sale returns and barcodes', () => {
     );
     const tooMany = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       items: [{ productId: serum, qty: '4' }],
     });
     expect(tooMany.status).toBe(422);
     expect(tooMany.body.error.details.items[0]).toMatchObject({ returnable: '3.000', requested: '4.000' });
     const tooMuchRefund = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       items: [{ productId: serum, qty: '1' }],
       refund: { amount: '5000', method: 'cash', accountSheetId: cashSheet },
     });
@@ -125,7 +125,7 @@ describe('Sale returns and barcodes', () => {
   it('holds returned stock until inspection, then restocks, writes off or sends back each item', async () => {
     const created = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'damaged',
+      reason: 'other',
       note: 'Box crushed in transit',
       items: [
         { productId: serum, qty: '2' },
@@ -210,7 +210,7 @@ describe('Sale returns and barcodes', () => {
 
     const second = await api('post', '/branch/returns', frontDesk).send({
       saleId,
-      reason: 'expired',
+      reason: 'other',
       items: [{ productId: serum, qty: '1' }],
     });
     expect(second.body.data.returnNo).toBe('LHR-RET-000002');
@@ -227,7 +227,7 @@ describe('Sale returns and barcodes', () => {
     });
     expect(cleared.body.data).toMatchObject({ refundAmount: '0.00', refundMethod: null });
 
-    const list = await api('get', '/branch/returns?status=pending&reason=expired', admin);
+    const list = await api('get', '/branch/returns?status=pending&reason=other', admin);
     expect(list.body.data.map((r: { id: string }) => r.id)).toEqual([second.body.data.id]);
     expect((await api('get', '/branch/returns?disposition=damaged', admin)).body.meta.total).toBe(1);
     expect((await api('get', '/branch/returns?search=LHR-RET-000002', admin)).body.meta.total).toBe(1);

@@ -13,7 +13,7 @@ import {
 } from '../../lib/validation';
 import { PAYMENT_METHODS } from '../appointments/appointment-payment.entity';
 import { RETURN_DISPOSITIONS } from './sale-return-item.entity';
-import { RETURN_REASONS, RETURN_STATUSES } from './sale-return.entity';
+import { NEW_RETURN_REASONS, RETURN_REASONS, RETURN_STATUSES } from './sale-return.entity';
 
 const positiveMoney = moneyInput.refine((v) => Number(v) > 0, 'Must be greater than zero');
 
@@ -33,7 +33,12 @@ export const createReturnSchema = registry.register(
     .object({
       saleId: z.uuid(),
       date: dateInput.optional(),
-      reason: z.enum(RETURN_REASONS),
+      reason: z
+        .enum(NEW_RETURN_REASONS)
+        .openapi({
+          description:
+            'Why the customer returned it. Damaged or expired stock is never sold, so it is not a reason.',
+        }),
       note: optionalText(5000),
       items: z
         .array(

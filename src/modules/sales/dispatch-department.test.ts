@@ -344,7 +344,16 @@ describe('Dispatch Department ships every online order from its own stock', () =
     });
     expect(sent.status).toBe(200);
     expect(sent.body.data.deliveryStatus).toBe('delivered');
+    expect(sent.body.data.gdnNo).toMatch(/^DSP-GDN-\d{6}$/);
     const seen = (await as(lahoreAdmin, 'get', `/branch/sales/${order.id}`)).body.data;
+    expect(seen.gdn).toMatchObject({
+      gdnNo: sent.body.data.gdnNo,
+      dispatchedOn: '2026-10-04',
+      dispatchedBy: expect.any(String),
+      from: { code: 'DSP' },
+      bookedAt: { name: 'Lahore' },
+      customer: { name: expect.any(String) },
+    });
     const serumLine = seen.items.find(
       (i: { product: { name: string } | null }) => i.product?.name === 'Vitamin C Serum',
     );

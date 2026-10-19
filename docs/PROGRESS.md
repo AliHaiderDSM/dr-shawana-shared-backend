@@ -22,6 +22,16 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Online sales per branch, 45-day shelf life, GDN and smaller fixes (2026-10-19)
+
+- Migration `1793700000000-BranchOnlineSales`: `branches.online_sales` (on for LHR-001 and ISB-002). A branch without it gets 403 on an online sale; branch DTO, options and `me.branch` carry `onlineSales`.
+- New returns take only wrong_item, customer_refused, not_delivered or other as the reason; damaged and expired stay for old rows and for inspection outcomes.
+- Completing a consultation completes its booked appointment; reopening it puts the appointment back to booked.
+- 45-day shelf life (`inventory/shelf-life.ts`): Stock In refuses a batch expiring within 45 days of the later of today and the entry date; sales, transfers, dispatch and labelled pieces skip such batches with a clear message; availability queries use the same cutoff.
+- Migration `1793800000000-SaleGdnNumbers`: `sales.gdn_no`. Dispatching an online order gives `<dispatch code>-GDN-000001`; sale detail has `gdn` (dispatcher, from, booked at, customer) and the delivery list has `gdnNo`.
+- Additional symptoms: 104 keys in the nine groups of the symptom sheet; every earlier key kept.
+- Tests: `ageBatch` fixture to age a batch. Suite: 266 passed.
+
 ## Patient app push for doctor replies (2026-10-18)
 
 - Expo push now goes out with priority high on the Android `messages` channel, titled with the doctor's name, and carries `doctorId` so a tap opens that chat. Tokens Expo reports as DeviceNotRegistered are deleted.

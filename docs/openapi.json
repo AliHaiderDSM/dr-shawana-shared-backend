@@ -556,6 +556,9 @@
                   "warehouse",
                   "dispatch"
                 ]
+              },
+              "onlineSales": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -563,7 +566,8 @@
               "name",
               "code",
               "city",
-              "kind"
+              "kind",
+              "onlineSales"
             ]
           },
           "permissions": {
@@ -675,6 +679,10 @@
             ],
             "maxLength": 500
           },
+          "onlineSales": {
+            "type": "boolean",
+            "description": "The branch may book online orders (shipped by the Dispatch Department)"
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -739,6 +747,10 @@
               "null"
             ],
             "maxLength": 500
+          },
+          "onlineSales": {
+            "type": "boolean",
+            "description": "The branch may book online orders (shipped by the Dispatch Department)"
           }
         }
       },
@@ -798,6 +810,9 @@
               "inactive"
             ]
           },
+          "onlineSales": {
+            "type": "boolean"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -818,6 +833,7 @@
           "logoPath",
           "kind",
           "status",
+          "onlineSales",
           "createdAt",
           "updatedAt"
         ]
@@ -9486,57 +9502,462 @@
             "items": {
               "type": "string",
               "enum": [
+                "difficulty_concentrating",
+                "word_finding_difficulty",
+                "brain_fog",
+                "reduced_multitasking",
+                "mood_swings",
+                "feeling_anxious",
+                "feeling_tense",
+                "feeling_depressed",
+                "low_motivation",
+                "feeling_hopeless",
+                "not_feeling_yourself",
+                "self_harm_thoughts",
+                "addictive_behaviour",
+                "irritability",
+                "panic_attacks",
+                "crying_spells",
+                "flat_mood",
+                "low_self_worth",
+                "feeling_bad_about_yourself",
+                "loss_of_interest",
+                "unhealthy_food_behaviour",
+                "social_withdrawal",
+                "accomplishing_less",
+                "fatigue",
+                "low_libido",
+                "migraines",
+                "pins_and_needles",
+                "night_sweats",
+                "dizziness_vertigo",
+                "restless_legs",
+                "difficulty_sleeping",
+                "headaches",
+                "tinnitus",
+                "hot_flushes",
+                "crawling_sensation",
+                "internal_tremors",
+                "burning_soles",
+                "taste_changes",
+                "hearing_changes",
+                "dry_skin",
+                "dry_hair",
+                "nail_changes",
+                "skin_itching",
                 "hair_loss",
                 "increased_facial_hair",
                 "skin_issues",
-                "dry_skin",
-                "skin_itching",
-                "crawling_sensation",
-                "nail_changes",
                 "body_odor_change",
                 "weight_gain",
+                "constipation",
+                "abdominal_pain",
+                "diarrhea",
+                "bloating",
+                "gas",
+                "heartburn",
                 "weight_loss",
                 "belly_fat",
                 "food_sugar_cravings",
-                "decreased_strength",
-                "decreased_stamina",
-                "low_backache",
+                "heavier_periods",
+                "longer_periods",
+                "longer_cycle",
+                "irregular_periods",
+                "vaginal_itching",
+                "frequent_urination",
+                "nocturia",
+                "painful_urination",
+                "lighter_periods",
+                "shorter_periods",
+                "shorter_cycle",
+                "vaginal_dryness",
+                "painful_sex",
+                "stress_incontinence",
+                "recurrent_utis",
+                "joint_pains",
+                "joint_stiffness",
+                "foot_pain",
+                "muscle_pains",
                 "frozen_shoulder",
                 "heel_pain",
+                "low_backache",
+                "decreased_strength",
+                "decreased_stamina",
                 "clicking_jaw_tmj",
-                "brain_fog",
-                "headaches",
-                "migraines",
-                "dizziness_vertigo",
-                "tinnitus",
-                "burning_soles",
-                "taste_changes",
+                "breast_pain",
+                "difficulty_breathing",
+                "hay_fever",
+                "reduced_alcohol_tolerance",
+                "dry_mouth",
                 "increased_smell",
-                "hearing_changes",
+                "worsening_physical_condition",
+                "palpitations",
+                "chest_pain",
+                "food_intolerances",
                 "dry_eyes",
+                "burning_mouth",
+                "worsening_mental_condition",
                 "vision_changes",
-                "bloating",
-                "gas",
-                "constipation",
-                "diarrhea",
-                "heartburn",
-                "recurrent_utis",
-                "stress_incontinence",
-                "vaginal_itching",
-                "social_withdrawal",
-                "accomplishing_less",
+                "voice_changes",
+                "impact_work",
+                "impact_family",
+                "impact_activity",
                 "marital_conflicts",
+                "impact_social",
                 "avoiding_intimacy",
-                "personal_life_dissatisfaction",
-                "voice_changes"
+                "personal_life_dissatisfaction"
               ]
             },
-            "maxItems": 43,
+            "maxItems": 104,
             "default": []
           },
           "severity": {
             "type": "object",
             "properties": {
+              "difficulty_concentrating": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "word_finding_difficulty": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "brain_fog": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "reduced_multitasking": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "mood_swings": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "feeling_anxious": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "feeling_tense": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "feeling_depressed": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "low_motivation": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "feeling_hopeless": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "not_feeling_yourself": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "self_harm_thoughts": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "addictive_behaviour": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "irritability": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "panic_attacks": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "crying_spells": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "flat_mood": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "low_self_worth": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "feeling_bad_about_yourself": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "loss_of_interest": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "unhealthy_food_behaviour": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "social_withdrawal": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "accomplishing_less": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "fatigue": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "low_libido": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "migraines": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "pins_and_needles": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "night_sweats": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "dizziness_vertigo": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "restless_legs": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "difficulty_sleeping": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "headaches": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "tinnitus": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "hot_flushes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "crawling_sensation": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "internal_tremors": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "burning_soles": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "taste_changes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "hearing_changes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "dry_skin": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "dry_hair": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "nail_changes": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "skin_itching": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
               "hair_loss": {
                 "type": [
                   "integer",
@@ -9561,38 +9982,6 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "dry_skin": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "skin_itching": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "crawling_sensation": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "nail_changes": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
               "body_odor_change": {
                 "type": [
                   "integer",
@@ -9602,6 +9991,54 @@
                 "maximum": 3
               },
               "weight_gain": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "constipation": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "abdominal_pain": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "diarrhea": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "bloating": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "gas": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "heartburn": {
                 "type": [
                   "integer",
                   "null"
@@ -9633,7 +10070,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "decreased_strength": {
+              "heavier_periods": {
                 "type": [
                   "integer",
                   "null"
@@ -9641,7 +10078,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "decreased_stamina": {
+              "longer_periods": {
                 "type": [
                   "integer",
                   "null"
@@ -9649,7 +10086,135 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "low_backache": {
+              "longer_cycle": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "irregular_periods": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "vaginal_itching": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "frequent_urination": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "nocturia": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "painful_urination": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "lighter_periods": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "shorter_periods": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "shorter_cycle": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "vaginal_dryness": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "painful_sex": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "stress_incontinence": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "recurrent_utis": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "joint_pains": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "joint_stiffness": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "foot_pain": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "muscle_pains": {
                 "type": [
                   "integer",
                   "null"
@@ -9673,6 +10238,30 @@
                 "minimum": 0,
                 "maximum": 3
               },
+              "low_backache": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "decreased_strength": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "decreased_stamina": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
               "clicking_jaw_tmj": {
                 "type": [
                   "integer",
@@ -9681,7 +10270,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "brain_fog": {
+              "breast_pain": {
                 "type": [
                   "integer",
                   "null"
@@ -9689,7 +10278,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "headaches": {
+              "difficulty_breathing": {
                 "type": [
                   "integer",
                   "null"
@@ -9697,7 +10286,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "migraines": {
+              "hay_fever": {
                 "type": [
                   "integer",
                   "null"
@@ -9705,7 +10294,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "dizziness_vertigo": {
+              "reduced_alcohol_tolerance": {
                 "type": [
                   "integer",
                   "null"
@@ -9713,23 +10302,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "tinnitus": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "burning_soles": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "taste_changes": {
+              "dry_mouth": {
                 "type": [
                   "integer",
                   "null"
@@ -9745,7 +10318,31 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "hearing_changes": {
+              "worsening_physical_condition": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "palpitations": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "chest_pain": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "food_intolerances": {
                 "type": [
                   "integer",
                   "null"
@@ -9761,6 +10358,22 @@
                 "minimum": 0,
                 "maximum": 3
               },
+              "burning_mouth": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "worsening_mental_condition": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
               "vision_changes": {
                 "type": [
                   "integer",
@@ -9769,7 +10382,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "bloating": {
+              "voice_changes": {
                 "type": [
                   "integer",
                   "null"
@@ -9777,7 +10390,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "gas": {
+              "impact_work": {
                 "type": [
                   "integer",
                   "null"
@@ -9785,7 +10398,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "constipation": {
+              "impact_family": {
                 "type": [
                   "integer",
                   "null"
@@ -9793,55 +10406,7 @@
                 "minimum": 0,
                 "maximum": 3
               },
-              "diarrhea": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "heartburn": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "recurrent_utis": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "stress_incontinence": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "vaginal_itching": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "social_withdrawal": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "accomplishing_less": {
+              "impact_activity": {
                 "type": [
                   "integer",
                   "null"
@@ -9850,6 +10415,14 @@
                 "maximum": 3
               },
               "marital_conflicts": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 3
+              },
+              "impact_social": {
                 "type": [
                   "integer",
                   "null"
@@ -9866,14 +10439,6 @@
                 "maximum": 3
               },
               "personal_life_dissatisfaction": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 0,
-                "maximum": 3
-              },
-              "voice_changes": {
                 "type": [
                   "integer",
                   "null"
@@ -12887,13 +13452,12 @@
           "reason": {
             "type": "string",
             "enum": [
-              "damaged",
-              "expired",
               "wrong_item",
               "customer_refused",
               "not_delivered",
               "other"
-            ]
+            ],
+            "description": "Why the customer returned it. Damaged or expired stock is never sold, so it is not a reason."
           },
           "note": {
             "type": [
@@ -14121,6 +14685,13 @@
             ],
             "format": "date"
           },
+          "gdnNo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Goods Dispatch Note number, given when the Dispatch Department sends the order"
+          },
           "paymentMethods": {
             "type": "array",
             "items": {
@@ -14315,6 +14886,104 @@
               "$ref": "#/components/schemas/AllocatedBatch"
             },
             "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
+          },
+          "gdn": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "gdnNo": {
+                "type": "string"
+              },
+              "dispatchedOn": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "dispatchedBy": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "from": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "code"
+                ]
+              },
+              "bookedAt": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "code"
+                ]
+              },
+              "customer": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "address": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "phone",
+                  "city",
+                  "address"
+                ]
+              }
+            },
+            "required": [
+              "gdnNo",
+              "dispatchedOn",
+              "dispatchedBy",
+              "from",
+              "bookedAt",
+              "customer"
+            ],
+            "description": "Goods Dispatch Note details of a dispatched online order (detail only)"
           }
         },
         "required": [
@@ -14340,6 +15009,7 @@
           "fulfillmentBranchId",
           "dispatchedOn",
           "deliveredOn",
+          "gdnNo",
           "paymentMethods",
           "note",
           "items",
@@ -14449,6 +15119,12 @@
           },
           "invoiceNo": {
             "type": "string"
+          },
+          "gdnNo": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "date": {
             "type": "string",
@@ -14612,6 +15288,7 @@
         "required": [
           "id",
           "invoiceNo",
+          "gdnNo",
           "date",
           "deliveryStatus",
           "dispatchedOn",
@@ -18105,6 +18782,9 @@
                               "dispatch"
                             ],
                             "description": "warehouse: the Super Admin stock (Super Admin only); branch: a selling branch; dispatch: the Dispatch Department that ships online orders"
+                          },
+                          "onlineSales": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -18113,7 +18793,8 @@
                           "code",
                           "city",
                           "status",
-                          "kind"
+                          "kind",
+                          "onlineSales"
                         ]
                       }
                     }
@@ -45771,6 +46452,13 @@
                             ],
                             "format": "date"
                           },
+                          "gdnNo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Goods Dispatch Note number, given when the Dispatch Department sends the order"
+                          },
                           "paymentMethods": {
                             "type": "array",
                             "items": {
@@ -45868,6 +46556,104 @@
                             },
                             "description": "Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}."
                           },
+                          "gdn": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "gdnNo": {
+                                "type": "string"
+                              },
+                              "dispatchedOn": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "format": "date"
+                              },
+                              "dispatchedBy": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "from": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "code": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "code"
+                                ]
+                              },
+                              "bookedAt": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "code": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "code"
+                                ]
+                              },
+                              "customer": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "phone": {
+                                    "type": "string"
+                                  },
+                                  "city": {
+                                    "type": "string"
+                                  },
+                                  "address": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "name",
+                                  "phone",
+                                  "city",
+                                  "address"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "gdnNo",
+                              "dispatchedOn",
+                              "dispatchedBy",
+                              "from",
+                              "bookedAt",
+                              "customer"
+                            ],
+                            "description": "Goods Dispatch Note details of a dispatched online order (detail only)"
+                          },
                           "products": {
                             "type": "array",
                             "items": {
@@ -45940,6 +46726,7 @@
                           "fulfillmentBranchId",
                           "dispatchedOn",
                           "deliveredOn",
+                          "gdnNo",
                           "paymentMethods",
                           "note",
                           "createdBy",

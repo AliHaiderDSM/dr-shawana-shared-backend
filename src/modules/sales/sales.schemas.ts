@@ -302,6 +302,9 @@ export const saleSchema = registry.register(
       .openapi({ description: 'Dispatch Department that ships this online order from its own stock' }),
     dispatchedOn: z.iso.date().nullable(),
     deliveredOn: z.iso.date().nullable(),
+    gdnNo: z.string().nullable().openapi({
+      description: 'Goods Dispatch Note number, given when the Dispatch Department sends the order',
+    }),
     paymentMethods: z.array(z.enum(PAYMENT_METHODS)),
     note: z.string().nullable(),
     items: z.array(
@@ -334,6 +337,20 @@ export const saleSchema = registry.register(
     batches: z.array(allocatedBatchSchema).optional().openapi({
       description: 'Batches the sold stock was taken from (FEFO). Only on GET /branch/sales/{id}.',
     }),
+    gdn: z
+      .object({
+        gdnNo: z.string(),
+        dispatchedOn: z.iso.date().nullable(),
+        dispatchedBy: z.string().nullable(),
+        from: z.object({ name: z.string(), code: z.string() }).nullable(),
+        bookedAt: z.object({ name: z.string(), code: z.string() }).nullable(),
+        customer: z
+          .object({ name: z.string(), phone: z.string(), city: z.string(), address: z.string().nullable() })
+          .nullable(),
+      })
+      .nullable()
+      .optional()
+      .openapi({ description: 'Goods Dispatch Note details of a dispatched online order (detail only)' }),
   }),
 );
 

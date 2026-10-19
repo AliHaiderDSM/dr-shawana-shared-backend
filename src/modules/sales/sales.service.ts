@@ -12,6 +12,7 @@ import { BUCKETS, createSignedUrl, publicUrl } from '../../lib/storage';
 import { today } from '../../lib/validation';
 import { accountSheetsRepository } from '../accounts/accounts.repository';
 import { auditService } from '../audit/audit.service';
+import { MIN_SHELF_DAYS } from '../inventory/shelf-life';
 import { Branch } from '../branches/branch.entity';
 import { BundleItem } from '../bundles/bundle-item.entity';
 import { Bundle } from '../bundles/bundle.entity';
@@ -141,6 +142,36 @@ function toSaleDto(sale: Sale) {
         lineTotal: i.lineTotal,
       })),
     payments: livePayments.map(toSalePaymentDto),
+  };
+}
+
+async function gdnOf(sale: Sale) {
+  const [row] = (await AppDataSource.query(
+    `SELECT TRIM(CONCAT(st.first_name, ' ', st.last_name)) AS "dispatchedBy",
+            f.name AS "fromName", f.code AS "fromCode", b.name AS "bookedName", b.code AS "bookedCode",
+            p.name AS "customerName", p.phone, p.city, p.address
+       FROM sales s
+       JOIN branches b ON b.id = s.branch_id
+       LEFT JOIN branches f ON f.id = COALESCE(s.fulfillment_branch_id, s.branch_id)
+       LEFT JOIN staff_profiles st ON st.id = s.dispatched_by
+       LEFT JOIN patients p ON p.id = s.patient_id
+      WHERE s.id = $1`,
+    [sale.id],
+  )) as Record<string, string | null>[];
+  return {
+    gdnNo: sale.gdnNo as string,
+    dispatchedOn: sale.dispatchedOn,
+    dispatchedBy: row?.dispatchedBy || null,
+    from: row?.fromName ? { name: row.fromName, code: row.fromCode as string } : null,
+    bookedAt: row?.bookedName ? { name: row.bookedName, code: row.bookedCode as string } : null,
+    customer: row?.customerName
+      ? {
+          name: row.customerName,
+          phone: row.phone as string,
+          city: row.city as string,
+          address: row.address ?? null,
+        }
+      : null,
   };
 }
 
@@ -425,7 +456,7 @@ async function assertAvailable(
   const rows: { productId: string; name: string; sellable: string; reserved: string }[] = await manager.query(
     `SELECT p.id AS "productId", p.name,
             COALESCE((SELECT SUM(m.qty) FROM stock_movements m LEFT JOIN product_batches b ON b.id = m.batch_id
-                       WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $3::date)), 0)::text AS sellable,
+                       WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $3::date + ${MIN_SHELF_DAYS})), 0)::text AS sellable,
             COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
                        WHERE si.product_id = p.id AND si.deleted_at IS NULL AND ${RESERVING_HERE}
                          AND ($4::uuid IS NULL OR s.id <> $4::uuid)), 0)::text AS reserved
@@ -465,7 +496,7 @@ async function assertDispatchAvailable(manager: EntityManager, sale: Sale, wante
   const rows: { productId: string; name: string; sellable: string; reserved: string }[] = await manager.query(
     `SELECT p.id AS "productId", p.name,
             COALESCE((SELECT SUM(m.qty) FROM stock_movements m LEFT JOIN product_batches b ON b.id = m.batch_id
-                       WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $3::date)), 0)::text AS sellable,
+                       WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $3::date + ${MIN_SHELF_DAYS})), 0)::text AS sellable,
             COALESCE((SELECT SUM(si.qty) FROM sale_items si
                         JOIN sales s ON s.id = si.sale_id
                         JOIN products sp ON sp.id = si.product_id
@@ -807,6 +838,7 @@ export const salesService = {
         qty: toQuantity(b.qty.negated()),
       })),
       serials: pieces.map((p) => ({ serial: p.serial, productId: shown(p.productId), status: p.status })),
+      gdn: sale.gdnNo ? await gdnOf(sale) : null,
     };
   },
 
@@ -830,6 +862,11 @@ export const salesService = {
         if (branch.kind === 'dispatch') {
           throw AppError.conflict(
             'The Dispatch Department does not book sales. Branches book online orders.',
+          );
+        }
+        if (online && !branch.onlineSales) {
+          throw AppError.forbidden(
+            `${branch.name} does not take online orders. Only branches allowed by the Super Admin book online sales.`,
           );
         }
         const fulfiller = online ? await dispatchDepartment(em) : null;
@@ -1027,6 +1064,11 @@ export const salesService = {
       }
       const date = input.date ?? today();
       if (date < sale.date) throw AppError.badRequest('The dispatch date cannot be before the order date');
+      const sender = stockBranchOf(sale);
+      const [from] = (await em.query('SELECT code FROM branches WHERE id = $1', [sender])) as {
+        code: string;
+      }[];
+      const gdnNo = `${from?.code ?? 'DSP'}-GDN-${String(await nextSequence(em, sender, 'gdn')).padStart(6, '0')}`;
       await postSaleStock(
         em,
         actor,
@@ -1042,6 +1084,7 @@ export const salesService = {
           dispatchedOn: date,
           deliveredOn: date,
           dispatchedBy: actor.userId,
+          gdnNo,
           updatedBy: actor.userId,
         },
       );
@@ -1051,7 +1094,7 @@ export const salesService = {
         'dispatch',
         em,
         { deliveryStatus: 'pending' },
-        { deliveryStatus: 'delivered', dispatchedOn: date },
+        { deliveryStatus: 'delivered', dispatchedOn: date, gdnNo },
       );
       return toSaleDto(await getOrder(branchId, id, em));
     });
@@ -1115,7 +1158,7 @@ export const salesService = {
       `SELECT p.id, p.name, p.batch_no AS "batchNo", p.unit, p.sale_price::text AS "salePrice",
               p.image_path AS "imagePath", p.track_serials AS "trackSerials", c.name AS "categoryName",
               COALESCE((SELECT SUM(m.qty) FROM stock_movements m LEFT JOIN product_batches b ON b.id = m.batch_id
-                         WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $2::date)), 0)::text AS sellable,
+                         WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= $2::date + ${MIN_SHELF_DAYS})), 0)::text AS sellable,
               COALESCE((SELECT SUM(si.qty) FROM sale_items si
                           JOIN sales s ON s.id = si.sale_id
                           JOIN products sp ON sp.id = si.product_id
@@ -1247,6 +1290,7 @@ export const salesService = {
         date: dto.date,
         deliveryStatus: dto.deliveryStatus,
         dispatchedOn: r.dispatchedOn,
+        gdnNo: r.gdnNo,
         deliveredOn: r.deliveredOn,
         total: dto.total,
         received: dto.received,
