@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient history report (2026-10-19)
+
+- `GET /branch/consultations/report` (same filters as the list) adds per visit: age, city, country, BMI, menopause stage/type, age at menopause, the 11 MRS items and scores, FSH / estradiol / total testosterone saved for that consultation, BHRT treatments of its prescription (Serenogest, Estradiol BHRT, vaginal creams, Testofeme) and still on treatment (hormone therapy = currently using). Suite: 269 passed.
+
 ## Earlier visits per section (2026-10-19)
 
 - `GET /branch/consultations/:id/previous` returns saved sections of earlier visits (up to this visit date), newest first, 20 per section; medical history carries the shared topics.

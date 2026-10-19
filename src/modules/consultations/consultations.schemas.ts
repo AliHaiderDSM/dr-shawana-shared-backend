@@ -120,6 +120,54 @@ registry.registerPath({
   responses: { 200: detail('Consultation'), ...errorResponses },
 });
 
+const consultationReportSchema = registry.register(
+  'ConsultationReportRow',
+  consultationSummarySchema.extend({
+    report: z.object({
+      age: z.number().int().nullable(),
+      city: z.string().nullable(),
+      country: z.string().nullable(),
+      bmi: z.number().nullable(),
+      bmiCategory: z.string().nullable(),
+      menopauseStage: z.array(z.string()),
+      menopauseType: z.array(z.string()),
+      ageAtMenopause: z.string().nullable(),
+      mrs: z.record(z.string(), z.number().nullable()).nullable(),
+      mrsScores: z
+        .object({
+          somatic: z.number(),
+          psychological: z.number(),
+          urogenital: z.number(),
+          total: z.number(),
+          percentage: z.number(),
+          severity: z.string(),
+        })
+        .nullable(),
+      fsh: z.string().nullable(),
+      estradiol: z.string().nullable(),
+      totalTestosterone: z.string().nullable(),
+      progesterone: z.array(z.string()),
+      estradiolTreatment: z.array(z.string()),
+      vaginal: z.array(z.string()),
+      testosterone: z.array(z.string()),
+      stillOnTreatment: z.enum(['yes', 'no']).nullable(),
+    }),
+  }),
+);
+
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/branch/consultations/report',
+  summary:
+    'Patient history report (posSoft): each visit with BMI, menopause status, MRS items and scores, FSH, estradiol, total testosterone and the BHRT treatments of its prescription',
+  request: { query: consultationListQuerySchema },
+  responses: {
+    200: { description: 'Page', ...jsonContent(pageEnvelope(consultationReportSchema)) },
+    ...errorResponses,
+  },
+});
+
 registry.registerPath({
   ...common,
   method: 'get',

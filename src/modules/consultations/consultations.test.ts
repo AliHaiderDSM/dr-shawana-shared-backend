@@ -184,7 +184,11 @@ describe('consultations and clinical records', () => {
         doctorUser,
       );
       followupConsultationId = followup.body.data.id;
-      const earlier = await api('get', `/branch/consultations/${followupConsultationId}/previous`, doctorUser);
+      const earlier = await api(
+        'get',
+        `/branch/consultations/${followupConsultationId}/previous`,
+        doctorUser,
+      );
       expect(earlier.status).toBe(200);
       expect(earlier.body.data.sections.medical_history[0]).toMatchObject({
         consultationId,
@@ -423,6 +427,21 @@ describe('consultations and clinical records', () => {
       );
       const other = await api('get', `/branch/patients/${patientId}/blood-work`, islamabadAdmin);
       expect(other.body.data.results).toEqual([]);
+    });
+
+    it('builds the posSoft patient history report row by row', async () => {
+      const report = await api('get', `/branch/consultations/report?patientId=${patientId}`, frontDesk);
+      expect(report.status).toBe(200);
+      const row = (report.body.data as { id: string }[]).find((r) => r.id === consultationId) as unknown as {
+        report: Record<string, unknown>;
+      };
+      expect(row.report).toMatchObject({
+        mrs: expect.objectContaining({ hotFlushes: 4, heartDiscomfort: 2, irritability: null }),
+        mrsScores: expect.objectContaining({ somatic: 9, total: 12 }),
+        fsh: expect.stringContaining('mIU/mL'),
+        estradiol: expect.stringContaining('20'),
+        totalTestosterone: null,
+      });
     });
 
     it("logs BHRT and keeps the patient's status on the newest entry", async () => {

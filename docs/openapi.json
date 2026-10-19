@@ -11006,6 +11006,329 @@
           }
         }
       },
+      "ConsultationReportRow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "completed"
+            ]
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointment": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "appointmentNo": {
+                "type": "integer"
+              },
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "timeFrom": {
+                "type": "string"
+              },
+              "visitType": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "appointmentNo",
+              "date",
+              "timeFrom",
+              "visitType",
+              "mode",
+              "status"
+            ]
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patient": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "age": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "city": {
+                "type": "string"
+              },
+              "bhrtStatus": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "phone",
+              "age",
+              "city",
+              "bhrtStatus"
+            ]
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctor": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "report": {
+            "type": "object",
+            "properties": {
+              "age": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "bmi": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "bmiCategory": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "menopauseStage": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "menopauseType": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ageAtMenopause": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mrs": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "mrsScores": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "somatic": {
+                    "type": "number"
+                  },
+                  "psychological": {
+                    "type": "number"
+                  },
+                  "urogenital": {
+                    "type": "number"
+                  },
+                  "total": {
+                    "type": "number"
+                  },
+                  "percentage": {
+                    "type": "number"
+                  },
+                  "severity": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "somatic",
+                  "psychological",
+                  "urogenital",
+                  "total",
+                  "percentage",
+                  "severity"
+                ]
+              },
+              "fsh": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "estradiol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "totalTestosterone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "progesterone": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "estradiolTreatment": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "vaginal": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "testosterone": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "stillOnTreatment": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "yes",
+                  "no",
+                  null
+                ]
+              }
+            },
+            "required": [
+              "age",
+              "city",
+              "country",
+              "bmi",
+              "bmiCategory",
+              "menopauseStage",
+              "menopauseType",
+              "ageAtMenopause",
+              "mrs",
+              "mrsScores",
+              "fsh",
+              "estradiol",
+              "totalTestosterone",
+              "progesterone",
+              "estradiolTreatment",
+              "vaginal",
+              "testosterone",
+              "stillOnTreatment"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "branchId",
+          "status",
+          "appointmentId",
+          "appointment",
+          "patientId",
+          "patient",
+          "doctorId",
+          "doctor",
+          "createdAt",
+          "updatedAt",
+          "report"
+        ]
+      },
       "ConsultationHistory": {
         "type": "object",
         "properties": {
@@ -40847,6 +41170,202 @@
                   },
                   "required": [
                     "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/consultations/report": {
+      "get": {
+        "tags": [
+          "Consultations"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Patient history report (posSoft): each visit with BMI, menopause status, MRS items and scores, FSH, estradiol, total testosterone and the BHRT treatments of its prescription",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "pageSize",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "date",
+                "-date",
+                "createdAt",
+                "-createdAt"
+              ],
+              "default": "-date"
+            },
+            "required": false,
+            "name": "sort",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "patientId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "doctorId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "completed"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ConsultationReportRow"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PageMeta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
                   ]
                 }
               }

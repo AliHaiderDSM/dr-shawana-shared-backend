@@ -61,6 +61,19 @@ consultationsRouter.get(
 consultationsRouter.use(path, ...scoped);
 
 consultationsRouter.get(
+  `${path}/report`,
+  can('view'),
+  validate({ query: consultationListQuerySchema }),
+  async (req, res) => {
+    const { items, meta } = await consultationsService.report(
+      await viewerOf(req),
+      validQuery(req, consultationListQuerySchema),
+    );
+    sendOk(res, items, meta);
+  },
+);
+
+consultationsRouter.get(
   path,
   can('view'),
   validate({ query: consultationListQuerySchema }),

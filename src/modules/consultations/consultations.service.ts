@@ -16,6 +16,7 @@ import { Consultation, type ConsultationStatus } from './consultation.entity';
 import { type ConsultationListQuery } from './consultations.schemas';
 import {
   bmiOf,
+  MRS_ITEMS,
   mrsScores,
   PATIENT_FIELDS_BY_SECTION,
   SECTION_SCHEMAS,
@@ -26,6 +27,8 @@ const consultations = branchScopedRepository(Consultation, 'c');
 const sections = branchScopedRepository(ConsultationSection, 's');
 
 type SectionMap = Partial<Record<SectionKey, ConsultationSection>>;
+
+const MRS_KEYS = [...MRS_ITEMS.somatic, ...MRS_ITEMS.psychological, ...MRS_ITEMS.urogenital];
 
 function scoped(viewer: Viewer, manager?: EntityManager) {
   const qb = consultations
@@ -161,6 +164,97 @@ export const consultationsService = {
       sortMap: { date: 'appointment.date', createdAt: 'c.createdAt' },
     });
     return { items: items.map(toSummary), meta };
+  },
+
+  async report(viewer: Viewer, query: ConsultationListQuery) {
+    const { items, meta } = await this.list(viewer, query);
+    const ids = items.map((c) => c.id);
+    if (ids.length === 0) return { items: [], meta };
+    const [sections, patients, blood, treatments] = await Promise.all([
+      AppDataSource.query(
+        `SELECT consultation_id AS id, section_key AS key, data FROM consultation_sections
+          WHERE consultation_id = ANY($1::uuid[]) AND deleted_at IS NULL
+            AND section_key IN ('basic_info', 'medical_history', 'mrs_scale', 'clinical_assessment')`,
+        [ids],
+      ) as Promise<{ id: string; key: string; data: Record<string, unknown> }[]>,
+      AppDataSource.query(
+        `SELECT p.id, p.age, p.city, p.country FROM patients p
+          WHERE p.id = ANY($1::uuid[])`,
+        [[...new Set(items.map((c) => c.patientId))]],
+      ) as Promise<{ id: string; age: number | null; city: string; country: string | null }[]>,
+      AppDataSource.query(
+        `SELECT DISTINCT ON (consultation_id, test) consultation_id AS id, test, value::text AS value, unit
+           FROM blood_work_results
+          WHERE consultation_id = ANY($1::uuid[]) AND deleted_at IS NULL
+            AND test IN ('fsh', 'estradiol', 'testosterone_total')
+          ORDER BY consultation_id, test, test_date DESC`,
+        [ids],
+      ) as Promise<{ id: string; test: string; value: string; unit: string | null }[]>,
+      AppDataSource.query(
+        `SELECT p.consultation_id AS id, i.group_name AS "group", i.name, i.dose
+           FROM prescriptions p
+           JOIN prescription_items i ON i.prescription_id = p.id AND i.deleted_at IS NULL
+          WHERE p.consultation_id = ANY($1::uuid[]) AND p.deleted_at IS NULL AND i.category = 'bhrt'`,
+        [ids],
+      ) as Promise<{ id: string; group: string; name: string; dose: string | null }[]>,
+    ]);
+    const sectionOf = (id: string, key: string) =>
+      sections.find((s) => s.id === id && s.key === key)?.data ?? {};
+    const TREATMENTS: Record<string, string[]> = {
+      progesterone: ['Serenogest 100mg'],
+      estradiol: ['Estradiol BHRT'],
+      vaginal: ['DSM Vaginal Estradiol', 'DSM Vaginal DHEA', 'DSM Mixed Vaginal Therapy'],
+      testosterone: ['Testofeme'],
+    };
+    return {
+      items: items.map((c) => {
+        const basic = sectionOf(c.id, 'basic_info');
+        const history = sectionOf(c.id, 'medical_history');
+        const mrs = sectionOf(c.id, 'mrs_scale');
+        const clinical = sectionOf(c.id, 'clinical_assessment');
+        const hasMrs = Object.keys(mrs).length > 0;
+        const patient = patients.find((p) => p.id === c.patientId);
+        const value = (test: string) => {
+          const row = blood.find((b) => b.id === c.id && b.test === test);
+          return row ? `${Number(row.value)}${row.unit ? ` ${row.unit}` : ''}` : null;
+        };
+        const items = treatments.filter((t) => t.id === c.id);
+        const treatment = (kind: string) =>
+          items.filter((t) => TREATMENTS[kind]!.includes(t.group)).map((t) => t.dose || t.name);
+        const therapy = history.hormoneTherapy;
+        return {
+          ...c,
+          report: {
+            age: patient?.age ?? null,
+            city: patient?.city ?? null,
+            country: patient?.country ?? null,
+            bmi: (basic.bmi as number | undefined) ?? null,
+            bmiCategory: (basic.bmiCategory as string | undefined) ?? null,
+            menopauseStage: (clinical.menopauseStage as string[] | undefined) ?? [],
+            menopauseType: (clinical.menopauseType as string[] | undefined) ?? [],
+            ageAtMenopause: (history.menopauseDiagnosedAge as string | undefined) ?? null,
+            mrs: hasMrs
+              ? Object.fromEntries(MRS_KEYS.map((k) => [k, (mrs[k] as number | null) ?? null]))
+              : null,
+            mrsScores: hasMrs ? mrsScores(mrs) : null,
+            fsh: value('fsh'),
+            estradiol: value('estradiol'),
+            totalTestosterone: value('testosterone_total'),
+            progesterone: treatment('progesterone'),
+            estradiolTreatment: treatment('estradiol'),
+            vaginal: treatment('vaginal'),
+            testosterone: treatment('testosterone'),
+            stillOnTreatment:
+              therapy === 'currently_using'
+                ? 'yes'
+                : therapy === 'never' || therapy === 'previously_used'
+                  ? 'no'
+                  : null,
+          },
+        };
+      }),
+      meta,
+    };
   },
 
   get: (viewer: Viewer, id: string) => toDetail(viewer, id),
