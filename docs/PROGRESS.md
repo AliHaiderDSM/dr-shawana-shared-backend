@@ -29,6 +29,7 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 - `GET/PUT /doctor/profile`: the doctor edits their display name, details and phone (the doctor row and the login phone), and first and last name. Password uses `/auth/change-password`.
 - Read-only production check: the one doctor voice message has no `duration_ms`. The app now takes the length from the player when the stored length is missing.
 - Doctor patient file records now carry `branch` (name) and `createdAt`. The app groups files uploaded together and shows the branch.
+- Doctor patient file prescriptions and clinical remarks now carry `branch` (name) next to `doctor`.
 - Suite: 277 passed.
 
 ## One app login (2026-10-19)

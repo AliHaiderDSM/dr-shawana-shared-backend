@@ -225,8 +225,10 @@ export const doctorAppService = {
       AppDataSource.query(
         `SELECT p.id, p.prescription_no AS "prescriptionNo", p.date::text AS date, p.diagnosis,
                 p.followup_date::text AS "followupDate", p.plan_treatment AS "planTreatment",
-                d.display_name AS doctor
-           FROM prescriptions p LEFT JOIN doctors d ON d.id = p.doctor_id
+                d.display_name AS doctor, b.name AS branch
+           FROM prescriptions p
+           LEFT JOIN doctors d ON d.id = p.doctor_id
+           LEFT JOIN branches b ON b.id = p.branch_id
           WHERE p.patient_id = $1 AND p.deleted_at IS NULL
           ORDER BY p.date DESC, p.prescription_no DESC`,
         [patientId],
@@ -240,11 +242,12 @@ export const doctorAppService = {
       ) as Promise<{ prescriptionId: string } & Record<string, unknown>[]>,
       AppDataSource.query(
         `SELECT c.id AS "consultationId", a.date::text AS date, a.appointment_no AS "appointmentNo",
-                d.display_name AS doctor, NULLIF(TRIM(cs.data->>'plan'), '') AS remarks,
+                d.display_name AS doctor, b.name AS branch, NULLIF(TRIM(cs.data->>'plan'), '') AS remarks,
                 cs.updated_at AS "updatedAt", (c.doctor_id = $2) AS editable
            FROM consultations c
            JOIN appointments a ON a.id = c.appointment_id
            LEFT JOIN doctors d ON d.id = c.doctor_id
+           LEFT JOIN branches b ON b.id = c.branch_id
            LEFT JOIN consultation_sections cs ON cs.consultation_id = c.id
                  AND cs.section_key = 'clinical_assessment' AND cs.deleted_at IS NULL
           WHERE c.patient_id = $1 AND c.deleted_at IS NULL

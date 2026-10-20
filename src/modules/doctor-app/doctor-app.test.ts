@@ -118,6 +118,8 @@ describe('doctor app', () => {
       consultationId,
       remarks: '<p><strong>Start</strong> BHRT</p>',
       editable: true,
+      branch: expect.any(String),
+      doctor: 'Dr. Shawana',
     });
     expect(file.prescriptions).toEqual([]);
     expect(file.records).toEqual([]);
