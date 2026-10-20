@@ -148,6 +148,20 @@ describe('doctor app', () => {
     ]);
   });
 
+  it('tells which branch each record is from and when it came in', async () => {
+    const saved = await staff('post', `/branch/patients/${patientId}/medical-records`, frontDesk)
+      .field('data', JSON.stringify({ type: 'medical_record', date: '2026-09-02', note: 'CBC' }))
+      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'cbc.pdf', contentType: 'application/pdf' });
+    expect(saved.status).toBe(201);
+    const { records } = (await staff('get', `/doctor/patients/${patientId}`, doctorUser)).body.data;
+    expect(records[0]).toMatchObject({
+      note: 'CBC',
+      branch: expect.any(String),
+      createdAt: expect.any(String),
+      files: [{ name: 'cbc.pdf' }],
+    });
+  });
+
   it('lets the doctor update the own profile', async () => {
     const before = await staff('get', '/doctor/profile', doctorUser);
     expect(before.status).toBe(200);

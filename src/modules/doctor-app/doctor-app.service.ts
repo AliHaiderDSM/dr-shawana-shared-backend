@@ -264,6 +264,14 @@ export const doctorAppService = {
         [patientId],
       ) as Promise<{ test: string; date: string; value: string; unit: string }[]>,
     ]);
+    const branchIds = [...new Set(records.map((r) => r.branchId))];
+    const branchNames = new Map(
+      (
+        (await AppDataSource.query(`SELECT id, name FROM branches WHERE id = ANY($1::uuid[])`, [
+          branchIds,
+        ])) as { id: string; name: string }[]
+      ).map((b) => [b.id, b.name]),
+    );
     return {
       patient,
       conversationId: conversation[0]?.id ?? null,
@@ -290,6 +298,8 @@ export const doctorAppService = {
         date: r.date,
         note: r.note,
         uploadedByPatient: r.uploadedByPatient,
+        branch: branchNames.get(r.branchId) ?? null,
+        createdAt: iso(r.createdAt),
         files: r.files.map((f) => ({ id: f.id, name: f.originalName, contentType: f.contentType })),
       })),
       bloodWork: bloodWork(blood),
