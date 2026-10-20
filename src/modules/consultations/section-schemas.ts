@@ -200,6 +200,7 @@ const yesNoOccasionally = choice(['yes', 'no', 'occasionally']);
 export const medicalHistorySchema = z
   .object({
     ...sharedTopics,
+    beforeVisitNote: text(),
     hormoneTherapy: choice(['never', 'currently_using', 'previously_used']),
     hormonesUsed: text(),
     contraception: choice(['yes', 'no', 'not_needed']),
@@ -324,6 +325,7 @@ export const ADDITIONAL_SYMPTOMS = [
   'feeling_bad_about_yourself',
   'loss_of_interest',
   'unhealthy_food_behaviour',
+  'lack_of_tolerance',
   'social_withdrawal',
   'accomplishing_less',
   'fatigue',

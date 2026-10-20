@@ -174,7 +174,7 @@ export const consultationsService = {
       AppDataSource.query(
         `SELECT consultation_id AS id, section_key AS key, data FROM consultation_sections
           WHERE consultation_id = ANY($1::uuid[]) AND deleted_at IS NULL
-            AND section_key IN ('basic_info', 'medical_history', 'mrs_scale', 'clinical_assessment')`,
+            AND section_key IN ('basic_info', 'medical_history', 'mrs_scale', 'clinical_assessment', 'additional_symptoms')`,
         [ids],
       ) as Promise<{ id: string; key: string; data: Record<string, unknown> }[]>,
       AppDataSource.query(
@@ -212,6 +212,9 @@ export const consultationsService = {
         const history = sectionOf(c.id, 'medical_history');
         const mrs = sectionOf(c.id, 'mrs_scale');
         const clinical = sectionOf(c.id, 'clinical_assessment');
+        const symptoms = sectionOf(c.id, 'additional_symptoms');
+        const ticked = Array.isArray(symptoms.symptoms) ? (symptoms.symptoms as string[]) : [];
+        const severity = (symptoms.severity ?? {}) as Record<string, number | null>;
         const hasMrs = Object.keys(mrs).length > 0;
         const patient = patients.find((p) => p.id === c.patientId);
         const value = (test: string) => {
@@ -244,6 +247,7 @@ export const consultationsService = {
             estradiolTreatment: treatment('estradiol'),
             vaginal: treatment('vaginal'),
             testosterone: treatment('testosterone'),
+            symptoms: Object.fromEntries(ticked.map((s) => [s, severity[s] ?? null])),
             stillOnTreatment:
               therapy === 'currently_using'
                 ? 'yes'

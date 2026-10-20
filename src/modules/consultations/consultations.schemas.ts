@@ -150,6 +150,9 @@ const consultationReportSchema = registry.register(
       estradiolTreatment: z.array(z.string()),
       vaginal: z.array(z.string()),
       testosterone: z.array(z.string()),
+      symptoms: z
+        .record(z.string(), z.number().int().nullable())
+        .openapi({ description: 'Ticked additional symptoms with their severity 0–3 (null when not rated)' }),
       stillOnTreatment: z.enum(['yes', 'no']).nullable(),
     }),
   }),

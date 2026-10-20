@@ -23,6 +23,40 @@ const invalidLink = () => new AppError(404, 'NOT_FOUND', 'This link is invalid o
 export const PUBLIC_SECTIONS = ['basic_info', 'medical_history', 'additional_symptoms'] as const;
 export type PublicSectionKey = (typeof PUBLIC_SECTIONS)[number];
 
+export const PUBLIC_SYMPTOMS = [
+  'hair_loss',
+  'tinnitus',
+  'weight_gain',
+  'belly_fat',
+  'weight_loss',
+  'frozen_shoulder',
+  'marital_conflicts',
+  'vaginal_itching',
+  'recurrent_utis',
+  'skin_issues',
+  'headaches',
+  'dizziness_vertigo',
+  'lack_of_tolerance',
+] as const;
+
+const asObject = (value: unknown) =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+const asList = (value: unknown) => (Array.isArray(value) ? (value as string[]) : []);
+
+function mergeIntake(key: PublicSectionKey, saved: Record<string, unknown>, body: unknown) {
+  const next = asObject(body);
+  if (key !== 'additional_symptoms') return { ...saved, ...next };
+  const publicKeys = PUBLIC_SYMPTOMS as readonly string[];
+  const symptoms = [
+    ...asList(saved.symptoms).filter((s) => !publicKeys.includes(s)),
+    ...asList(next.symptoms).filter((s) => publicKeys.includes(s)),
+  ];
+  const severity = Object.fromEntries(
+    Object.entries(asObject(saved.severity)).filter(([s]) => symptoms.includes(s)),
+  );
+  return { ...saved, symptoms: [...new Set(symptoms)], severity };
+}
+
 const RESOURCE_KEYS = [
   'glpDietPlan',
   'generalDietPlan',
@@ -180,12 +214,14 @@ export const patientLinksService = {
   async saveSection(token: string, key: PublicSectionKey, body: unknown, ip: string | null) {
     const { appointment, actor, viewer } = await formContext(token, ip);
     const opened = await consultationsService.open(actor, viewer, appointment.id);
+    const current = await consultationsService.forAppointment(viewer, appointment.id).catch(() => null);
+    const saved = asObject(current?.sections[key]?.data);
     const result = await consultationsService.saveSection(
       actor,
       viewer,
       opened.consultation.id,
       key as SectionKey,
-      body,
+      mergeIntake(key, saved, body),
     );
     return { key, data: result.section?.data ?? null };
   },

@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient link form and history report as posSoft (2026-10-20)
+
+- Public link saves now merge with what is already saved, so a partial save never wipes clinic data (family history, severities). For additional symptoms the link only changes its 13 posSoft symptoms (`PUBLIC_SYMPTOMS`); other ticked symptoms and their severity stay.
+- `medical_history` takes `beforeVisitNote`. New symptom `lack_of_tolerance` (Lack of tolerance / Rage).
+- `GET /branch/consultations/report` rows carry `report.symptoms` {key: severity 0–3 or null}, like the posSoft Patients history table.
+- Suite: 278 passed.
+
 ## App records, doctor profile and blood work (2026-10-20)
 
 - `DELETE /patient/documents/files/:fileId` removes one file of a report the patient uploaded. If it was the last file, the report goes too. Clinic reports give 403.

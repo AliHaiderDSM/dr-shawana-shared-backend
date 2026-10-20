@@ -111,6 +111,55 @@ describe('patient history links', () => {
     expect(after.body.data.resources).toEqual(['glpDietPlan', 'hairCareRoutine']);
   });
 
+  it('keeps what the clinic filled when the patient saves part of a section', async () => {
+    const { token } = (await api(`/branch/appointments/${appointmentId}/patient-link`, admin)).body.data;
+    const consultationId = (await api(`/branch/appointments/${appointmentId}/consultation`, admin)).body.data
+      .id as string;
+    const staffSave = (key: string, body: object) =>
+      request(app)
+        .put(`/api/v1/branch/consultations/${consultationId}/sections/${key}`)
+        .set(bearer(admin))
+        .send(body);
+    const publicSave = (key: string, body: object) =>
+      request(app).put(`/api/v1/public/patient-history/${token}/sections/${key}`).send(body);
+
+    await staffSave('medical_history', {
+      familyHistory: [{ relative: 'mother', conditions: ['diabetes'] }],
+    }).expect(200);
+    await staffSave('additional_symptoms', {
+      symptoms: ['fatigue', 'hair_loss'],
+      severity: { fatigue: 2, hair_loss: 1 },
+    }).expect(200);
+
+    await publicSave('medical_history', {
+      majorComplaint: 'Hot flushes',
+      discussTopics: 'Sleep, weight, mood',
+      beforeVisitNote: 'Coming with my sister',
+      currentMedications: 'None',
+    }).expect(200);
+    const symptoms = await publicSave('additional_symptoms', {
+      symptoms: ['belly_fat', 'lack_of_tolerance', 'fatigue'],
+    });
+    expect(symptoms.status).toBe(200);
+
+    const sections = (await api(`/branch/consultations/${consultationId}`, admin)).body.data.sections;
+    expect(sections.medical_history.data).toMatchObject({
+      majorComplaint: 'Hot flushes',
+      discussTopics: 'Sleep, weight, mood',
+      beforeVisitNote: 'Coming with my sister',
+      familyHistory: [expect.objectContaining({ relative: 'mother', conditions: ['diabetes'] })],
+    });
+    expect([...sections.additional_symptoms.data.symptoms].sort()).toEqual([
+      'belly_fat',
+      'fatigue',
+      'lack_of_tolerance',
+    ]);
+    expect(sections.additional_symptoms.data.severity).toEqual({ fatigue: 2 });
+
+    const report = await api(`/branch/consultations/report?patientId=${patientId}`, admin);
+    expect(report.body.data[0].report.symptoms).toMatchObject({ fatigue: 2, belly_fat: null });
+  });
+
   it('rejects tampered tokens and unknown files', async () => {
     const { token } = (await api(`/branch/appointments/${appointmentId}/patient-link`, admin)).body.data;
     const [body, signature] = token.split('.');
