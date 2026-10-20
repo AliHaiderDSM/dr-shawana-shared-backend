@@ -425,6 +425,14 @@ export const additionalSymptomsSchema = z.object({
 const scan = z
   .object({
     status: choice(['normal', 'abnormal', 'not_done']),
+    year: z.coerce
+      .number()
+      .int()
+      .min(1900)
+      .max(2100)
+      .nullable()
+      .default(null)
+      .openapi({ description: 'Year the scan was done' }),
     date,
     abnormalDetails: text(),
   })
@@ -438,7 +446,7 @@ const scan = z
     ),
   )
   .transform((v) => ({ ...v, abnormalDetails: v.status === 'abnormal' ? v.abnormalDetails : null }))
-  .default({ status: null, date: null, abnormalDetails: null });
+  .default({ status: null, year: null, date: null, abnormalDetails: null });
 
 export const imagingResultsSchema = z.object({
   pelvicScan: scan,

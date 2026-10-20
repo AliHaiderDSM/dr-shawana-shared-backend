@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Imaging scan year (2026-10-20)
+
+- Each imaging scan takes `year` (1900–2100). `date` stays for older data and is cleared when the dashboard saves a scan again. Suite: 279 passed.
+
 ## Patient link form and history report as posSoft (2026-10-20)
 
 - Public link saves now merge with what is already saved, so a partial save never wipes clinic data (family history, severities). For additional symptoms the link only changes its 13 posSoft symptoms (`PUBLIC_SYMPTOMS`); other ticked symptoms and their severity stay.

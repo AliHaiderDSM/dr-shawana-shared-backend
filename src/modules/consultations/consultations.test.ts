@@ -224,6 +224,20 @@ describe('consultations and clinical records', () => {
       expect(wrongVisit.status).toBe(422);
     });
 
+    it('keeps the year of each imaging scan', async () => {
+      const res = await section('imaging_results', {
+        pelvicScan: { status: 'normal', year: '2024' },
+        dexaScan: { status: 'abnormal', year: 2023, abnormalDetails: 'Low bone density' },
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.data.section.data.pelvicScan).toMatchObject({ status: 'normal', year: 2024 });
+      expect(res.body.data.section.data.dexaScan).toMatchObject({ year: 2023 });
+      expect(res.body.data.section.data.mammogram).toMatchObject({ status: null, year: null });
+      expect(
+        (await section('imaging_results', { pelvicScan: { status: 'normal', year: 1800 } })).status,
+      ).toBe(400);
+    });
+
     it('computes MRS scores on the server', async () => {
       const res = await section('mrs_scale', {
         date: '2026-09-01',

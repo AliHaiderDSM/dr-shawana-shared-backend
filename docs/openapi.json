@@ -11488,6 +11488,16 @@
                 ],
                 "default": null
               },
+              "year": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1900,
+                "maximum": 2100,
+                "default": null,
+                "description": "Year the scan was done"
+              },
               "date": {
                 "type": [
                   "string",
@@ -11508,6 +11518,7 @@
             },
             "default": {
               "status": null,
+              "year": null,
               "date": null,
               "abnormalDetails": null
             }
@@ -11536,6 +11547,16 @@
                 ],
                 "default": null
               },
+              "year": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1900,
+                "maximum": 2100,
+                "default": null,
+                "description": "Year the scan was done"
+              },
               "date": {
                 "type": [
                   "string",
@@ -11556,6 +11577,7 @@
             },
             "default": {
               "status": null,
+              "year": null,
               "date": null,
               "abnormalDetails": null
             }
@@ -11576,6 +11598,16 @@
                 ],
                 "default": null
               },
+              "year": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1900,
+                "maximum": 2100,
+                "default": null,
+                "description": "Year the scan was done"
+              },
               "date": {
                 "type": [
                   "string",
@@ -11596,6 +11628,7 @@
             },
             "default": {
               "status": null,
+              "year": null,
               "date": null,
               "abnormalDetails": null
             }
@@ -11616,6 +11649,16 @@
                 ],
                 "default": null
               },
+              "year": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1900,
+                "maximum": 2100,
+                "default": null,
+                "description": "Year the scan was done"
+              },
               "date": {
                 "type": [
                   "string",
@@ -11636,6 +11679,7 @@
             },
             "default": {
               "status": null,
+              "year": null,
               "date": null,
               "abnormalDetails": null
             }
