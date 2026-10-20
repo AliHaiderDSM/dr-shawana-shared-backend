@@ -34,6 +34,29 @@ const pushTokenBody = registry.register(
   }),
 );
 const removeTokenBody = z.object({ token: z.string().trim().min(10).max(255) });
+const profileBody = registry.register(
+  'DoctorOwnProfile',
+  z
+    .object({
+      displayName: z
+        .string()
+        .trim()
+        .min(1)
+        .max(150)
+        .openapi({ description: 'Name patients see, e.g. Dr. Shawana' }),
+      details: z
+        .string()
+        .trim()
+        .max(5000)
+        .nullable()
+        .openapi({ description: 'Qualification and speciality' }),
+      phone: z.string().trim().max(30).nullable().openapi({ description: 'Also used to log in to the app' }),
+      firstName: z.string().trim().min(1).max(100),
+      lastName: z.string().trim().min(1).max(100),
+    })
+    .partial()
+    .refine((v) => Object.keys(v).length > 0, 'Provide at least one field to update'),
+);
 
 export const doctorAppRouter = Router();
 doctorAppRouter.use('/doctor', authenticate, doctorOnly, (_req, res, next) => {
@@ -43,6 +66,22 @@ doctorAppRouter.use('/doctor', authenticate, doctorOnly, (_req, res, next) => {
 
 doctorAppRouter.get('/doctor/home', async (req, res) => {
   sendOk(res, await doctorAppService.home(req.auth!.userId));
+});
+
+doctorAppRouter.get('/doctor/profile', async (req, res) => {
+  sendOk(res, await doctorAppService.profile(req.auth!.userId));
+});
+
+doctorAppRouter.put('/doctor/profile', validate({ body: profileBody }), async (req, res) => {
+  const body = validBody(req, profileBody);
+  sendOk(
+    res,
+    await doctorAppService.updateProfile(actorFrom(req), req.auth!.userId, {
+      ...body,
+      details: body.details === '' ? null : body.details,
+      phone: body.phone === '' ? null : body.phone,
+    }),
+  );
 });
 
 doctorAppRouter.get('/doctor/patients', validate({ query: patientsQuery }), async (req, res) => {
@@ -170,4 +209,19 @@ registry.registerPath({
   summary: 'Forget a push token when the doctor logs out on that phone',
   request: json(removeTokenBody),
   responses: { 204: { description: 'Removed' }, ...errorResponses },
+});
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/doctor/profile',
+  summary: 'Own doctor profile: the name patients see, details, phone and login',
+  responses: ok('Profile'),
+});
+registry.registerPath({
+  ...docs,
+  method: 'put',
+  path: '/doctor/profile',
+  summary: 'Update own name, details and phone. The phone is also the app login phone.',
+  request: json(profileBody),
+  responses: ok('Profile'),
 });

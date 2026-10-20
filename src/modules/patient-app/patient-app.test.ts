@@ -22,7 +22,11 @@ describe('patient app', () => {
 
   const staff = (method: 'get' | 'post' | 'patch', path: string, who: { id: string }) =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
-  const asPatient = (method: 'get' | 'post' | 'patch' | 'delete', path: string, token = session.accessToken) =>
+  const asPatient = (
+    method: 'get' | 'post' | 'patch' | 'delete',
+    path: string,
+    token = session.accessToken,
+  ) =>
     request(app)
       [method](`/api/v1${path}`)
       .set({ Authorization: `Bearer ${token}` });
@@ -280,6 +284,26 @@ describe('patient app', () => {
       .attach('files', Buffer.from('%PDF-1.4'), { filename: 'lab.pdf', contentType: 'application/pdf' });
     expect(byClinic.status).toBe(201);
     expect((await asPatient('delete', `/patient/documents/${byClinic.body.data.id}`)).status).toBe(403);
+
+    const pair = await asPatient('post', '/patient/documents')
+      .field('title', 'Two pages')
+      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'p1.pdf', contentType: 'application/pdf' })
+      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'p2.pdf', contentType: 'application/pdf' });
+    const [first, second] = pair.body.data.files as { id: string }[];
+    expect(
+      (await asPatient('delete', `/patient/documents/files/${byClinic.body.data.files[0].id}`)).status,
+    ).toBe(403);
+    expect((await asPatient('delete', `/patient/documents/files/${first!.id}`)).status).toBe(204);
+    const afterOne = (await asPatient('get', '/patient/documents')).body.data as {
+      id: string;
+      files: { id: string }[];
+    }[];
+    expect(afterOne.find((d) => d.id === pair.body.data.id)?.files.map((f) => f.id)).toEqual([second!.id]);
+    expect((await asPatient('delete', `/patient/documents/files/${second!.id}`)).status).toBe(204);
+    expect(
+      ((await asPatient('get', '/patient/documents')).body.data as { id: string }[]).map((d) => d.id),
+    ).not.toContain(pair.body.data.id);
+    expect((await asPatient('delete', `/patient/documents/files/${second!.id}`)).status).toBe(404);
 
     expect((await asPatient('delete', `/patient/documents/${scan.body.data.id}`)).status).toBe(204);
     const left = (await asPatient('get', '/patient/documents')).body.data as { id: string }[];

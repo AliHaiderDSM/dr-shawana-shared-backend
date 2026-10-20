@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## App records, doctor profile and blood work (2026-10-20)
+
+- `DELETE /patient/documents/files/:fileId` removes one file of a report the patient uploaded. If it was the last file, the report goes too. Clinic reports give 403.
+- `GET /doctor/patients/:id` now returns `bloodWork` ({dates, tests[{test, unit, points[{date, value}]}]}) from every branch, for the chart and table in the doctor app.
+- `GET/PUT /doctor/profile`: the doctor edits their display name, details and phone (the doctor row and the login phone), and first and last name. Password uses `/auth/change-password`.
+- Read-only production check: the one doctor voice message has no `duration_ms`. The app now takes the length from the player when the stored length is missing.
+- Suite: 276 passed.
+
 ## One app login (2026-10-19)
 
 - `POST /app/login` {identifier, password}: a phone number tries the patient password first, then an active doctor with that phone; an email or username logs in a doctor. Other staff get 403. The answer carries role so the app opens the right side. Suite: 274 passed.

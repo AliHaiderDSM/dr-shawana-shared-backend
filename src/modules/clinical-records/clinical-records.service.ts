@@ -472,6 +472,42 @@ export const medicalRecordsService = {
     );
   },
 
+  async removeFileFromPatient(patientId: string, fileId: string) {
+    await withTransaction(async (em) => {
+      const [file] = (await em.query(
+        `SELECT f.id, f.original_name AS name, r.id AS "recordId", r.branch_id AS "branchId",
+                r.uploaded_by_patient AS "uploadedByPatient"
+           FROM medical_record_files f
+           JOIN medical_records r ON r.id = f.medical_record_id AND r.deleted_at IS NULL
+          WHERE f.id = $1 AND r.patient_id = $2 AND f.deleted_at IS NULL`,
+        [fileId, patientId],
+      )) as { id: string; name: string; recordId: string; branchId: string; uploadedByPatient: boolean }[];
+      if (!file) throw AppError.notFound('Document');
+      if (!file.uploadedByPatient) {
+        throw AppError.forbidden('Only reports you uploaded can be deleted. Ask the clinic about this one.');
+      }
+      await em.query(`UPDATE medical_record_files SET deleted_at = now() WHERE id = $1`, [fileId]);
+      const [left] = (await em.query(
+        `SELECT COUNT(*)::int AS n FROM medical_record_files WHERE medical_record_id = $1 AND deleted_at IS NULL`,
+        [file.recordId],
+      )) as { n: number }[];
+      if (!left?.n) {
+        await em.query(`UPDATE medical_records SET deleted_at = now() WHERE id = $1`, [file.recordId]);
+      }
+      await auditService.record(
+        {
+          actor: null,
+          branchId: file.branchId,
+          action: 'remove_file_from_app',
+          entity: 'medical_record',
+          entityId: file.recordId,
+          before: { patientId, fileId, name: file.name },
+        },
+        em,
+      );
+    });
+  },
+
   async removeFile(actor: Actor, branchId: string, patientId: string, id: string, fileId: string) {
     await withTransaction(async (em) => {
       await getRecord(branchId, patientId, id, em);

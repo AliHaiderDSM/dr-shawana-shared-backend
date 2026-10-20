@@ -156,6 +156,18 @@ patientAppRouter.delete('/patient/documents/:id', byId, async (req, res) => {
   sendNoContent(res);
 });
 
+patientAppRouter.delete(
+  '/patient/documents/files/:fileId',
+  validate({ params: patientFileParamsSchema }),
+  async (req, res) => {
+    await patientAppService.removeDocumentFile(
+      patientId(req),
+      validParams(req, patientFileParamsSchema).fileId,
+    );
+    sendNoContent(res);
+  },
+);
+
 patientAppRouter.get(
   '/patient/documents/files/:fileId/url',
   validate({ params: patientFileParamsSchema }),

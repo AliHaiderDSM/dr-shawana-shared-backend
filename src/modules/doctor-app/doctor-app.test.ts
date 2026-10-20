@@ -121,6 +121,52 @@ describe('doctor app', () => {
     });
     expect(file.prescriptions).toEqual([]);
     expect(file.records).toEqual([]);
+    expect(file.bloodWork).toEqual({ dates: [], tests: [] });
+  });
+
+  it('shows blood work for the chart and table', async () => {
+    const added = await staff('post', `/branch/patients/${patientId}/blood-work`, doctorUser).send({
+      results: [
+        { test: 'fsh', value: '20.5', testDate: '2026-08-01' },
+        { test: 'fsh', value: '12', testDate: '2026-09-01' },
+        { test: 'tsh', value: '2.1', testDate: '2026-09-01' },
+      ],
+    });
+    expect(added.status).toBe(201);
+    const { bloodWork } = (await staff('get', `/doctor/patients/${patientId}`, doctorUser)).body.data;
+    expect(bloodWork.dates).toEqual(['2026-08-01', '2026-09-01']);
+    expect(bloodWork.tests).toEqual([
+      {
+        test: 'fsh',
+        unit: 'mIU/mL',
+        points: [
+          { date: '2026-08-01', value: 20.5 },
+          { date: '2026-09-01', value: 12 },
+        ],
+      },
+      { test: 'tsh', unit: 'µIU/mL', points: [{ date: '2026-09-01', value: 2.1 }] },
+    ]);
+  });
+
+  it('lets the doctor update the own profile', async () => {
+    const before = await staff('get', '/doctor/profile', doctorUser);
+    expect(before.status).toBe(200);
+    expect(before.body.data).toMatchObject({ id: doctorId, displayName: 'Dr. Shawana' });
+    const saved = await staff('put', '/doctor/profile', doctorUser).send({
+      displayName: 'Dr. Shawana Malik',
+      details: 'MBBS, FCPS (Gynae)',
+      phone: '0321 5550000',
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data).toMatchObject({
+      displayName: 'Dr. Shawana Malik',
+      details: 'MBBS, FCPS (Gynae)',
+      phone: '0321 5550000',
+    });
+    expect((await staff('get', '/doctor/home', doctorUser)).body.data.doctor.name).toBe('Dr. Shawana Malik');
+    expect((await staff('put', '/doctor/profile', doctorUser).send({})).status).toBe(400);
+    expect((await staff('put', '/doctor/profile', frontDesk).send({ displayName: 'X' })).status).toBe(403);
+    await staff('put', '/doctor/profile', doctorUser).send({ displayName: 'Dr. Shawana' }).expect(200);
   });
 
   it('starts a chat, sends to the patient and gets a push when the patient answers', async () => {

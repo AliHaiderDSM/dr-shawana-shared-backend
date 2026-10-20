@@ -3,8 +3,12 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { BUCKETS, createSignedUrl } from '../../lib/storage';
 import { today } from '../../lib/validation';
+import { authService } from '../auth/auth.service';
+import { BLOOD_TESTS } from '../clinical-records/blood-work-result.entity';
+import { BLOOD_TEST_UNITS } from '../clinical-records/clinical-records.schemas';
 import { medicalRecordsService } from '../clinical-records/clinical-records.service';
 import { consultationsService } from '../consultations/consultations.service';
+import { doctorsService } from '../doctors/doctors.service';
 
 interface DoctorRow {
   id: string;
@@ -34,6 +38,29 @@ async function assertOwnPatient(doctorId: string, patientId: string) {
     [doctorId, patientId],
   )) as unknown[];
   if (!row) throw AppError.notFound('Patient');
+}
+
+export interface DoctorProfileInput {
+  displayName?: string;
+  details?: string | null;
+  phone?: string | null;
+  firstName?: string;
+  lastName?: string;
+}
+
+function bloodWork(rows: { test: string; date: string; value: string; unit: string }[]) {
+  const dates = [...new Set(rows.map((r) => r.date))].sort();
+  const tests = BLOOD_TESTS.filter((test) => rows.some((r) => r.test === test)).map((test) => {
+    const mine = rows.filter((r) => r.test === test);
+    return {
+      test,
+      unit: mine[mine.length - 1]?.unit ?? BLOOD_TEST_UNITS[test],
+      points: [
+        ...new Map(mine.map((r) => [r.date, { date: r.date, value: Number(r.value) }] as const)).values(),
+      ],
+    };
+  });
+  return { dates, tests };
 }
 
 const iso = (value: Date | string | null) =>
@@ -183,7 +210,7 @@ export const doctorAppService = {
          FROM patients WHERE id = $1`,
       [patientId],
     )) as Record<string, unknown>[];
-    const [appointments, prescriptions, items, remarks, records, conversation] = await Promise.all([
+    const [appointments, prescriptions, items, remarks, records, conversation, blood] = await Promise.all([
       AppDataSource.query(
         `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
                 a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode, a.issues, a.remark,
@@ -230,6 +257,12 @@ export const doctorAppService = {
         patientId,
         doctor.id,
       ]) as Promise<{ id: string }[]>,
+      AppDataSource.query(
+        `SELECT test, test_date::text AS date, value::text AS value, unit FROM blood_work_results
+          WHERE patient_id = $1 AND deleted_at IS NULL
+          ORDER BY test_date, created_at`,
+        [patientId],
+      ) as Promise<{ test: string; date: string; value: string; unit: string }[]>,
     ]);
     return {
       patient,
@@ -259,7 +292,52 @@ export const doctorAppService = {
         uploadedByPatient: r.uploadedByPatient,
         files: r.files.map((f) => ({ id: f.id, name: f.originalName, contentType: f.contentType })),
       })),
+      bloodWork: bloodWork(blood),
     };
+  },
+
+  async profile(staffId: string) {
+    const doctor = await doctorOf(staffId);
+    const [row] = (await AppDataSource.query(
+      `SELECT d.phone, s.first_name AS "firstName", s.last_name AS "lastName", s.email, s.username,
+              s.phone AS "loginPhone"
+         FROM doctors d JOIN staff_profiles s ON s.id = d.staff_id
+        WHERE d.id = $1`,
+      [doctor.id],
+    )) as {
+      phone: string | null;
+      firstName: string;
+      lastName: string;
+      email: string;
+      username: string;
+      loginPhone: string | null;
+    }[];
+    return {
+      id: doctor.id,
+      displayName: doctor.name,
+      details: doctor.details,
+      branch: doctor.branchName,
+      phone: row?.loginPhone ?? row?.phone ?? null,
+      firstName: row?.firstName ?? '',
+      lastName: row?.lastName ?? '',
+      email: row?.email ?? '',
+      username: row?.username ?? '',
+    };
+  },
+
+  async updateProfile(actor: Actor, staffId: string, input: DoctorProfileInput) {
+    const doctor = await doctorOf(staffId);
+    const { displayName, details, phone, firstName, lastName } = input;
+    const forDoctor = Object.fromEntries(
+      Object.entries({ displayName, details, phone }).filter(([, v]) => v !== undefined),
+    );
+    const forStaff = Object.fromEntries(
+      Object.entries({ firstName, lastName, phone }).filter(([, v]) => v !== undefined),
+    );
+    if (Object.keys(forDoctor).length)
+      await doctorsService.update(actor, doctor.branchId, doctor.id, forDoctor);
+    if (Object.keys(forStaff).length) await authService.updateOwnProfile(actor, forStaff);
+    return this.profile(staffId);
   },
 
   async fileUrl(staffId: string, patientId: string, fileId: string) {

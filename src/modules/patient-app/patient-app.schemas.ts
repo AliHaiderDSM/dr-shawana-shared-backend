@@ -81,12 +81,9 @@ export const createPatientRequestSchema = registry.register(
 
 export const uploadDocumentFieldsSchema = z.object({
   title: z.string().trim().max(200).optional(),
-  type: z
-    .enum(['medical_record', 'imaging'])
-    .default('medical_record')
-    .openapi({
-      description: 'medical_record: lab or blood report; imaging: scans, kept in the records only',
-    }),
+  type: z.enum(['medical_record', 'imaging']).default('medical_record').openapi({
+    description: 'medical_record: lab or blood report; imaging: scans, kept in the records only',
+  }),
 });
 
 export const patientFileParamsSchema = z.object({ fileId: z.uuid() });
@@ -265,6 +262,15 @@ registry.registerPath({
   path: '/patient/documents/{id}',
   summary: 'Delete a report the patient uploaded (reports from the clinic cannot be deleted here)',
   request: { params: idParamsSchema },
+  responses: { 204: { description: 'Deleted' }, ...errorResponses },
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'delete',
+  path: '/patient/documents/files/{fileId}',
+  summary:
+    'Delete one file of a report the patient uploaded. When it was the last file, the report goes too.',
+  request: { params: patientFileParamsSchema },
   responses: { 204: { description: 'Deleted' }, ...errorResponses },
 });
 registry.registerPath({

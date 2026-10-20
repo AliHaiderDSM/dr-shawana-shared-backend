@@ -329,6 +329,10 @@ export const patientAppService = {
     await medicalRecordsService.removeFromPatient(patientId, id);
   },
 
+  async removeDocumentFile(patientId: string, fileId: string) {
+    await medicalRecordsService.removeFileFromPatient(patientId, fileId);
+  },
+
   async documentUrl(patientId: string, fileId: string) {
     const file = await repo(MedicalRecordFile)
       .createQueryBuilder('f')
