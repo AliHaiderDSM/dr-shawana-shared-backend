@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Doctor appointments list (2026-10-21)
+
+- `GET /doctor/appointments?when=upcoming|past&page=` lists the doctor's own appointments in every branch, 30 a page (`hasMore`). Upcoming runs from today, soonest first; past is newest first. `/doctor/home` counts carry `appointments`. Suite: 280 passed.
+
 ## Medical history topics trimmed (2026-10-21)
 
 - `medical_history` no longer takes or returns `discussTopics` or `beforeVisitNote` (the dashboard tab and the patient link alike); unknown keys are dropped. The follow up form keeps them. Only `majorComplaint` and `currentMedications` are shared into medical history.

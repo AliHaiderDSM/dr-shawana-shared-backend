@@ -16,6 +16,10 @@ const patientParams = z.object({ patientId: z.uuid() });
 const fileParams = z.object({ patientId: z.uuid(), fileId: z.uuid() });
 const consultationParams = z.object({ consultationId: z.uuid() });
 const patientsQuery = z.object({ search: z.string().trim().max(100).optional() });
+const appointmentsQuery = z.object({
+  when: z.enum(['upcoming', 'past']).default('upcoming'),
+  page: z.coerce.number().int().min(1).max(1000).default(1),
+});
 const remarksBody = registry.register(
   'DoctorRemarks',
   z.object({
@@ -82,6 +86,11 @@ doctorAppRouter.put('/doctor/profile', validate({ body: profileBody }), async (r
       phone: body.phone === '' ? null : body.phone,
     }),
   );
+});
+
+doctorAppRouter.get('/doctor/appointments', validate({ query: appointmentsQuery }), async (req, res) => {
+  const { when, page } = validQuery(req, appointmentsQuery);
+  sendOk(res, await doctorAppService.appointments(req.auth!.userId, when, page));
 });
 
 doctorAppRouter.get('/doctor/patients', validate({ query: patientsQuery }), async (req, res) => {
@@ -224,4 +233,13 @@ registry.registerPath({
   summary: 'Update own name, details and phone. The phone is also the app login phone.',
   request: json(profileBody),
   responses: ok('Profile'),
+});
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/doctor/appointments',
+  summary:
+    'Own appointments in every branch: upcoming (today onwards, soonest first) or past (newest first), 30 a page',
+  request: { query: appointmentsQuery },
+  responses: ok('Appointments page'),
 });

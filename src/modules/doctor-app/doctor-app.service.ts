@@ -63,6 +63,8 @@ function bloodWork(rows: { test: string; date: string; value: string; unit: stri
   return { dates, tests };
 }
 
+const APPOINTMENT_PAGE = 30;
+
 const iso = (value: Date | string | null) =>
   value === null ? null : value instanceof Date ? value.toISOString() : String(value);
 
@@ -73,6 +75,7 @@ export const doctorAppService = {
     const [counts] = (await AppDataSource.query(
       `SELECT
          (SELECT COUNT(DISTINCT patient_id)::int FROM appointments WHERE doctor_id = $1 AND deleted_at IS NULL) AS patients,
+         (SELECT COUNT(*)::int FROM appointments WHERE doctor_id = $1 AND deleted_at IS NULL) AS appointments,
          (SELECT COUNT(*)::int FROM appointments WHERE doctor_id = $1 AND deleted_at IS NULL AND date = $2::date
             AND status <> 'cancelled') AS today,
          (SELECT COUNT(*)::int FROM appointments WHERE doctor_id = $1 AND deleted_at IS NULL AND date = $2::date
@@ -81,7 +84,14 @@ export const doctorAppService = {
             AND status = 'booked') AS upcoming,
          (SELECT COALESCE(SUM(doctor_unread), 0)::int FROM chat_conversations WHERE doctor_id = $1) AS unread`,
       [doctor.id, on],
-    )) as { patients: number; today: number; completedToday: number; upcoming: number; unread: number }[];
+    )) as {
+      patients: number;
+      appointments: number;
+      today: number;
+      completedToday: number;
+      upcoming: number;
+      unread: number;
+    }[];
     const schedule = (await AppDataSource.query(
       `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
               a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode,
@@ -145,6 +155,56 @@ export const doctorAppService = {
         lastMessageAt: iso(c.lastMessageAt),
         unread: Number(c.unread),
       })),
+    };
+  },
+
+  async appointments(staffId: string, when: 'upcoming' | 'past', page: number) {
+    const doctor = await doctorOf(staffId);
+    const size = APPOINTMENT_PAGE;
+    const upcoming = when === 'upcoming';
+    const rows = (await AppDataSource.query(
+      `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
+              a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode, a.issues,
+              p.id AS "patientId", p.name AS "patientName", p.phone AS "patientPhone", b.name AS "branchName"
+         FROM appointments a
+         JOIN patients p ON p.id = a.patient_id AND p.deleted_at IS NULL
+         JOIN branches b ON b.id = a.branch_id
+        WHERE a.doctor_id = $1 AND a.deleted_at IS NULL
+          AND ${upcoming ? 'a.date >= $2::date' : 'a.date < $2::date'}
+        ORDER BY a.date ${upcoming ? 'ASC' : 'DESC'}, a.time_from ${upcoming ? 'ASC' : 'DESC'}
+        LIMIT $3 OFFSET $4`,
+      [doctor.id, today(), size + 1, (page - 1) * size],
+    )) as {
+      id: string;
+      appointmentNo: number;
+      date: string;
+      timeFrom: string;
+      timeTo: string;
+      status: string;
+      visitType: string;
+      mode: string;
+      issues: string | null;
+      patientId: string;
+      patientName: string;
+      patientPhone: string;
+      branchName: string;
+    }[];
+    return {
+      items: rows.slice(0, size).map((a) => ({
+        id: a.id,
+        appointmentNo: a.appointmentNo,
+        date: a.date,
+        timeFrom: a.timeFrom.slice(0, 5),
+        timeTo: a.timeTo.slice(0, 5),
+        status: a.status,
+        visitType: a.visitType,
+        mode: a.mode,
+        issues: a.issues,
+        branch: a.branchName,
+        patient: { id: a.patientId, name: a.patientName, phone: a.patientPhone },
+      })),
+      page,
+      hasMore: rows.length > size,
     };
   },
 

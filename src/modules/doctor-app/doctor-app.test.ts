@@ -99,6 +99,22 @@ describe('doctor app', () => {
     expect((await staff('get', `/doctor/patients/${patientId}`, otherDoctorUser)).status).toBe(404);
   });
 
+  it('lists the doctor’s past and upcoming appointments', async () => {
+    const past = await staff('get', '/doctor/appointments?when=past', doctorUser);
+    expect(past.status).toBe(200);
+    expect(past.body.data).toMatchObject({
+      page: 1,
+      hasMore: false,
+      items: [{ id: appointmentId, date: '2026-09-01', timeFrom: '10:00', patient: { id: patientId } }],
+    });
+    expect((await staff('get', '/doctor/appointments', doctorUser)).body.data.items).toEqual([]);
+    expect((await staff('get', '/doctor/appointments?when=past', otherDoctorUser)).body.data.items).toEqual(
+      [],
+    );
+    expect((await staff('get', '/doctor/appointments?when=soon', doctorUser)).status).toBe(400);
+    expect((await staff('get', '/doctor/home', doctorUser)).body.data.counts.appointments).toBe(1);
+  });
+
   it('writes clinical remarks and shows the patient file by date', async () => {
     const saved = await staff('put', `/doctor/consultations/${consultationId}/remarks`, doctorUser).send({
       remarks: '<p><strong>Start</strong> BHRT</p>',
