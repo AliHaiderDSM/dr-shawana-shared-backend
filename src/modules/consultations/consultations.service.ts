@@ -20,6 +20,7 @@ import {
   mrsScores,
   PATIENT_FIELDS_BY_SECTION,
   SECTION_SCHEMAS,
+  MEDICAL_HISTORY_TOPICS,
   SHARED_TOPIC_FIELDS,
 } from './section-schemas';
 
@@ -81,7 +82,10 @@ function patientValues(patient: Patient | undefined, key: SectionKey) {
 function sectionView(consultation: Consultation, key: SectionKey, row: ConsultationSection | undefined) {
   if (!row) return null;
   const data: Record<string, unknown> = { ...row.data, ...patientValues(consultation.patient, key) };
-  if (key === 'medical_history' || key === 'follow_up') {
+  if (key === 'medical_history') {
+    for (const field of MEDICAL_HISTORY_TOPICS) data[field] = consultation[field];
+  }
+  if (key === 'follow_up') {
     for (const field of SHARED_TOPIC_FIELDS) data[field] = consultation[field];
   }
   return {

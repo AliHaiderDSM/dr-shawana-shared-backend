@@ -145,10 +145,14 @@ describe('patient history links', () => {
     const sections = (await api(`/branch/consultations/${consultationId}`, admin)).body.data.sections;
     expect(sections.medical_history.data).toMatchObject({
       majorComplaint: 'Hot flushes',
-      discussTopics: 'Sleep, weight, mood',
-      beforeVisitNote: 'Coming with my sister',
+      currentMedications: 'None',
       familyHistory: [expect.objectContaining({ relative: 'mother', conditions: ['diabetes'] })],
     });
+    expect(sections.medical_history.data).not.toHaveProperty('discussTopics');
+    expect(sections.medical_history.data).not.toHaveProperty('beforeVisitNote');
+    expect(
+      (await api(`/branch/consultations/${consultationId}`, admin)).body.data.discussTopics ?? null,
+    ).toBeNull();
     expect([...sections.additional_symptoms.data.symptoms].sort()).toEqual([
       'belly_fat',
       'fatigue',

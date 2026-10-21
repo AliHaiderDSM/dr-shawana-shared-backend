@@ -197,10 +197,12 @@ export const FAMILY_CONDITIONS = [
 
 const yesNoOccasionally = choice(['yes', 'no', 'occasionally']);
 
+export const MEDICAL_HISTORY_TOPICS = ['majorComplaint', 'currentMedications'] as const;
+
 export const medicalHistorySchema = z
   .object({
-    ...sharedTopics,
-    beforeVisitNote: text(),
+    majorComplaint: sharedTopics.majorComplaint,
+    currentMedications: sharedTopics.currentMedications,
     hormoneTherapy: choice(['never', 'currently_using', 'previously_used']),
     hormonesUsed: text(),
     contraception: choice(['yes', 'no', 'not_needed']),

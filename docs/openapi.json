@@ -9845,14 +9845,6 @@
       "Section_medical_history": {
         "type": "object",
         "properties": {
-          "discussTopics": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 5000,
-            "default": null
-          },
           "majorComplaint": {
             "type": [
               "string",
@@ -9862,14 +9854,6 @@
             "default": null
           },
           "currentMedications": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 5000,
-            "default": null
-          },
-          "beforeVisitNote": {
             "type": [
               "string",
               "null"

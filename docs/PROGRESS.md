@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Medical history topics trimmed (2026-10-21)
+
+- `medical_history` no longer takes or returns `discussTopics` or `beforeVisitNote` (the dashboard tab and the patient link alike); unknown keys are dropped. The follow up form keeps them. Only `majorComplaint` and `currentMedications` are shared into medical history.
+- Read-only production check of voice notes: the one doctor note without `duration_ms` was recorded in the browser as a fragmented MP4, so phones read its length as the first 250 ms fragment. Newer notes carry `duration_ms`.
+- Suite: 279 passed.
+
 ## Imaging scan year (2026-10-20)
 
 - Each imaging scan takes `year` (1900–2100). `date` stays for older data and is cleared when the dashboard saves a scan again. Suite: 279 passed.
