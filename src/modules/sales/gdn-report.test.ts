@@ -11,6 +11,7 @@ describe('GDN day-end report', () => {
   let dispatcher: { id: string };
   let lahoreDesk: { id: string };
   let lahoreAdmin: { id: string };
+  let superAdmin: { id: string };
   let dispatchId: string;
   let lahoreId: string;
   let patientId: string;
@@ -47,6 +48,7 @@ describe('GDN day-end report', () => {
     dispatcher = await createStaff(fake, { role: 'dispatcher', branchId: dispatchId });
     lahoreDesk = await createStaff(fake, { role: 'front_desk', branchId: lahoreId });
     lahoreAdmin = await createStaff(fake, { role: 'branch_admin', branchId: lahoreId });
+    superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
     patientId = (
       await request(app)
         .post('/api/v1/branch/patients')
@@ -109,6 +111,15 @@ describe('GDN day-end report', () => {
       closing: 2,
       closingFromOpening: 2,
     });
+  });
+
+  it('lets the Super Admin open any branch report', async () => {
+    const res = await request(app)
+      .get(`/api/v1/branch/sales/gdn-report?date=2026-10-21&branchId=${dispatchId}`)
+      .set(bearer(superAdmin));
+    expect(res.body).toBeDefined();
+    expect(res.status).toBe(200);
+    expect(res.body.data.summary.opening).toBe(7);
   });
 
   it('shows the booking branch its own orders and keeps the report to report viewers', async () => {
