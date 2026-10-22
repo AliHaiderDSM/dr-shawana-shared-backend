@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Doctor patient file: prescriptions carry their visit (2026-10-22)
+
+- `GET /doctor/patients/:id` prescriptions now include `consultationId`, so the app shows and edits the clinical remarks of the same visit under each prescription.
+
 ## Patient create without date of birth (2026-10-22)
 
 - `CreatePatient` and the inline patient on appointments and sales no longer take `dateOfBirth` (it is dropped if sent). `UpdatePatient` still takes it, so the date the patient sets in the app is kept.

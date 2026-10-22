@@ -285,7 +285,7 @@ export const doctorAppService = {
       AppDataSource.query(
         `SELECT p.id, p.prescription_no AS "prescriptionNo", p.date::text AS date, p.diagnosis,
                 p.followup_date::text AS "followupDate", p.plan_treatment AS "planTreatment",
-                d.display_name AS doctor, b.name AS branch
+                p.consultation_id AS "consultationId", d.display_name AS doctor, b.name AS branch
            FROM prescriptions p
            LEFT JOIN doctors d ON d.id = p.doctor_id
            LEFT JOIN branches b ON b.id = p.branch_id
