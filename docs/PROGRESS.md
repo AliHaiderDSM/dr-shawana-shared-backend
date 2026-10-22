@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient create without date of birth (2026-10-22)
+
+- `CreatePatient` and the inline patient on appointments and sales no longer take `dateOfBirth` (it is dropped if sent). `UpdatePatient` still takes it, so the date the patient sets in the app is kept.
+
 ## Stock request approval capped (2026-10-22)
 
 - Approving a stock request line above what the branch asked now fails (422, names the products and the asked quantity). Approve less or the same.

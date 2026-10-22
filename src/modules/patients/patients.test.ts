@@ -49,12 +49,14 @@ describe('patients and doctors', () => {
         city: 'Lahore',
         age: '42',
         country: 'Pakistan',
+        dateOfBirth: '1984-02-01',
       });
       expect(res.status).toBe(201);
       expect(res.body.data).toMatchObject({
         phone: '923001234567',
         phoneNormalized: '+923001234567',
         age: 42,
+        dateOfBirth: null,
         bhrtStatus: 'none',
         createdBy: frontDesk.id,
       });

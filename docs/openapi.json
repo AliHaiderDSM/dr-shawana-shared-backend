@@ -4639,14 +4639,6 @@
             "type": "integer",
             "example": 42
           },
-          "dateOfBirth": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "example": "2026-09-30"
-          },
           "country": {
             "type": [
               "string",
@@ -4690,14 +4682,6 @@
             "type": "integer",
             "example": 42
           },
-          "dateOfBirth": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date",
-            "example": "2026-09-30"
-          },
           "country": {
             "type": [
               "string",
@@ -4711,6 +4695,14 @@
               "null"
             ],
             "maxLength": 2000
+          },
+          "dateOfBirth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "example": "2026-09-30"
           }
         }
       },
@@ -5477,14 +5469,6 @@
               "age": {
                 "type": "integer",
                 "example": 42
-              },
-              "dateOfBirth": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date",
-                "example": "2026-09-30"
               },
               "country": {
                 "type": [
@@ -14703,14 +14687,6 @@
               "age": {
                 "type": "integer",
                 "example": 42
-              },
-              "dateOfBirth": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date",
-                "example": "2026-09-30"
               },
               "country": {
                 "type": [

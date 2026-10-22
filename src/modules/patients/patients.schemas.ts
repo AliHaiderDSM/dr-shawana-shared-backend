@@ -38,13 +38,15 @@ export const patientFields = z.object({
   phone: phoneInput,
   city: requiredText(1, 100),
   age: ageInput.nullable().optional(),
-  dateOfBirth: dateInput.nullable().optional(),
   country: optionalText(100),
   address: optionalText(2000),
 });
 
 export const createPatientSchema = registry.register('CreatePatient', patientFields);
-export const updatePatientSchema = registry.register('UpdatePatient', atLeastOneField(patientFields));
+export const updatePatientSchema = registry.register(
+  'UpdatePatient',
+  atLeastOneField(patientFields.extend({ dateOfBirth: dateInput.nullable().optional() })),
+);
 
 export const patientListQuerySchema = listQuerySchema(['createdAt', 'name', 'city']).extend({
   city: z.string().trim().max(100).optional(),
