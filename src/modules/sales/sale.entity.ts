@@ -109,6 +109,9 @@ export class Sale extends BranchScopedEntity {
   @Column({ name: 'delivered_on', type: 'date', nullable: true })
   deliveredOn: string | null;
 
+  @Column({ name: 'cancelled_on', type: 'date', nullable: true })
+  cancelledOn: string | null;
+
   @Column({ type: 'text', nullable: true })
   note: string | null;
 

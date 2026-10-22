@@ -2,11 +2,13 @@ import { Router, type Request } from 'express';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
+import { today } from '../../lib/validation';
 import { documentsUpload, jsonDataField, uploadedFiles } from '../../lib/upload';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
+import { gdnReportService } from './gdn-report.service';
 import { saleDocumentsService } from './sale-documents.service';
 import {
   createSalePaymentSchema,
@@ -18,6 +20,7 @@ import {
   deliveryCalendarQuerySchema,
   deliverySlipsQuerySchema,
   dispatchSchema,
+  gdnReportQuerySchema,
   deliveryStatusSchema,
   saleListQuerySchema,
   salePaymentParamsSchema,
@@ -71,6 +74,16 @@ salesRouter.get(
   validate({ query: deliveriesQuerySchema }),
   async (req, res) => {
     sendOk(res, await salesService.deliveries(branchIdOf(req), validQuery(req, deliveriesQuerySchema)));
+  },
+);
+
+salesRouter.get(
+  `${path}/gdn-report`,
+  requirePermission('deliveryReport.view'),
+  validate({ query: gdnReportQuerySchema }),
+  async (req, res) => {
+    const { date } = validQuery(req, gdnReportQuerySchema);
+    sendOk(res, await gdnReportService.day(branchIdOf(req), date ?? today()));
   },
 );
 

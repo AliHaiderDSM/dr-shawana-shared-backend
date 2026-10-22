@@ -1108,7 +1108,10 @@ export const salesService = {
         throw AppError.conflict('Only an online order that is still waiting for dispatch can be cancelled');
       }
       if (input.refund) await returnsService.refundCancelledOrder(em, actor, sale, input.refund);
-      await repo(Sale, em).update({ id }, { deliveryStatus: 'cancelled', updatedBy: actor.userId });
+      await repo(Sale, em).update(
+        { id },
+        { deliveryStatus: 'cancelled', cancelledOn: today(), updatedBy: actor.userId },
+      );
       await audit(
         actor,
         sale,

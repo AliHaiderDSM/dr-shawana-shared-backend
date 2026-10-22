@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## GDN day-end report (2026-10-22)
+
+- Migration `1794100000000-SaleCancelledOn`: `sales.cancelled_on` (date), filled from `updated_at` for orders already cancelled. Cancelling an online order now stores the day. Run `npm run migration:run`.
+- `GET /branch/sales/gdn-report?date=` (deliveryReport.view): online orders of the day for the Dispatch Department (orders it sends) or a booking branch (orders it booked). Opening = booked before the day and neither dispatched nor cancelled before it; then new orders, dispatched that day (split into earlier and same-day orders), cancelled that day, and closing (carried to the next day). Each order has GDN no., customer, city, booking branch, items, amount and days waited.
+- Suite: 283 passed.
+
 ## Doctor appointments list (2026-10-21)
 
 - `GET /doctor/appointments?when=upcoming|past&page=` lists the doctor's own appointments in every branch, 30 a page (`hasMore`). Upcoming runs from today, soonest first; past is newest first. `/doctor/home` counts carry `appointments`. Suite: 280 passed.

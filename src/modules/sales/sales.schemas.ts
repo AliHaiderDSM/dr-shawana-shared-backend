@@ -151,6 +151,11 @@ export const deliveryCalendarQuerySchema = z.object({
   branchId: z.uuid().optional(),
 });
 
+export const gdnReportQuerySchema = z.object({
+  date: dateInput.optional().openapi({ description: 'The day of the report; today when left out' }),
+  branchId: z.uuid().optional(),
+});
+
 export const deliveriesQuerySchema = z.object({
   date: dateInput.optional(),
   by: z.enum(['order', 'dispatch']).default('order'),
