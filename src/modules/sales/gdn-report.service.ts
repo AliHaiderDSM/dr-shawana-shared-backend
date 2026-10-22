@@ -25,8 +25,11 @@ const daysBetween = (from: string, to: string) =>
 const sum = (rows: { total: string }[]) => rows.reduce((total, r) => total + Number(r.total), 0).toFixed(2);
 
 export const gdnReportService = {
-  async day(branchId: string, date: string) {
+  async day(branchId: string, date: string, superAdmin: boolean) {
     const dispatch = await isDispatchBranch(AppDataSource.manager, branchId);
+    if (!superAdmin && !dispatch) {
+      throw AppError.forbidden('The GDN report is for the Dispatch Department and the Super Admin');
+    }
     const column = dispatch ? 's.fulfillment_branch_id' : 's.branch_id';
     const [branch] = (await AppDataSource.query('SELECT name, code FROM branches WHERE id = $1', [
       branchId,

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## GDN report access (2026-10-22)
+
+- `GET /branch/sales/gdn-report` answers only a Dispatch Department or the Super Admin (who can pick any branch with `branchId`); other branches get 403.
+
 ## Doctor patient file: prescriptions carry their visit (2026-10-22)
 
 - `GET /doctor/patients/:id` prescriptions now include `consultationId`, so the app shows and edits the clinical remarks of the same visit under each prescription.

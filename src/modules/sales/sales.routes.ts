@@ -83,7 +83,7 @@ salesRouter.get(
   validate({ query: gdnReportQuerySchema }),
   async (req, res) => {
     const { date } = validQuery(req, gdnReportQuerySchema);
-    sendOk(res, await gdnReportService.day(branchIdOf(req), date ?? today()));
+    sendOk(res, await gdnReportService.day(branchIdOf(req), date ?? today(), req.auth!.isSuperAdmin));
   },
 );
 

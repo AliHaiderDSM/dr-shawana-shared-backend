@@ -122,10 +122,17 @@ describe('GDN day-end report', () => {
     expect(res.body.data.summary.opening).toBe(7);
   });
 
-  it('shows the booking branch its own orders and keeps the report to report viewers', async () => {
-    const lahore = (await report(lahoreAdmin, '2026-10-21')).body.data;
+  it('keeps the report to the Dispatch Department and the Super Admin', async () => {
+    const branchAdmin = await report(lahoreAdmin, '2026-10-21');
+    expect(branchAdmin.status).toBe(403);
+    expect(branchAdmin.body.error.message).toContain('Dispatch Department');
+    expect((await report(lahoreDesk, '2026-10-21')).status).toBe(403);
+    const lahore = (
+      await request(app)
+        .get(`/api/v1/branch/sales/gdn-report?date=2026-10-21&branchId=${lahoreId}`)
+        .set(bearer(superAdmin))
+    ).body.data;
     expect(lahore.branch).toMatchObject({ code: 'LHR', dispatch: false });
     expect(lahore.summary.opening).toBe(7);
-    expect((await report(lahoreDesk, '2026-10-21')).status).toBe(403);
   });
 });
