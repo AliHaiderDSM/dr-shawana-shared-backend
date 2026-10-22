@@ -154,6 +154,14 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     });
     const all = await as(superAdmin, 'get', '/branch/stock-requests?status=pending');
     expect(all.body.data.map((r: { requestNo: string }) => r.requestNo)).toEqual(['LHR-SR-000001']);
+    const overAsked = await as(superAdmin, 'post', `/admin/stock-requests/${requestId}/approve`).send({
+      items: [{ id: tonerLine.id, approvedQty: '1111' }],
+    });
+    expect(overAsked.status).toBe(422);
+    expect(overAsked.body.error.message).toContain('Rose Toner 10');
+    expect((await as(superAdmin, 'get', `/branch/stock-requests/${requestId}`)).body.data.status).toBe(
+      'pending',
+    );
     const approved = await as(superAdmin, 'post', `/admin/stock-requests/${requestId}/approve`).send({
       note: 'Only 6 toners this week',
       items: [{ id: tonerLine.id, approvedQty: '6' }],

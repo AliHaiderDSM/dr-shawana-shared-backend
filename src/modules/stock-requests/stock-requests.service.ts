@@ -52,7 +52,7 @@ const SELECT = `
          ${person('rq')} AS "requestedBy", ${person('dc')} AS "decidedBy", ${person('rc')} AS "receivedBy",
          COALESCE((SELECT json_agg(json_build_object(
                     'id', it.id, 'productId', it.product_id, 'productName', p.name, 'unit', p.unit,
-                    'qty', it.qty::text, 'approvedQty', it.approved_qty::text, 'note', it.note,
+                    'qty', it.qty::text, 'approvedQty', LEAST(it.approved_qty, it.qty)::text, 'note', it.note,
                     'available', ${SELLABLE}::text,
                     'sentQty', COALESCE((SELECT SUM(o.qty) FROM stock_outs o WHERE o.stock_request_id = r.id
                                 AND o.product_id = it.product_id AND o.deleted_at IS NULL), 0)::text,
@@ -338,6 +338,27 @@ export const stockRequestsService = {
         for (const id of given.keys()) {
           if (!items.some((i) => i.id === id)) throw AppError.badRequest('An item is not on this request');
         }
+        const over = items.filter((item) => new Decimal(given.get(item.id) ?? item.qty).gt(item.qty));
+        if (over.length) {
+          const names = (await em.query(`SELECT id, name FROM products WHERE id = ANY($1::uuid[])`, [
+            over.map((i) => i.productId),
+          ])) as { id: string; name: string }[];
+          throw AppError.unprocessable(
+            `You can approve up to what the branch asked: ${over
+              .map(
+                (i) =>
+                  `${names.find((n) => n.id === i.productId)?.name ?? 'Product'} ${toQuantity(i.qty).toString()}`,
+              )
+              .join(', ')}`,
+            {
+              items: over.map((i) => ({
+                id: i.id,
+                asked: toQuantity(i.qty).toString(),
+                approved: toQuantity(given.get(i.id)!).toString(),
+              })),
+            },
+          );
+        }
         for (const item of items) {
           item.approvedQty = toQuantity(given.get(item.id) ?? item.qty);
         }
@@ -376,7 +397,7 @@ export const stockRequestsService = {
     lines: { productId: string; qty: string }[],
   ) {
     const rows = (await manager.query(
-      `SELECT it.product_id AS "productId", p.name, COALESCE(it.approved_qty, 0)::text AS approved,
+      `SELECT it.product_id AS "productId", p.name, COALESCE(LEAST(it.approved_qty, it.qty), 0)::text AS approved,
               COALESCE((SELECT SUM(o.qty) FROM stock_outs o WHERE o.stock_request_id = it.request_id
                          AND o.product_id = it.product_id AND o.deleted_at IS NULL), 0)::text AS sent
          FROM stock_request_items it JOIN products p ON p.id = it.product_id

@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Stock request approval capped (2026-10-22)
+
+- Approving a stock request line above what the branch asked now fails (422, names the products and the asked quantity). Approve less or the same.
+- Requests already approved above the ask (e.g. 1 asked, 1111 approved) read and send as the asked quantity: `approvedQty` and the Stock Out limit use `LEAST(approved_qty, qty)`. No data was changed in production.
+
 ## GDN day-end report (2026-10-22)
 
 - Migration `1794100000000-SaleCancelledOn`: `sales.cancelled_on` (date), filled from `updated_at` for orders already cancelled. Cancelling an online order now stores the day. Run `npm run migration:run`.
