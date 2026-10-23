@@ -1,5 +1,6 @@
 import { AppDataSource } from '../../database/data-source';
 import { type Role } from '../../lib/permissions';
+import { pendingGrnEdits } from '../inventory/stock-in-edits';
 import { pendingReceipts } from '../inventory/store-receipts';
 import { doctorChat } from '../chat/chat.service';
 import { patientRequestsService } from '../patient-app/patient-requests.service';
@@ -61,7 +62,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
       writeOffs,
       discountRequests,
       returns,
-      stockReceipts: await pendingReceipts(null),
+      stockReceipts: (await pendingReceipts(null)) + (await pendingGrnEdits()),
       patientRequests: await patientRequestsService.openCount(null),
     };
   }

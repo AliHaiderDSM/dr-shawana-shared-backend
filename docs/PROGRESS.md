@@ -22,6 +22,15 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## GRN edits with Super Admin approval (2026-10-23)
+
+- Migration `1794200000000-StockInEditRequests` (table `stock_in_edit_requests`, one pending edit per GRN). Run `npm run migration:run`.
+- `PUT /branch/stock-receipts/:grnNo/lines` {update[], add[], remove[], note}: Lab Officer or Super Admin. While the GRN waits for the Warehouse Keeper, or when the Super Admin edits, it applies at once in one transaction. A Lab Officer edit of a confirmed GRN is first tried and rolled back (so it fails early if it cannot apply), then saved as a request.
+- Changing qty or batch replaces the line (old movement and untouched labels removed, new line posted under the same GRN, labels printed again); expiry, mfg date and cost alone update in place. Added lines join the same GRN with its status.
+- `GET /branch/stock-receipts/edit-requests`, `POST /admin/stock-receipts/edit-requests/:id/approve|reject` (Super Admin). Receipts carry `pendingEdit`, `manufacturingDate`, `unitCost`. The Super Admin store badge counts waiting edits.
+- `stockInService.create/update/remove` accept an outer transaction and, for create, the GRN number and receipt status.
+- Suite: 288 passed.
+
 ## GDN report access (2026-10-22)
 
 - `GET /branch/sales/gdn-report` answers only a Dispatch Department or the Super Admin (who can pick any branch with `branchId`); other branches get 403.

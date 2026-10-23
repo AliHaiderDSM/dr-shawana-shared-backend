@@ -388,7 +388,13 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
 
     get: getDto,
 
-    async create(actor: Actor, branchId: string, input: CreateInput, files: Express.Multer.File[] = []) {
+    async create(
+      actor: Actor,
+      branchId: string,
+      input: CreateInput,
+      files: Express.Multer.File[] = [],
+      opts: { grnNo?: string; receipt?: 'pending' | 'confirmed'; manager?: EntityManager } = {},
+    ) {
       if (config.kind === 'stock_in')
         assertShelfLife(
           input.items.map((i) => ({
@@ -412,7 +418,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             branchId,
           ])) as { kind: string; code: string }[];
           const storeEntry = config.kind === 'stock_in' && here?.kind === 'warehouse';
-          const pendingReceipt = storeEntry && !actor.isSuperAdmin;
+          const pendingReceipt =
+            storeEntry && (opts.receipt ? opts.receipt === 'pending' : !actor.isSuperAdmin);
           if (
             config.kind === 'stock_out' &&
             here?.kind === 'warehouse' &&
@@ -421,7 +428,8 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             throw AppError.forbidden('Only the Warehouse Keeper sends stock out of the Super Admin stock');
           }
           const grnNo = storeEntry
-            ? `${here!.code}-GRN-${String(await nextSequence(em, branchId, 'grn')).padStart(6, '0')}`
+            ? (opts.grnNo ??
+              `${here!.code}-GRN-${String(await nextSequence(em, branchId, 'grn')).padStart(6, '0')}`)
             : null;
           if (config.kind === 'stock_out' && !input.stockRequestId) {
             if (here?.kind === 'warehouse') {
@@ -495,14 +503,14 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             );
           }
           return created;
-        });
+        }, opts.manager);
       } catch (err) {
         await discardUploads(uploaded);
         throw err;
       }
     },
 
-    async update(actor: Actor, branchId: string, id: string, input: UpdateInput) {
+    async update(actor: Actor, branchId: string, id: string, input: UpdateInput, manager?: EntityManager) {
       return withTransaction(async (em) => {
         const record = await getRecord(branchId, id, em);
         assertNotTransferIn(record);
@@ -576,10 +584,10 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           em,
         );
         return after;
-      });
+      }, manager);
     },
 
-    async remove(actor: Actor, branchId: string, id: string) {
+    async remove(actor: Actor, branchId: string, id: string, manager?: EntityManager) {
       await withTransaction(async (em) => {
         const before = await getDto(branchId, id, em);
         const record = await getRecord(branchId, id, em);
@@ -624,7 +632,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
           { actor, branchId, action: 'delete', entity: config.kind, entityId: id, before },
           em,
         );
-      });
+      }, manager);
     },
 
     async addAttachments(actor: Actor, branchId: string, id: string, files: Express.Multer.File[]) {

@@ -60,6 +60,7 @@ const receiptSchema = registry.register(
     enteredBy: person,
     confirmedBy: person,
     confirmedAt: z.string().nullable(),
+    pendingEdit: z.object({ id: z.uuid(), createdAt: z.string() }).nullable(),
     lines: z.array(
       z.object({
         id: z.uuid(),
@@ -70,6 +71,8 @@ const receiptSchema = registry.register(
         receivedQty: z.string().nullable(),
         batch: z.string().nullable(),
         expiryDate: z.string().nullable(),
+        manufacturingDate: z.string().nullable(),
+        unitCost: z.string().nullable(),
         labels: z.number().int(),
         receiptNote: z.string().nullable(),
       }),
@@ -125,6 +128,8 @@ async function list(branchId: string, status?: 'pending' | 'confirmed', grnNo?: 
     `SELECT si.grn_no AS "grnNo", to_char(MIN(si.date), 'YYYY-MM-DD') AS date, MIN(si.created_at) AS "createdAt",
             CASE WHEN bool_and(si.receipt_status = 'confirmed') THEN 'confirmed' ELSE 'pending' END AS status,
             MAX(sp.name) AS supplier, MAX(si.note) AS note,
+            (SELECT json_build_object('id', r.id, 'createdAt', r.created_at) FROM stock_in_edit_requests r
+              WHERE r.branch_id = $1 AND r.grn_no = si.grn_no AND r.status = 'pending' LIMIT 1) AS "pendingEdit",
             (SELECT ${PERSON('u')} FROM staff_profiles u WHERE u.id = (array_agg(si.created_by))[1]) AS "enteredBy",
             (SELECT ${PERSON('c')} FROM staff_profiles c
               WHERE c.id = (array_agg(si.confirmed_by) FILTER (WHERE si.confirmed_by IS NOT NULL))[1]) AS "confirmedBy",
@@ -133,6 +138,7 @@ async function list(branchId: string, status?: 'pending' | 'confirmed', grnNo?: 
               'id', si.id, 'productId', si.product_id, 'productName', p.name, 'unit', p.unit,
               'qty', si.qty::text, 'receivedQty', si.received_qty::text, 'batch', si.batch,
               'expiryDate', to_char(si.expiry_date, 'YYYY-MM-DD'), 'receiptNote', si.receipt_note,
+              'manufacturingDate', to_char(si.manufacturing_date, 'YYYY-MM-DD'), 'unitCost', si.unit_cost::text,
               'labels', (SELECT COUNT(*) FROM inventory_items i WHERE i.source_type = 'stock_in' AND i.source_id = si.id)::int
             ) ORDER BY p.name) AS lines
        FROM stock_ins si
@@ -263,6 +269,10 @@ async function confirm(actor: Actor, branchId: string, grnNo: string, input: z.o
   });
   return (await list(branchId, undefined, grnNo))[0] ?? null;
 }
+
+export const storeReceiptsService = {
+  one: async (branchId: string, grnNo: string) => (await list(branchId, undefined, grnNo))[0] ?? null,
+};
 
 export async function pendingReceipts(branchId: string | null) {
   const [row] = (await AppDataSource.query(
