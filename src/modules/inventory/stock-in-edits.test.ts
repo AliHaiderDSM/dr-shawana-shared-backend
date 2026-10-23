@@ -158,6 +158,8 @@ describe('Editing a GRN', () => {
     const line = (await receipt(grn!)).lines.find((l) => l.productName === 'Rose Toner')!;
     const asked = await as(lab, 'put', `/branch/stock-receipts/${grn}/lines`).send({
       update: [{ id: line.id, batch: 'T-9' }],
+      add: [],
+      remove: [],
     });
     const id = asked.body.data.request.id as string;
     const rejected = await as(superAdmin, 'post', `/admin/stock-receipts/edit-requests/${id}/reject`).send({

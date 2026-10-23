@@ -38,7 +38,7 @@ export const editGrnSchema = registry.register(
     .object({
       note: optionalText(500),
       update: z.array(lineChange).max(50).default([]),
-      add: addItems.optional(),
+      add: z.preprocess((v) => (Array.isArray(v) && v.length === 0 ? undefined : v), addItems.optional()),
       remove: z.array(z.uuid()).max(50).default([]),
     })
     .refine((v) => v.update.length + v.remove.length + ((v.add as unknown[] | undefined)?.length ?? 0) > 0, {
