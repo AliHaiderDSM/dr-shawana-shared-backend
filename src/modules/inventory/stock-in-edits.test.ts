@@ -175,6 +175,30 @@ describe('Editing a GRN', () => {
     ).toBe(409);
   });
 
+  it('deletes a whole confirmed entry only after the Super Admin approves', async () => {
+    const entry = await as(lab, 'post', '/branch/stock-ins').send({
+      date: '2026-10-06',
+      items: [{ productId: cream, qty: '4', batch: 'C-2', expiryDate: '2028-06-30' }],
+    });
+    const grn = entry.body.data[0].grnNo as string;
+    await as(keeper, 'post', `/branch/stock-receipts/${grn}/confirm`)
+      .send({ date: '2026-10-06' })
+      .expect(200);
+    const before = await stockOf('Night Cream');
+    const asked = await as(lab, 'put', `/branch/stock-receipts/${grn}/lines`).send({
+      update: [],
+      add: [],
+      remove: [entry.body.data[0].id],
+    });
+    expect(asked.body.data).toMatchObject({ applied: false });
+    expect(await stockOf('Night Cream')).toBe(before);
+    await as(superAdmin, 'post', `/admin/stock-receipts/edit-requests/${asked.body.data.request.id}/approve`)
+      .send({})
+      .expect(200);
+    expect(await stockOf('Night Cream')).toBe(before - 4);
+    expect((await as(lab, 'get', `/branch/stock-receipts?grnNo=${grn}`)).body.data).toEqual([]);
+  });
+
   it('lets the Super Admin edit a confirmed GRN directly and keeps others out', async () => {
     const [grn] = (await as(lab, 'get', '/branch/stock-receipts?status=confirmed')).body.data.map(
       (r: { grnNo: string }) => r.grnNo,

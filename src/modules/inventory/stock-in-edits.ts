@@ -108,9 +108,6 @@ async function apply(em: EntityManager, actor: Actor, branchId: string, grnNo: s
     throw AppError.badRequest('A line cannot be changed and removed together');
   }
   const adds = (changes.add ?? []) as AddItem[];
-  if (changes.remove.length === rows.length && adds.length === 0) {
-    throw AppError.badRequest('A GRN needs at least one line. Add a line or delete the GRN instead.');
-  }
   const create = (items: AddItem[]) =>
     stockInService.create(
       actor,

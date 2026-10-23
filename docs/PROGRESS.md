@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Lab Officer delete of a stock-in entry (2026-10-23)
+
+- A GRN edit may now remove every line; approving such a request deletes the whole entry and reverses its stock.
+- `add: []` and `update: []` are accepted, so the dashboard sends a delete as `{ update: [], add: [], remove: [id] }`.
+- A pending GRN is deleted at once; a confirmed one waits for the Super Admin. Test added in `stock-in-edits.test.ts`. Full suite: 297 passed.
+
 ## Scale hardening (2026-10-23)
 
 - Shared rate limits: login, patient login, patient requests, app login and chat messages count in Upstash Redis when `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or Vercel's `KV_REST_API_URL` / `KV_REST_API_TOKEN`) are set; one EVAL per hit. If Redis fails they fall back to memory. The general `/api` limiter stays in memory. `src/lib/rate-limit.ts`.
