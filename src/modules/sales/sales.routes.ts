@@ -82,8 +82,8 @@ salesRouter.get(
   requirePermission('deliveryReport.view'),
   validate({ query: gdnReportQuerySchema }),
   async (req, res) => {
-    const { date } = validQuery(req, gdnReportQuerySchema);
-    sendOk(res, await gdnReportService.day(branchIdOf(req), date ?? today(), req.auth!.isSuperAdmin));
+    const { date, type } = validQuery(req, gdnReportQuerySchema);
+    sendOk(res, await gdnReportService.day(branchIdOf(req), date ?? today(), req.auth!.isSuperAdmin, type));
   },
 );
 

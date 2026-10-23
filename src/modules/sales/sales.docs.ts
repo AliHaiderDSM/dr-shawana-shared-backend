@@ -293,7 +293,7 @@ registry.registerPath({
   method: 'get',
   path: '/branch/sales/gdn-report',
   summary:
-    'Day-end GDN report of online orders: orders still waiting from earlier days (opening), new orders of the day, what was dispatched (split into earlier and same-day orders), cancelled, and what carries to the next day. Only for a Dispatch Department (the orders it sends) and the Super Admin, who may pick any branch (a booking branch shows the orders it booked).',
+    'Day-end GDN report. type=online (default): orders still waiting from earlier days (opening), new orders of the day, what was dispatched (split into earlier and same-day orders), cancelled, and what carries to the next day. Only for a Dispatch Department (the orders it sends) and the Super Admin, who may pick any branch (a booking branch shows the orders it booked). type=office adds the office sales of the branch: each gets its GDN when it is saved and counts as new and dispatched the same day; type=all shows both.',
   request: { query: gdnReportQuerySchema },
   responses: {
     200: { description: 'Report', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },

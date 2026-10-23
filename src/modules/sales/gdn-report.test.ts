@@ -39,6 +39,22 @@ describe('GDN day-end report', () => {
     );
   };
 
+  const counterSale = async (date: string) => {
+    seq += 1;
+    await AppDataSource.query(
+      `INSERT INTO sales (branch_id, invoice_seq, invoice_no, patient_id, sale_type, city, date, subtotal, total, gdn_no)
+       VALUES ($1, $2, $3, $4, 'office', 'Lahore', $5, 500, 500, $6)`,
+      [
+        lahoreId,
+        seq,
+        `LHR-${String(seq).padStart(6, '0')}`,
+        patientId,
+        date,
+        `LHR-GDN-${String(seq).padStart(6, '0')}`,
+      ],
+    );
+  };
+
   const report = (who: { id: string }, date: string) =>
     request(app).get(`/api/v1/branch/sales/gdn-report?date=${date}`).set(bearer(who));
 
@@ -61,6 +77,8 @@ describe('GDN day-end report', () => {
     await order('2026-10-20', { cancelledOn: '2026-10-21' });
     for (let i = 0; i < 2; i += 1) await order('2026-10-21', { dispatchedOn: '2026-10-21' });
     for (let i = 0; i < 2; i += 1) await order('2026-10-21');
+    for (let i = 0; i < 3; i += 1) await counterSale('2026-10-21');
+    await counterSale('2026-10-20');
   });
 
   it('shows the first day: 10 booked, 3 sent, 7 carried to the next day', async () => {
@@ -120,6 +138,38 @@ describe('GDN day-end report', () => {
     expect(res.body).toBeDefined();
     expect(res.status).toBe(200);
     expect(res.body.data.summary.opening).toBe(7);
+  });
+
+  it('adds the office sales of a branch, each handed over with its own GDN on the day', async () => {
+    const at = (type: string) =>
+      request(app)
+        .get(`/api/v1/branch/sales/gdn-report?date=2026-10-21&branchId=${lahoreId}&type=${type}`)
+        .set(bearer(superAdmin));
+    const office = (await at('office')).body.data;
+    expect(office.type).toBe('office');
+    expect(office.summary).toMatchObject({
+      office: 3,
+      officeAmount: '1500.00',
+      opening: 0,
+      newOrders: 3,
+      dispatched: 3,
+      closing: 0,
+    });
+    expect(office.orders[0]).toMatchObject({
+      saleType: 'office',
+      status: 'dispatched',
+      dispatchedOn: '2026-10-21',
+      gdnNo: expect.stringMatching(/^LHR-GDN-/),
+    });
+    const all = (await at('all')).body.data.summary;
+    expect(all).toMatchObject({ office: 3, opening: 7, newOrders: 7, dispatched: 11, closing: 2 });
+    expect((await at('online')).body.data.summary).toMatchObject({ office: 0, newOrders: 4 });
+    const dispatchAll = (
+      await request(app)
+        .get('/api/v1/branch/sales/gdn-report?date=2026-10-21&type=all')
+        .set(bearer(dispatcher))
+    ).body.data.summary;
+    expect(dispatchAll).toMatchObject({ office: 0, dispatched: 8 });
   });
 
   it('keeps the report to the Dispatch Department and the Super Admin', async () => {

@@ -151,8 +151,14 @@ export const deliveryCalendarQuerySchema = z.object({
   branchId: z.uuid().optional(),
 });
 
+export const GDN_REPORT_TYPES = ['online', 'office', 'all'] as const;
+
 export const gdnReportQuerySchema = z.object({
   date: dateInput.optional().openapi({ description: 'The day of the report; today when left out' }),
+  type: z
+    .enum(GDN_REPORT_TYPES)
+    .default('online')
+    .openapi({ description: 'online orders (default), office sales handed over at the counter, or all' }),
   branchId: z.uuid().optional(),
 });
 

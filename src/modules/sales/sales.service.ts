@@ -160,7 +160,7 @@ async function gdnOf(sale: Sale) {
   )) as Record<string, string | null>[];
   return {
     gdnNo: sale.gdnNo as string,
-    dispatchedOn: sale.dispatchedOn,
+    dispatchedOn: sale.dispatchedOn ?? (sale.saleType === 'office' ? sale.date : null),
     dispatchedBy: row?.dispatchedBy || null,
     from: row?.fromName ? { name: row.fromName, code: row.fromCode as string } : null,
     bookedAt: row?.bookedName ? { name: row.bookedName, code: row.bookedCode as string } : null,
@@ -878,6 +878,9 @@ export const salesService = {
         const totals = saleTotals(lines, received, input, input.payments.length > 0);
         const seq = await nextSequence(em, branchId, 'sale');
         const date = input.date ?? today();
+        const gdnNo = online
+          ? null
+          : `${branch.code}-GDN-${String(await nextSequence(em, branchId, 'gdn')).padStart(6, '0')}`;
 
         const sale = await sales.create(
           branchId,
@@ -893,6 +896,8 @@ export const salesService = {
             note: input.note ?? null,
             deliveryStatus: input.saleType === 'online' ? 'pending' : null,
             fulfillmentBranchId: fulfiller?.id ?? null,
+            gdnNo,
+            dispatchedBy: online ? null : actor.userId,
             ...totals,
           },
           em,

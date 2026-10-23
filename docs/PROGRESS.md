@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Office sales get a GDN (2026-10-23)
+
+- An office sale gets its GDN number when it is saved: `<branch code>-GDN-000001`, from the branch's own `gdn` sequence; `dispatched_by` is the cashier. The GDN print uses the sale date as its dispatch date.
+- `GET /branch/sales/gdn-report` takes `type=online|office|all` (default `online`, so the Dispatch Department report is unchanged). Office sales of the branch count as booked and dispatched the same day; orders carry `saleType` and the summary `office` / `officeAmount`. A dispatch branch never shows office sales.
+- Older office sales have no GDN number; nothing is backfilled. No migration. Full suite: 298 passed.
+
 ## Lab Officer delete of a stock-in entry (2026-10-23)
 
 - A GRN edit may now remove every line; approving such a request deletes the whole entry and reverses its stock.

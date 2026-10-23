@@ -131,6 +131,7 @@ describe('POS sales', () => {
     saleId = res.body.data.id;
     expect(res.body.data).toMatchObject({
       invoiceNo: 'LHR-000001',
+      gdnNo: 'LHR-GDN-000001',
       saleType: 'office',
       city: 'Lahore',
       patientCity: 'Kasur',
