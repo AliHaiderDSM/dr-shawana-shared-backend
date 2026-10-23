@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Scale hardening (2026-10-23)
+
+- Shared rate limits: login, patient login, patient requests, app login and chat messages count in Upstash Redis when `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (or Vercel's `KV_REST_API_URL` / `KV_REST_API_TOKEN`) are set; one EVAL per hit. If Redis fails they fall back to memory. The general `/api` limiter stays in memory. `src/lib/rate-limit.ts`.
+- Staff tokens are verified locally against the Supabase JWKS (ES256, cached 10 min, forced refresh at most once a minute); unknown keys, an issuer or audience that does not match `SUPABASE_URL` (trailing slash ignored) and non-JWT tokens fall back to `auth.getUser`; only a bad signature or an expired token is refused outright. The staff status check on every request is unchanged. `src/lib/jwt.ts`.
+- Migration `1794300000000-SearchTrigramIndexes`: `pg_trgm` plus GIN trigram indexes on patients name/phone/city, products name, product batch numbers and label serials. Run `npm run migration:run`.
+- Reports and the dashboard refuse periods over 366 days or without a start date (400). Server and Vercel set a Postgres `statement_timeout` (`DATABASE_STATEMENT_TIMEOUT_MS`, default 25000, 0 turns it off) so a slow query fails before Vercel's 30 s; migrations run without it.
+- Suite: 296 passed.
+
 ## GRN edits with Super Admin approval (2026-10-23)
 
 - Migration `1794200000000-StockInEditRequests` (table `stock_in_edit_requests`, one pending edit per GRN). Run `npm run migration:run`.

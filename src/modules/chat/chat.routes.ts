@@ -1,7 +1,5 @@
 import { Router, type RequestHandler } from 'express';
-import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { env } from '../../config/env';
 import { AppError } from '../../lib/errors';
 import {
   dataEnvelope,
@@ -18,6 +16,7 @@ import { authenticate } from '../../middleware/auth';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import { authenticatePatient, patientOf } from '../patient-app/patient-auth';
 import { doctorChat, patientChat } from './chat.service';
+import { limiter } from '../../lib/rate-limit';
 
 const doctorParams = z.object({ doctorId: z.uuid() });
 const conversationParams = z.object({ conversationId: z.uuid() });
@@ -192,13 +191,10 @@ registry.registerPath({
   responses: ok('Signed URL', signed),
 });
 
-const messageLimiter = rateLimit({
+const messageLimiter = limiter('chat-messages', {
   windowMs: 15 * 60_000,
-  limit: env.NODE_ENV === 'test' ? 1_000 : 60,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  handler: (_req, _res, next) =>
-    next(new AppError(429, 'RATE_LIMITED', 'Too many messages. Try again later.')),
+  limit: 60,
+  message: 'Too many messages. Try again later.',
 });
 
 const doctorOnly: RequestHandler = (req, _res, next) =>

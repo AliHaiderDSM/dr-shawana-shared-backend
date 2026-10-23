@@ -2,7 +2,9 @@ import { Router, type Request, type RequestHandler } from 'express';
 import { type z } from 'zod';
 import { actorFrom } from '../../lib/actor';
 import { sendOk } from '../../lib/http';
-import { sendReport, type Report } from '../../lib/report';
+import { AppError } from '../../lib/errors';
+import { periodProblem, sendReport, type Report } from '../../lib/report';
+import { today } from '../../lib/validation';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
@@ -49,6 +51,9 @@ function mount<S extends z.ZodObject>(
     validate({ query: schema }),
     async (req, res) => {
       const query = validQuery(req, schema) as z.output<S> & { format: 'json' | 'csv' };
+      const problem = periodProblem(query as { month?: string; from?: string; to?: string }, today());
+      if (problem)
+        throw AppError.validation([{ path: 'query.from', message: problem, code: 'custom' }], problem);
       sendReport(res, await run(await scopeOf(req), query), query.format);
     },
   );
@@ -100,6 +105,9 @@ reportsRouter.get(
   validate({ query: dashboardQuerySchema }),
   async (req, res) => {
     const { year, from, to } = validQuery(req, dashboardQuerySchema);
+    const problem = periodProblem({ from, to }, today());
+    if (problem)
+      throw AppError.validation([{ path: 'query.from', message: problem, code: 'custom' }], problem);
     sendOk(res, await dashboardService.kpis(actorFrom(req), await scopeOf(req), year, { from, to }));
   },
 );

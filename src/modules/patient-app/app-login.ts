@@ -1,7 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { env } from '../../config/env';
 import { AppDataSource } from '../../database/data-source';
 import { AppError } from '../../lib/errors';
 import { dataEnvelope, errorResponses, jsonContent, sendOk } from '../../lib/http';
@@ -10,6 +8,7 @@ import { validate, validBody } from '../../middleware/validate';
 import { authService } from '../auth/auth.service';
 import { normalizePhone } from '../patients/phone';
 import { patientAuth } from './patient-auth';
+import { limiter } from '../../lib/rate-limit';
 
 const NO_MATCH = 'This phone, email or username and password do not match a patient or doctor account.';
 const STAFF_ONLY = 'This is a clinic staff account. Only doctors use the app; other staff use the dashboard.';
@@ -85,13 +84,10 @@ export const appLoginRouter = Router();
 
 appLoginRouter.post(
   '/app/login',
-  rateLimit({
+  limiter('app-login', {
     windowMs: 15 * 60_000,
-    limit: env.NODE_ENV === 'test' ? 1_000 : 20,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    handler: (_req, _res, next) =>
-      next(new AppError(429, 'RATE_LIMITED', 'Too many attempts. Try again in a few minutes.')),
+    limit: 20,
+    message: 'Too many attempts. Try again in a few minutes.',
   }),
   validate({ body: appLoginSchema }),
   async (req, res) => {

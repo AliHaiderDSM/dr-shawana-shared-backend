@@ -1,21 +1,16 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
-import { env } from '../../config/env';
-import { AppError } from '../../lib/errors';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { authController } from './auth.controller';
 import { changePasswordSchema, loginSchema, refreshSchema, updateOwnProfileSchema } from './auth.schemas';
+import { limiter } from '../../lib/rate-limit';
 
 export const authRouter = Router();
 
-const credentialLimiter = rateLimit({
+const credentialLimiter = limiter('staff-credentials', {
   windowMs: 15 * 60_000,
-  limit: env.NODE_ENV === 'test' ? 1_000 : 20,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  handler: (_req, _res, next) =>
-    next(new AppError(429, 'RATE_LIMITED', 'Too many login attempts, try again in a few minutes')),
+  limit: 20,
+  message: 'Too many login attempts, try again in a few minutes',
 });
 
 authRouter.post('/auth/login', credentialLimiter, validate({ body: loginSchema }), authController.login);

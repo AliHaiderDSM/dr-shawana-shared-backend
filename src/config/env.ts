@@ -36,11 +36,17 @@ const envSchema = z
       .transform((v) => v === 'true'),
     DATABASE_SSL_CA: z.string().optional(),
     DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
+    DATABASE_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).default(25_000),
 
     SUPABASE_URL: isProd ? z.url() : z.url().optional(),
     SUPABASE_SERVICE_ROLE_KEY: supabaseVar,
     SUPABASE_ANON_KEY: supabaseVar,
     PATIENT_LINK_SECRET: z.string().min(32).optional(),
+
+    UPSTASH_REDIS_REST_URL: z.url().optional(),
+    UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+    KV_REST_API_URL: z.url().optional(),
+    KV_REST_API_TOKEN: z.string().optional(),
 
     WEB_PUSH_PUBLIC_KEY: z.string().optional(),
     WEB_PUSH_PRIVATE_KEY: z.string().optional(),

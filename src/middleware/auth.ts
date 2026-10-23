@@ -1,5 +1,6 @@
 import { type RequestHandler } from 'express';
 import { AppError } from '../lib/errors';
+import { verifySupabaseJwt } from '../lib/jwt';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { authService } from '../modules/auth/auth.service';
 
@@ -19,11 +20,19 @@ async function verifiedUserId(token: string): Promise<string | null> {
   if (cached && cached.expiresAt > now) return cached.userId;
   verifiedTokens.delete(token);
 
-  const { data, error } = await getSupabaseAdmin().auth.getUser(token);
-  if (error || !data.user) return null;
+  const local = await verifySupabaseJwt(token);
+  if ('invalid' in local) return null;
+  const userId = 'userId' in local ? local.userId : await remoteUserId(token);
+  if (!userId) return null;
 
   if (verifiedTokens.size >= MAX_CACHED_TOKENS) verifiedTokens.clear();
-  verifiedTokens.set(token, { userId: data.user.id, expiresAt: now + TOKEN_TTL_MS });
+  verifiedTokens.set(token, { userId, expiresAt: now + TOKEN_TTL_MS });
+  return userId;
+}
+
+async function remoteUserId(token: string) {
+  const { data, error } = await getSupabaseAdmin().auth.getUser(token);
+  if (error || !data.user) return null;
   return data.user.id;
 }
 

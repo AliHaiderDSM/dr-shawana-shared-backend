@@ -28,6 +28,17 @@ export const reportFormat = {
     .openapi({ description: 'super_admin: one branch; leave out for every branch' }),
 };
 
+export const MAX_PERIOD_DAYS = 366;
+
+export function periodProblem(q: { month?: string; from?: string; to?: string }, today: string) {
+  if (q.month || (!q.from && !q.to)) return null;
+  if (!q.from) return 'Choose a start date as well';
+  const end = q.to ?? today;
+  if (end < q.from) return 'The end date is before the start date';
+  const days = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${q.from}T00:00:00Z`)) / 86_400_000 + 1;
+  return days > MAX_PERIOD_DAYS ? `Choose a period of up to ${MAX_PERIOD_DAYS} days` : null;
+}
+
 export const periodFilters = {
   month: z
     .string()

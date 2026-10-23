@@ -2,7 +2,6 @@ import './lib/openapi';
 import path from 'node:path';
 import cors from 'cors';
 import express, { type Express } from 'express';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import swaggerUi from 'swagger-ui-express';
@@ -15,6 +14,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { RESOURCES_PATH } from './modules/educational-resources/educational-resources.service';
 import { requestId } from './middleware/requestId';
 import { apiRouter } from './routes';
+import { limiter } from './lib/rate-limit';
 
 export function createApp(): Express {
   const app = express();
@@ -54,12 +54,12 @@ export function createApp(): Express {
 
   app.use(
     '/api',
-    rateLimit({
+    limiter('api', {
       windowMs: 60_000,
-      limit: env.NODE_ENV === 'test' ? 10_000 : 300,
-      standardHeaders: 'draft-8',
-      legacyHeaders: false,
-      handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', 'Too many requests, slow down')),
+      limit: 300,
+      testLimit: 10_000,
+      message: 'Too many requests, slow down',
+      shared: false,
     }),
   );
 

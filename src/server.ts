@@ -1,10 +1,11 @@
 import 'reflect-metadata';
 import { env } from './config/env';
-import { AppDataSource } from './database/data-source';
+import { AppDataSource, useRequestTimeouts } from './database/data-source';
 import { createApp } from './app';
 import { logger } from './lib/logger';
 
 async function main() {
+  useRequestTimeouts();
   await AppDataSource.initialize();
   logger.info('Database connected');
 

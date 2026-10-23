@@ -36,3 +36,13 @@ export const AppDataSource = new DataSource({
     idleTimeoutMillis: 30_000,
   },
 });
+
+export function useRequestTimeouts() {
+  if (AppDataSource.isInitialized || env.DATABASE_STATEMENT_TIMEOUT_MS === 0) return;
+  AppDataSource.setOptions({
+    extra: {
+      ...(AppDataSource.options.extra as Record<string, unknown>),
+      statement_timeout: env.DATABASE_STATEMENT_TIMEOUT_MS,
+    },
+  });
+}

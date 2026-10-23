@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createApp } from './app';
-import { AppDataSource } from './database/data-source';
+import { AppDataSource, useRequestTimeouts } from './database/data-source';
 import { logger } from './lib/logger';
 
 const app = createApp();
@@ -9,6 +9,7 @@ let ready: Promise<unknown> | null = null;
 
 function connect() {
   if (AppDataSource.isInitialized) return Promise.resolve();
+  useRequestTimeouts();
   ready ??= AppDataSource.initialize().catch((err: unknown) => {
     ready = null;
     throw err;

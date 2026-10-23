@@ -1,8 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
-import { env } from '../../config/env';
 import { actorFrom } from '../../lib/actor';
-import { AppError } from '../../lib/errors';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
 import { documentsUpload, uploadedFiles } from '../../lib/upload';
@@ -27,20 +24,20 @@ import {
 } from './patient-app.schemas';
 import { patientAppService } from './patient-app.service';
 import { patientRequestsService } from './patient-requests.service';
+import { limiter } from '../../lib/rate-limit';
 
 export const patientAppRouter = Router();
 
-const limiter = (limit: number, message: string) =>
-  rateLimit({
-    windowMs: 15 * 60_000,
-    limit: env.NODE_ENV === 'test' ? 1_000 : limit,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    handler: (_req, _res, next) => next(new AppError(429, 'RATE_LIMITED', message)),
-  });
-
-const credentialLimiter = limiter(20, 'Too many attempts. Try again in a few minutes.');
-const requestLimiter = limiter(30, 'Too many requests sent. Try again later.');
+const credentialLimiter = limiter('patient-credentials', {
+  windowMs: 15 * 60_000,
+  limit: 20,
+  message: 'Too many attempts. Try again in a few minutes.',
+});
+const requestLimiter = limiter('patient-requests', {
+  windowMs: 15 * 60_000,
+  limit: 30,
+  message: 'Too many requests sent. Try again later.',
+});
 const byId = validate({ params: idParamsSchema });
 const patientId = (req: Parameters<typeof patientOf>[0]) => patientOf(req).patientId;
 
