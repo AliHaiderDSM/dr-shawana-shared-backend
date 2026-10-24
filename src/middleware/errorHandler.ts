@@ -2,7 +2,7 @@ import { type ErrorRequestHandler, type RequestHandler } from 'express';
 import { EntityNotFoundError, QueryFailedError } from 'typeorm';
 import { ZodError } from 'zod';
 import { AppError } from '../lib/errors';
-import { logger } from '../lib/logger';
+import { logger, safePath } from '../lib/logger';
 import { fromMulterError } from '../lib/upload';
 import { formatZodIssues } from './validate';
 
@@ -76,7 +76,10 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const appError = toAppError(err);
 
   if (!appError) {
-    logger.error({ err, requestId: req.id, method: req.method, url: req.originalUrl }, 'Unhandled error');
+    logger.error(
+      { err, requestId: req.id, method: req.method, url: safePath(req.originalUrl) },
+      'Unhandled error',
+    );
     res.status(500).json({
       error: { code: 'INTERNAL_ERROR', message: 'Something went wrong', requestId: req.id },
     });

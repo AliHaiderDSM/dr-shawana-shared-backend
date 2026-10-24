@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Audit fixes: packages, clinic day, safe logs, idempotency (2026-10-24)
+
+- Packages: `npm audit fix` (zod 4.6.7, multer 2.5.0, body-parser 2.4.0) and an `overrides` entry so `@vercel/cli-config` uses the same zod. `npm audit --omit=dev`: 0.
+- `today()` is the Pakistan date (`Asia/Karachi`, `Intl`), not UTC; `TODAY_SQL` replaces `CURRENT_DATE` in expiry queries. Test: `lib/clinic-day.test.ts`.
+- Logs: `safePath` drops the query string and hides the token of `/public/patient-history/:token` in pino-http and the unhandled-error log. Test: `lib/logger.test.ts`.
+- Idempotency: `middleware/idempotency.ts` with `Idempotency-Key` on sale create, sale payment, appointment create, appointment payment and return create. A 2xx answer is stored 24 h and replayed (`Idempotent-Replayed: true`); a failed answer frees the key; a second request while the first runs gets 409. Migration `1794500000000-IdempotencyKeys` (table `idempotency_keys`, RLS on). Test in `sales.test.ts`.
+- Full suite: 306 passed.
+
 ## Rate limits per user and per account (2026-10-24)
 
 - `rateKey`: a limiter counts by its own key (lower-cased), else the signed-in staff user, else the patient, else the IP (`ipKeyGenerator`).

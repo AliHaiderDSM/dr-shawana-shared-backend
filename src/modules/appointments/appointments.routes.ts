@@ -1,4 +1,5 @@
 import { Router, type Request } from 'express';
+import { idempotent } from '../../middleware/idempotency';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
@@ -90,6 +91,7 @@ appointmentsRouter.get(
 appointmentsRouter.post(
   path,
   can('create'),
+  idempotent('appointment-create'),
   documentFieldsUpload([
     { name: 'medicalRecordFiles', maxCount: 5 },
     { name: 'paymentProofs', maxCount: 10 },
@@ -192,6 +194,7 @@ appointmentsRouter.post(
   `${path}/:id/payments`,
   canPay('create'),
   byId,
+  idempotent('appointment-payment'),
   documentUpload('proof'),
   jsonDataField,
   validate({ body: createPaymentSchema }),

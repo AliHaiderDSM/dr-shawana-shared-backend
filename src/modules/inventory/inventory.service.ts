@@ -3,7 +3,7 @@ import { AppDataSource } from '../../database/data-source';
 import { toQuantity } from '../../database/transformers';
 import { AppError } from '../../lib/errors';
 import { escapeLike, pageMeta } from '../../lib/pagination';
-import { today } from '../../lib/validation';
+import { TODAY_SQL, today } from '../../lib/validation';
 import { productsRepository } from '../products/products.repository';
 import {
   type ExpiryAlertsQuery,
@@ -153,13 +153,13 @@ export const inventoryService = {
       await AppDataSource.query(
         `SELECT b.id AS "batchId", b.branch_id AS "branchId", br.name AS "branchName", br.kind AS "branchKind",
               b.product_id AS "productId", p.name AS "productName", p.unit, b.batch_no AS "batchNo",
-              to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate", (b.expiry_date - CURRENT_DATE)::int AS "daysLeft",
+              to_char(b.expiry_date, 'YYYY-MM-DD') AS "expiryDate", (b.expiry_date - ${TODAY_SQL})::int AS "daysLeft",
               SUM(m.qty)::text AS quantity
          FROM product_batches b
          JOIN branches br ON br.id = b.branch_id AND br.deleted_at IS NULL
          JOIN products p ON p.id = b.product_id AND p.deleted_at IS NULL
          JOIN stock_movements m ON m.batch_id = b.id
-        WHERE b.deleted_at IS NULL AND b.expiry_date <= CURRENT_DATE + $1::int
+        WHERE b.deleted_at IS NULL AND b.expiry_date <= ${TODAY_SQL} + $1::int
           ${branchId ? 'AND b.branch_id = $2' : ''}
         GROUP BY b.id, br.name, br.kind, p.name, p.unit
        HAVING SUM(m.qty) > 0

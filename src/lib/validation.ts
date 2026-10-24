@@ -18,14 +18,18 @@ export const positiveQuantityInput = decimal(3).refine((v) => Number(v) > 0, 'Mu
 
 export const dateInput = z.iso.date().openapi({ example: '2026-09-30' });
 
-const EMAIL_PATTERN = /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9_%+-])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/;
+const EMAIL_PATTERN =
+  /^[a-z0-9](?:[a-z0-9._%+-]*[a-z0-9_%+-])?@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/;
 
 export const emailInput = z
   .string()
   .trim()
   .toLowerCase()
   .max(150)
-  .refine((v) => EMAIL_PATTERN.test(v) && !v.includes('..'), 'Enter a valid email address, e.g. name@example.com')
+  .refine(
+    (v) => EMAIL_PATTERN.test(v) && !v.includes('..'),
+    'Enter a valid email address, e.g. name@example.com',
+  )
   .openapi({ format: 'email', example: 'name@example.com' });
 
 export const optionalEmailInput = emailInput.nullable().optional();
@@ -43,4 +47,15 @@ export const moneyOutput = z.string().openapi({ example: '1250.50' });
 
 export const quantityOutput = z.string().openapi({ example: '10.000' });
 
-export const today = () => new Date().toISOString().slice(0, 10);
+export const CLINIC_TIME_ZONE = 'Asia/Karachi';
+
+const clinicDay = new Intl.DateTimeFormat('en-CA', {
+  timeZone: CLINIC_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export const today = (at: Date = new Date()) => clinicDay.format(at);
+
+export const TODAY_SQL = `(now() AT TIME ZONE '${CLINIC_TIME_ZONE}')::date`;

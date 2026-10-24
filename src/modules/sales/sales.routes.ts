@@ -1,4 +1,5 @@
 import { Router, type Request } from 'express';
+import { idempotent } from '../../middleware/idempotency';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
@@ -105,6 +106,7 @@ salesRouter.get(
 salesRouter.post(
   path,
   can('create'),
+  idempotent('sale-create'),
   documentsUpload('paymentProofs', 10),
   jsonDataField,
   validate({ body: createSaleSchema }),
@@ -190,6 +192,7 @@ salesRouter.post(
   `${path}/:id/payments`,
   can('update'),
   byId,
+  idempotent('sale-payment'),
   documentsUpload('proof', 5),
   jsonDataField,
   validate({ body: createSalePaymentSchema }),

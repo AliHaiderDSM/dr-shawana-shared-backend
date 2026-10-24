@@ -691,6 +691,33 @@ describe('POS sales', () => {
     }
   });
 
+  it('saves a sale once when the same Idempotency-Key is sent twice', async () => {
+    const send = (key: string, qty = '1') =>
+      api('post', '/branch/sales', admin)
+        .set('Idempotency-Key', key)
+        .send({ patientId, saleType: 'office', items: [{ productId: toner, qty }], payments: pay() });
+    const key = `sale-${Date.now()}`;
+    const first = await send(key);
+    expect(first.status).toBe(201);
+    const again = await send(key);
+    expect(again.status).toBe(201);
+    expect(again.headers['idempotent-replayed']).toBe('true');
+    expect(again.body.data.id).toBe(first.body.data.id);
+    const listed = await api('get', `/branch/sales?search=${first.body.data.invoiceNo}`, admin);
+    expect(listed.body.data).toHaveLength(1);
+
+    const failedKey = `fail-${Date.now()}`;
+    expect((await send(failedKey, '9999')).status).toBe(422);
+    const retried = await send(failedKey);
+    expect(retried.status).toBe(201);
+    expect(retried.headers['idempotent-replayed']).toBeUndefined();
+    expect((await send('bad key!')).status).toBe(400);
+
+    for (const id of [first.body.data.id, retried.body.data.id]) {
+      expect((await api('delete', `/branch/sales/${id}`, admin)).status).toBe(204);
+    }
+  });
+
   describe('online orders booked now and dispatched later', () => {
     const balance = async (productId: string) =>
       (await api('get', '/branch/inventory/stock?pageSize=100', admin)).body.data.find(

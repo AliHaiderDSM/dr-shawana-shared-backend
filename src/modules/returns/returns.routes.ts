@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { idempotent } from '../../middleware/idempotency';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
@@ -48,12 +49,18 @@ returnsRouter.get(
   },
 );
 
-returnsRouter.post(path, can('create'), validate({ body: createReturnSchema }), async (req, res) => {
-  sendCreated(
-    res,
-    await returnsService.create(actorFrom(req), branchIdOf(req), validBody(req, createReturnSchema)),
-  );
-});
+returnsRouter.post(
+  path,
+  can('create'),
+  idempotent('return-create'),
+  validate({ body: createReturnSchema }),
+  async (req, res) => {
+    sendCreated(
+      res,
+      await returnsService.create(actorFrom(req), branchIdOf(req), validBody(req, createReturnSchema)),
+    );
+  },
+);
 
 returnsRouter.get(`${path}/:id`, can('view'), byId, async (req, res) => {
   sendOk(res, await returnsService.get(req.branchId ?? null, idOf(req)));

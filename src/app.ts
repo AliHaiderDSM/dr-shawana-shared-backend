@@ -8,7 +8,7 @@ import swaggerUi from 'swagger-ui-express';
 import { env, isProduction } from './config/env';
 import { buildOpenApiDocument } from './docs';
 import { AppError } from './lib/errors';
-import { logger } from './lib/logger';
+import { logger, safePath } from './lib/logger';
 import { requestTiming } from './lib/perf';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { RESOURCES_PATH } from './modules/educational-resources/educational-resources.service';
@@ -28,6 +28,13 @@ export function createApp(): Express {
     pinoHttp({
       logger,
       genReqId: (req) => (req as express.Request).id,
+      serializers: {
+        req: (req: { id?: unknown; method?: string; url?: string }) => ({
+          id: req.id,
+          method: req.method,
+          url: safePath(req.url),
+        }),
+      },
       autoLogging: { ignore: (req) => req.url === '/api/v1/health' },
     }),
   );

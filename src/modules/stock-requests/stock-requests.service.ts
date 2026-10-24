@@ -6,7 +6,7 @@ import { toQuantity } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { escapeLike } from '../../lib/pagination';
-import { today } from '../../lib/validation';
+import { TODAY_SQL, today } from '../../lib/validation';
 import { auditService } from '../audit/audit.service';
 import { MIN_SHELF_DAYS } from '../inventory/shelf-life';
 import { transfersService } from '../inventory/transfers.service';
@@ -39,7 +39,7 @@ async function warehouseId(manager: EntityManager) {
 }
 
 const SELLABLE = `COALESCE((SELECT SUM(m.qty) FROM stock_movements m LEFT JOIN product_batches b ON b.id = m.batch_id
-                    WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= CURRENT_DATE + ${MIN_SHELF_DAYS})), 0)`;
+                    WHERE m.product_id = p.id AND (b.expiry_date IS NULL OR b.expiry_date >= ${TODAY_SQL} + ${MIN_SHELF_DAYS})), 0)`;
 
 const person = (alias: string) =>
   `CASE WHEN ${alias}.id IS NULL THEN NULL ELSE json_build_object('id', ${alias}.id,
