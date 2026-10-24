@@ -8,7 +8,7 @@ import { validate, validBody } from '../../middleware/validate';
 import { authService } from '../auth/auth.service';
 import { normalizePhone } from '../patients/phone';
 import { patientAuth } from './patient-auth';
-import { limiter } from '../../lib/rate-limit';
+import { loginGuard } from '../../lib/rate-limit';
 
 const NO_MATCH = 'This phone, email or username and password do not match a patient or doctor account.';
 const STAFF_ONLY = 'This is a clinic staff account. Only doctors use the app; other staff use the dashboard.';
@@ -84,11 +84,7 @@ export const appLoginRouter = Router();
 
 appLoginRouter.post(
   '/app/login',
-  limiter('app-login', {
-    windowMs: 15 * 60_000,
-    limit: 20,
-    message: 'Too many attempts. Try again in a few minutes.',
-  }),
+  ...loginGuard('app-login', (body) => body.identifier),
   validate({ body: appLoginSchema }),
   async (req, res) => {
     sendOk(res, await appLogin(validBody(req, appLoginSchema)));

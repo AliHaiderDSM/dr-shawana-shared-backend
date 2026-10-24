@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import { perUserLimit } from '../../lib/rate-limit';
 import { promisify } from 'node:util';
 import { type RequestHandler } from 'express';
 import { AppDataSource } from '../../database/data-source';
@@ -285,7 +286,8 @@ function bearerToken(header: string | undefined) {
   return scheme?.toLowerCase() === 'bearer' && token ? token : null;
 }
 
-export const authenticatePatient: RequestHandler = async (req, _res, next) => {
+export const authenticatePatient: RequestHandler = async (req, res, next) => {
+  if (req.patient) return next();
   const token = bearerToken(req.header('authorization'));
   const payload = token
     ? readSignedToken<{ kind?: unknown; patientId?: unknown; sid?: unknown }>(token)
@@ -308,7 +310,7 @@ export const authenticatePatient: RequestHandler = async (req, _res, next) => {
   )) as { id: string }[];
   if (!session) return next(AppError.unauthorized(SESSION_ENDED));
   req.patient = { patientId: payload.patientId, sessionId: payload.sid };
-  next();
+  void perUserLimit(req, res, next);
 };
 
 export function patientOf(req: { patient?: { patientId: string; sessionId: string } }) {

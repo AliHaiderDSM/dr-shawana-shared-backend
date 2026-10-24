@@ -22,6 +22,19 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Rate limits per user and per account (2026-10-24)
+
+- `rateKey`: a limiter counts by its own key (lower-cased), else the signed-in staff user, else the patient, else the IP (`ipKeyGenerator`).
+- Logins (`/auth/login`, `/app/login`, patient login, password login, reset): `loginGuard` = 10 wrong attempts per account per 15 min (Redis) + 200 attempts per IP per 15 min. Refresh: 60 per IP per 15 min. Change password: 10 wrong per user per 15 min.
+- After sign-in, `authenticate` / `authenticatePatient` apply `perUserLimit`: 300 requests per user per minute, in memory (not Redis, to save commands). The `/api` network guard is 1,500 per IP per minute, in memory.
+- Chat messages (60/15 min) and patient requests (30/15 min) now count per patient instead of per IP.
+- Full suite: 302 passed.
+
+## Return value, doctor month calendar (2026-10-24)
+
+- `GET /branch/returns/sale/:saleId/returnable` gives the sale `discountPercent` and per item `unitPrice` (line total ÷ qty × sale total ÷ subtotal), so the overall discount is shared by price.
+- Doctor app: `/doctor/home` schedule is today only; `/doctor/appointments?month=YYYY-MM` returns the whole month (up to 500).
+
 ## Overall discount needs the Super Admin (2026-10-24)
 
 - A discount request without productId/bundleId is an overall request: `saleAmount` + `discountPercent` (stored as qty 1 × unit_price = sale amount). DTO has `scope: 'item' | 'sale'`. Migration `1794400000000-OverallDiscountRequests` lets product_id and bundle_id both be null.

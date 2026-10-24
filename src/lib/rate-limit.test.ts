@@ -1,5 +1,6 @@
 import { env } from '../config/env';
-import { RedisStore } from './rate-limit';
+import { type Request } from 'express';
+import { rateKey, RedisStore } from './rate-limit';
 
 describe('RedisStore', () => {
   const saved = { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN };
@@ -50,5 +51,22 @@ describe('RedisStore', () => {
       .spyOn(global, 'fetch')
       .mockResolvedValue(new Response(JSON.stringify({ error: 'WRONGPASS' }), { status: 401 }));
     expect((await store().increment('9.9.9.9')).totalHits).toBe(1);
+  });
+});
+
+describe('rate limit keys', () => {
+  const req = (extra: Partial<Request>) => ({ ip: '10.0.0.7', body: {}, ...extra }) as Request;
+
+  it('counts a signed-in staff member or patient on their own, not their network', () => {
+    expect(rateKey(req({ auth: { userId: 'u1' } as Request['auth'] }))).toBe('user:u1');
+    expect(rateKey(req({ patient: { patientId: 'p1', sessionId: 's1' } }))).toBe('patient:p1');
+  });
+
+  it('counts a login by the account it tries, falling back to the network', () => {
+    const byAccount = (body: Record<string, unknown>) => body.identifier;
+    expect(rateKey(req({ body: { identifier: ' Rabbia@DSM.pk ' } }), (r) => byAccount(r.body))).toBe(
+      'id:rabbia@dsm.pk',
+    );
+    expect(rateKey(req({ body: {} }), (r) => byAccount(r.body))).toBe('ip:10.0.0.7');
   });
 });

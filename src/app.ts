@@ -56,10 +56,11 @@ export function createApp(): Express {
     '/api',
     limiter('api', {
       windowMs: 60_000,
-      limit: 300,
+      limit: 1_500,
       testLimit: 10_000,
-      message: 'Too many requests, slow down',
+      message: 'Too many requests from this network, slow down',
       shared: false,
+      byIp: true,
     }),
   );
 

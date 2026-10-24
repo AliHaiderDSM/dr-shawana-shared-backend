@@ -1,6 +1,7 @@
 import { type RequestHandler } from 'express';
 import { AppError } from '../lib/errors';
 import { verifySupabaseJwt } from '../lib/jwt';
+import { perUserLimit } from '../lib/rate-limit';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { authService } from '../modules/auth/auth.service';
 
@@ -36,7 +37,7 @@ async function remoteUserId(token: string) {
   return data.user.id;
 }
 
-export const authenticate: RequestHandler = async (req, _res, next) => {
+export const authenticate: RequestHandler = async (req, res, next) => {
   if (req.auth) return next();
   const token = bearerToken(req.header('authorization'));
   if (!token) return next(AppError.unauthorized());
@@ -45,5 +46,5 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
   if (!userId) return next(AppError.unauthorized('Invalid or expired token'));
 
   req.auth = await authService.resolveContext(userId);
-  next();
+  void perUserLimit(req, res, next);
 };

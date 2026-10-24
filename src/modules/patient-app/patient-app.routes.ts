@@ -24,14 +24,22 @@ import {
 } from './patient-app.schemas';
 import { patientAppService } from './patient-app.service';
 import { patientRequestsService } from './patient-requests.service';
-import { limiter } from '../../lib/rate-limit';
+import { limiter, loginGuard } from '../../lib/rate-limit';
 
 export const patientAppRouter = Router();
 
-const credentialLimiter = limiter('patient-credentials', {
+const credentialLimiter = loginGuard('patient-login', (body) => body.phone);
+const refreshLimiter = limiter('patient-refresh', {
   windowMs: 15 * 60_000,
-  limit: 20,
+  limit: 60,
+  byIp: true,
   message: 'Too many attempts. Try again in a few minutes.',
+});
+const passwordLimiter = limiter('patient-password', {
+  windowMs: 15 * 60_000,
+  limit: 10,
+  failuresOnly: true,
+  message: 'Too many wrong passwords. Try again in 15 minutes.',
 });
 const requestLimiter = limiter('patient-requests', {
   windowMs: 15 * 60_000,
@@ -43,7 +51,7 @@ const patientId = (req: Parameters<typeof patientOf>[0]) => patientOf(req).patie
 
 patientAppRouter.post(
   '/patient/auth/login',
-  credentialLimiter,
+  ...credentialLimiter,
   validate({ body: patientLoginSchema }),
   async (req, res) => {
     sendOk(res, await patientAuth.loginWithCode(validBody(req, patientLoginSchema)));
@@ -52,7 +60,7 @@ patientAppRouter.post(
 
 patientAppRouter.post(
   '/patient/auth/password-login',
-  credentialLimiter,
+  ...credentialLimiter,
   validate({ body: patientPasswordLoginSchema }),
   async (req, res) => {
     sendOk(res, await patientAuth.loginWithPassword(validBody(req, patientPasswordLoginSchema)));
@@ -61,7 +69,7 @@ patientAppRouter.post(
 
 patientAppRouter.post(
   '/patient/auth/reset-password',
-  credentialLimiter,
+  ...credentialLimiter,
   validate({ body: patientResetPasswordSchema }),
   async (req, res) => {
     sendOk(res, await patientAuth.resetPassword(validBody(req, patientResetPasswordSchema)));
@@ -70,7 +78,7 @@ patientAppRouter.post(
 
 patientAppRouter.post(
   '/patient/auth/refresh',
-  credentialLimiter,
+  refreshLimiter,
   validate({ body: patientRefreshSchema }),
   async (req, res) => {
     sendOk(res, await patientAuth.refresh(validBody(req, patientRefreshSchema).refreshToken));
@@ -98,7 +106,7 @@ patientAppRouter.patch('/patient/me', validate({ body: updatePatientProfileSchem
 
 patientAppRouter.post(
   '/patient/me/password',
-  credentialLimiter,
+  passwordLimiter,
   validate({ body: patientSetPasswordSchema }),
   async (req, res) => {
     await patientAuth.setPassword(patientId(req), validBody(req, patientSetPasswordSchema));
