@@ -112,6 +112,13 @@ describe('doctor app', () => {
       [],
     );
     expect((await staff('get', '/doctor/appointments?when=soon', doctorUser)).status).toBe(400);
+    const september = await staff('get', '/doctor/appointments?month=2026-09', doctorUser);
+    expect(september.body.data).toMatchObject({ hasMore: false, items: [{ id: appointmentId }] });
+    expect((await staff('get', '/doctor/appointments?month=2026-10', doctorUser)).body.data.items).toEqual(
+      [],
+    );
+    expect((await staff('get', '/doctor/appointments?month=2026-13', doctorUser)).status).toBe(400);
+    expect((await staff('get', '/doctor/home', doctorUser)).body.data.schedule).toEqual([]);
     expect((await staff('get', '/doctor/home', doctorUser)).body.data.counts.appointments).toBe(1);
   });
 

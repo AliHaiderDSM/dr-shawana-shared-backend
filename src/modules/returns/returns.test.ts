@@ -236,4 +236,39 @@ describe('Sale returns and barcodes', () => {
     expect((await api('delete', `/branch/returns/${second.body.data.id}`, admin)).status).toBe(204);
     expect(await stock(serum)).toBe('9.000');
   });
+
+  it('values each unit after its product discount and its price share of the overall discount', async () => {
+    const sale = await request(app)
+      .post(`/api/v1/branch/sales?branchId=${ownerBranch}`)
+      .set(bearer(owner))
+      .send({
+        patient: { name: 'Hina', phone: '923004445556', city: 'Lahore' },
+        saleType: 'office',
+        discountPercent: '10',
+        items: [
+          { productId: serum, qty: '2', discountPercent: '20' },
+          { productId: toner, qty: '1' },
+        ],
+        payments: [{ method: 'cash', amount: '1', accountSheetId: cashSheet }],
+      });
+    expect(sale.status).toBe(201);
+    const { subtotal, total, items } = sale.body.data as {
+      subtotal: string;
+      total: string;
+      items: { productId: string; qty: string; lineTotal: string }[];
+    };
+    const kept = Number(total) / Number(subtotal);
+    const expected = (productId: string) => {
+      const line = items.find((i) => i.productId === productId)!;
+      return ((Number(line.lineTotal) / Number(line.qty)) * kept).toFixed(2);
+    };
+    const returnable = (await api('get', `/branch/returns/sale/${sale.body.data.id}/returnable`, admin)).body
+      .data;
+    expect(returnable.discountPercent).toBe('10.00');
+    const price = (productId: string) =>
+      returnable.items.find((i: { productId: string }) => i.productId === productId).unitPrice;
+    expect(price(serum)).toBe(expected(serum));
+    expect(price(toner)).toBe(expected(toner));
+    expect(Number(price(serum)) * 2 + Number(price(toner))).toBeCloseTo(Number(total), 1);
+  });
 });

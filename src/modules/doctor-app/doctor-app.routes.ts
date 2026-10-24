@@ -19,6 +19,13 @@ const patientsQuery = z.object({ search: z.string().trim().max(100).optional() }
 const appointmentsQuery = z.object({
   when: z.enum(['upcoming', 'past']).default('upcoming'),
   page: z.coerce.number().int().min(1).max(1000).default(1),
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM')
+    .optional()
+    .openapi({
+      description: 'Every appointment of this month (YYYY-MM), oldest first; when and page are ignored',
+    }),
 });
 const remarksBody = registry.register(
   'DoctorRemarks',
@@ -89,8 +96,8 @@ doctorAppRouter.put('/doctor/profile', validate({ body: profileBody }), async (r
 });
 
 doctorAppRouter.get('/doctor/appointments', validate({ query: appointmentsQuery }), async (req, res) => {
-  const { when, page } = validQuery(req, appointmentsQuery);
-  sendOk(res, await doctorAppService.appointments(req.auth!.userId, when, page));
+  const { when, page, month } = validQuery(req, appointmentsQuery);
+  sendOk(res, await doctorAppService.appointments(req.auth!.userId, when, page, month));
 });
 
 doctorAppRouter.get('/doctor/patients', validate({ query: patientsQuery }), async (req, res) => {
@@ -239,7 +246,7 @@ registry.registerPath({
   method: 'get',
   path: '/doctor/appointments',
   summary:
-    'Own appointments in every branch: upcoming (today onwards, soonest first) or past (newest first), 30 a page',
+    'Own appointments in every branch: upcoming (today onwards, soonest first) or past (newest first), 30 a page; or a whole month with ?month=YYYY-MM',
   request: { query: appointmentsQuery },
   responses: ok('Appointments page'),
 });

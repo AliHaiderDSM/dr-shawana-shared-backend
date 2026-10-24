@@ -33,12 +33,10 @@ export const createReturnSchema = registry.register(
     .object({
       saleId: z.uuid(),
       date: dateInput.optional(),
-      reason: z
-        .enum(NEW_RETURN_REASONS)
-        .openapi({
-          description:
-            'Why the customer returned it. Damaged or expired stock is never sold, so it is not a reason.',
-        }),
+      reason: z.enum(NEW_RETURN_REASONS).openapi({
+        description:
+          'Why the customer returned it. Damaged or expired stock is never sold, so it is not a reason.',
+      }),
       note: optionalText(5000),
       items: z
         .array(
@@ -167,6 +165,7 @@ export const returnableSchema = registry.register(
     invoiceNo: z.string(),
     received: moneyOutput,
     refunded: moneyOutput,
+    discountPercent: z.string().openapi({ description: 'Overall discount of the sale' }),
     items: z.array(
       z.object({
         productId: z.uuid(),
@@ -174,6 +173,10 @@ export const returnableSchema = registry.register(
         sold: quantityOutput,
         returned: quantityOutput,
         returnable: quantityOutput,
+        unitPrice: moneyOutput.openapi({
+          description:
+            'What one unit really cost the customer: its line total after the product discount, less its share of the overall discount (shared by price)',
+        }),
         trackSerials: z.boolean(),
         serials: z.array(z.string()).openapi({ description: 'Labels sold on the sale and not returned yet' }),
       }),

@@ -64,6 +64,7 @@ function bloodWork(rows: { test: string; date: string; value: string; unit: stri
 }
 
 const APPOINTMENT_PAGE = 30;
+const MONTH_LIMIT = 500;
 
 const iso = (value: Date | string | null) =>
   value === null ? null : value instanceof Date ? value.toISOString() : String(value);
@@ -99,9 +100,9 @@ export const doctorAppService = {
          FROM appointments a
          JOIN patients p ON p.id = a.patient_id AND p.deleted_at IS NULL
          JOIN branches b ON b.id = a.branch_id
-        WHERE a.doctor_id = $1 AND a.deleted_at IS NULL AND a.date >= $2::date AND a.status <> 'cancelled'
-        ORDER BY a.date, a.time_from
-        LIMIT 12`,
+        WHERE a.doctor_id = $1 AND a.deleted_at IS NULL AND a.date = $2::date AND a.status <> 'cancelled'
+        ORDER BY a.time_from
+        LIMIT 100`,
       [doctor.id, on],
     )) as {
       id: string;
@@ -158,10 +159,16 @@ export const doctorAppService = {
     };
   },
 
-  async appointments(staffId: string, when: 'upcoming' | 'past', page: number) {
+  async appointments(staffId: string, when: 'upcoming' | 'past', page: number, month?: string) {
     const doctor = await doctorOf(staffId);
-    const size = APPOINTMENT_PAGE;
+    const size = month ? MONTH_LIMIT : APPOINTMENT_PAGE;
     const upcoming = when === 'upcoming';
+    const range = month
+      ? "a.date >= $2::date AND a.date < ($2::date + INTERVAL '1 month')"
+      : upcoming
+        ? 'a.date >= $2::date'
+        : 'a.date < $2::date';
+    const order = month || upcoming ? 'ASC' : 'DESC';
     const rows = (await AppDataSource.query(
       `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
               a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode, a.issues,
@@ -170,10 +177,10 @@ export const doctorAppService = {
          JOIN patients p ON p.id = a.patient_id AND p.deleted_at IS NULL
          JOIN branches b ON b.id = a.branch_id
         WHERE a.doctor_id = $1 AND a.deleted_at IS NULL
-          AND ${upcoming ? 'a.date >= $2::date' : 'a.date < $2::date'}
-        ORDER BY a.date ${upcoming ? 'ASC' : 'DESC'}, a.time_from ${upcoming ? 'ASC' : 'DESC'}
+          AND ${range}
+        ORDER BY a.date ${order}, a.time_from ${order}
         LIMIT $3 OFFSET $4`,
-      [doctor.id, today(), size + 1, (page - 1) * size],
+      [doctor.id, month ? `${month}-01` : today(), size + 1, month ? 0 : (page - 1) * size],
     )) as {
       id: string;
       appointmentNo: number;

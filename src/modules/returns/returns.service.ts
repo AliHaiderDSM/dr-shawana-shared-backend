@@ -68,6 +68,7 @@ interface SaleLine {
   barcode: string | null;
   sold: Decimal;
   returned: Decimal;
+  lineTotal: Decimal;
 }
 
 function toReturnDto(r: SaleReturn) {
@@ -136,10 +137,16 @@ async function lockSale(manager: EntityManager, branchId: string, saleId: string
 }
 
 async function saleLines(manager: EntityManager, saleId: string): Promise<Map<string, SaleLine>> {
-  const rows: { productId: string; name: string; barcode: string | null; sold: string; returned: string }[] =
-    await manager.query(
-      `SELECT si.product_id AS "productId", p.name, p.barcode,
-              SUM(si.qty)::text AS sold,
+  const rows: {
+    productId: string;
+    name: string;
+    barcode: string | null;
+    sold: string;
+    returned: string;
+    lineTotal: string;
+  }[] = await manager.query(
+    `SELECT si.product_id AS "productId", p.name, p.barcode,
+              SUM(si.qty)::text AS sold, SUM(si.line_total)::text AS "lineTotal",
               COALESCE((SELECT SUM(ri.qty) FROM sale_return_items ri
                           JOIN sale_returns r ON r.id = ri.sale_return_id AND r.deleted_at IS NULL
                          WHERE r.sale_id = $1 AND ri.product_id = si.product_id AND ri.deleted_at IS NULL), 0)::text AS returned
@@ -147,8 +154,8 @@ async function saleLines(manager: EntityManager, saleId: string): Promise<Map<st
         WHERE si.sale_id = $1 AND si.deleted_at IS NULL
         GROUP BY si.product_id, p.name, p.barcode
         ORDER BY p.name`,
-      [saleId],
-    );
+    [saleId],
+  );
   return new Map(
     rows.map((r) => [
       r.productId,
@@ -158,6 +165,7 @@ async function saleLines(manager: EntityManager, saleId: string): Promise<Map<st
         barcode: r.barcode,
         sold: new Decimal(r.sold),
         returned: new Decimal(r.returned),
+        lineTotal: new Decimal(r.lineTotal),
       },
     ]),
   );
@@ -466,9 +474,12 @@ export const returnsService = {
     ]);
     const tracked = new Set([...lines.keys()].filter((id) => stockTracked.has(stockMap.get(id) ?? id)));
     const stockIdOf = (id: string) => stockMap.get(id) ?? id;
+    const subtotal = new Decimal(sale.subtotal);
+    const kept = subtotal.gt(0) ? new Decimal(sale.total).div(subtotal) : new Decimal(1);
     return {
       saleId,
       invoiceNo: sale.invoiceNo,
+      discountPercent: new Decimal(sale.discountPercent).toFixed(2),
       received: toMoney(sale.received),
       refunded: toMoney(await refundedFor(manager, saleId)),
       items: [...lines.values()].map((l) => ({
@@ -477,6 +488,7 @@ export const returnsService = {
         sold: toQuantity(l.sold),
         returned: toQuantity(l.returned),
         returnable: toQuantity(Decimal.max(l.sold.minus(l.returned), 0)),
+        unitPrice: toMoney(l.sold.gt(0) ? l.lineTotal.div(l.sold).times(kept) : 0),
         trackSerials: tracked.has(l.productId),
         serials: sold.filter((i) => i.productId === stockIdOf(l.productId)).map((i) => i.serial),
       })),
