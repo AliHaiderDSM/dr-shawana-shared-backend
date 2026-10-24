@@ -38,6 +38,12 @@ describe('POS sales', () => {
 
   const pay = (amount = '1') => [{ method: 'cash', amount, accountSheetId: cashSheet }];
 
+  const overallApproval = async (who: { id: string }, saleAmount: string, discountPercent: string) => {
+    const asked = await api('post', '/branch/discount-requests', who).send({ saleAmount, discountPercent });
+    await api('post', `/admin/discount-requests/${asked.body.data.id}/approve`, owner).send({});
+    return asked.body.data.id as string;
+  };
+
   async function stock(productId: string) {
     const res = await api('get', '/branch/inventory/stock?pageSize=100', admin);
     return res.body.data.find((r: { productId: string }) => r.productId === productId)?.quantity as string;
@@ -100,6 +106,7 @@ describe('POS sales', () => {
   });
 
   it('prices items on the server, expands bundles, takes payments and reduces stock', async () => {
+    const overallId = await overallApproval(frontDesk, '3700', '10');
     const res = await request(app)
       .post('/api/v1/branch/sales')
       .set(bearer(frontDesk))
@@ -110,6 +117,7 @@ describe('POS sales', () => {
           date: '2026-09-10',
           saleType: 'office',
           discountPercent: '10',
+          discountRequestId: overallId,
           items: [
             { productId: serum, qty: '2' },
             { bundleId, qty: '1' },
@@ -223,6 +231,7 @@ describe('POS sales', () => {
       patient: { name: 'Walk In', phone: '923331112222', city: 'Lahore' },
       saleType: 'online',
       autoDiscount: true,
+      discountRequestId: await overallApproval(admin, '1000', '10'),
       items: [{ productId: serum, qty: '1' }],
       payments: [{ method: 'cash', amount: '900', accountSheetId: cashSheet }],
     });
@@ -514,10 +523,11 @@ describe('POS sales', () => {
 
   it('takes a line discount only after the Super Admin approves it, with the sale discount on top', async () => {
     const superAdmin = await createStaff(fake, { role: 'super_admin', branchId: null });
-    const body = (discountRequestId?: string) => ({
+    const body = (discountRequestId?: string, overallId?: string) => ({
       patientId,
       saleType: 'office',
       discountPercent: '10',
+      ...(overallId ? { discountRequestId: overallId } : {}),
       items: [
         {
           productId: serum,
@@ -552,7 +562,7 @@ describe('POS sales', () => {
       (await api('post', `/branch/discount-requests/${walkIn.body.data.id}/cancel`, frontDesk)).status,
     ).toBe(200);
     expect(asked.body.data).toMatchObject({
-      requestNo: 'LHR-DR-000001',
+      requestNo: expect.stringMatching(/^LHR-DR-/),
       status: 'pending',
       discountAmount: '500.00',
       requestedBy: { id: frontDesk.id, role: 'front_desk' },
@@ -571,7 +581,9 @@ describe('POS sales', () => {
       note: 'OK',
     });
     expect(approved.body.data).toMatchObject({ status: 'approved', decidedBy: { id: superAdmin.id } });
-    const res = await api('post', '/branch/sales', admin).send(body(requestId));
+    const res = await api('post', '/branch/sales', admin).send(
+      body(requestId, await overallApproval(admin, '2500', '10')),
+    );
     expect(res.status).toBe(201);
     const after = (await api('get', `/branch/discount-requests?ids=${requestId}`, admin)).body.data[0];
     expect(after).toMatchObject({
@@ -615,6 +627,68 @@ describe('POS sales', () => {
       payments: pay(),
     });
     expect(tooMuch.status).toBe(400);
+  });
+
+  it('takes an overall discount only after the Super Admin approves it, and not more than approved', async () => {
+    const body = (discountPercent: string, discountRequestId?: string) => ({
+      patientId,
+      saleType: 'office',
+      discountPercent,
+      ...(discountRequestId ? { discountRequestId } : {}),
+      items: [{ productId: toner, qty: '2' }],
+      payments: pay(),
+    });
+    const unasked = await api('post', '/branch/sales', frontDesk).send(body('20'));
+    expect(unasked.status).toBe(422);
+    expect(unasked.body.error.message).toContain('overall discount');
+    expect(
+      (await api('post', '/branch/discount-requests', frontDesk).send({ discountPercent: '20' })).status,
+    ).toBe(400);
+    const asked = await api('post', '/branch/discount-requests', frontDesk).send({
+      saleAmount: '1000',
+      discountPercent: '20',
+      note: 'Old patient',
+      patientId,
+    });
+    expect(asked.status).toBe(201);
+    expect(asked.body.data).toMatchObject({
+      scope: 'sale',
+      productId: null,
+      bundleId: null,
+      itemName: 'Overall discount on the sale',
+      discountAmount: '200.00',
+      status: 'pending',
+    });
+    const id = asked.body.data.id as string;
+    const waiting = await api('post', '/branch/sales', frontDesk).send(body('20', id));
+    expect(waiting.status).toBe(422);
+    expect(waiting.body.error.message).toContain('waiting');
+    await api('post', `/admin/discount-requests/${id}/approve`, owner).send({}).expect(200);
+    const tooBig = await api('post', '/branch/sales', frontDesk).send(body('25', id));
+    expect(tooBig.status).toBe(422);
+    expect(tooBig.body.error.message).toContain('approved overall discount is 20.00%');
+    const sold = await api('post', '/branch/sales', frontDesk).send(body('20', id));
+    expect(sold.status).toBe(201);
+    expect(sold.body.data).toMatchObject({ subtotal: '1000.00', discountAmount: '200.00', total: '800.00' });
+    const used = (await api('get', `/branch/discount-requests?ids=${id}`, frontDesk)).body.data[0];
+    expect(used).toMatchObject({ status: 'used', saleId: sold.body.data.id });
+    expect((await api('post', '/branch/sales', frontDesk).send(body('20', id))).status).toBe(422);
+
+    const saleUrl = `/branch/sales/${sold.body.data.id}`;
+    expect((await api('patch', saleUrl, frontDesk).send({ note: 'Kept' })).status).toBe(200);
+    expect((await api('patch', saleUrl, frontDesk).send({ discountPercent: '15' })).status).toBe(200);
+    expect((await api('patch', saleUrl, frontDesk).send({ discountPercent: '20' })).status).toBe(200);
+    const raised = await api('patch', saleUrl, frontDesk).send({ discountPercent: '30' });
+    expect(raised.status).toBe(422);
+    expect(
+      (await api('patch', `${saleUrl}?branchId=${ownerBranch}`, owner).send({ discountPercent: '30' }))
+        .status,
+    ).toBe(200);
+    const plain = await api('post', '/branch/sales', admin).send(body('0'));
+    expect(plain.status).toBe(201);
+    for (const id of [sold.body.data.id, plain.body.data.id]) {
+      expect((await api('delete', `/branch/sales/${id}`, admin)).status).toBe(204);
+    }
   });
 
   describe('online orders booked now and dispatched later', () => {

@@ -47,7 +47,7 @@ const SELECT = `
   SELECT r.id, r.request_no AS "requestNo", r.branch_id AS "branchId", b.name AS "branchName", b.code AS "branchCode",
          r.created_by AS "requesterId", NULLIF(TRIM(CONCAT(rq.first_name, ' ', rq.last_name)), '') AS "requesterName",
          rq.role::text AS "requesterRole",
-         r.product_id AS "productId", r.bundle_id AS "bundleId", COALESCE(p.name, bu.name, 'Item') AS "itemName",
+         r.product_id AS "productId", r.bundle_id AS "bundleId", COALESCE(p.name, bu.name, CASE WHEN r.product_id IS NULL AND r.bundle_id IS NULL THEN 'Overall discount on the sale' END, 'Item') AS "itemName",
          r.qty::text AS qty, r.unit_price::text AS "unitPrice", r.discount_percent::text AS "discountPercent",
          r.note, r.status, r.decided_by AS "deciderId",
          NULLIF(TRIM(CONCAT(dc.first_name, ' ', dc.last_name)), '') AS "deciderName", dc.role::text AS "deciderRole",
@@ -75,6 +75,7 @@ function toDto(r: Row) {
     requestedBy: r.requesterId
       ? { id: r.requesterId, name: r.requesterName ?? 'Staff', role: r.requesterRole ?? '' }
       : null,
+    scope: r.productId || r.bundleId ? ('item' as const) : ('sale' as const),
     productId: r.productId,
     bundleId: r.bundleId,
     itemName: r.itemName,
@@ -133,6 +134,13 @@ async function record(
   );
 }
 
+const isOverall = (request: DiscountRequest) => !request.productId && !request.bundleId;
+
+export interface OverallDiscount {
+  discountAmount: Decimal;
+  discountRequestId?: string;
+}
+
 export interface DiscountedLine {
   productId?: string;
   bundleId?: string;
@@ -174,7 +182,9 @@ export const discountRequestsService = {
   async create(actor: Actor, branchId: string, input: CreateDiscountRequestInput) {
     return withTransaction(async (em) => {
       let unitPrice: Decimal;
-      if (input.productId) {
+      if (!input.productId && !input.bundleId) {
+        unitPrice = toMoney(input.saleAmount ?? 0);
+      } else if (input.productId) {
         const department = await dispatchDepartment(em);
         const product = await repo(Product, em).findOne({
           where: [
@@ -204,7 +214,7 @@ export const discountRequestsService = {
           requestNo: `${branch.code}-DR-${String(seq).padStart(6, '0')}`,
           productId: input.productId ?? null,
           bundleId: input.bundleId ?? null,
-          qty: toQuantity(input.qty),
+          qty: toQuantity(input.productId || input.bundleId ? (input.qty ?? 1) : 1),
           unitPrice,
           discountPercent: new Decimal(input.discountPercent).toFixed(2),
           note: input.note ?? null,
@@ -266,6 +276,7 @@ export const discountRequestsService = {
     for (const [index, input] of inputs.entries()) {
       const percent = new Decimal(input.discountPercent ?? 0);
       if (percent.lte(0) || actor.isSuperAdmin) continue;
+      if (!input.productId && !input.bundleId) continue;
       const label = `Item ${index + 1}`;
       const requestId =
         input.discountRequestId ??
@@ -299,6 +310,7 @@ export const discountRequestsService = {
         throw AppError.unprocessable(`${label}: the discount request was ${request.status}`, { index });
       }
       if (
+        isOverall(request) ||
         (request.productId ?? null) !== (input.productId ?? null) ||
         (request.bundleId ?? null) !== (input.bundleId ?? null)
       ) {
@@ -326,8 +338,67 @@ export const discountRequestsService = {
     }
     await manager.query(
       `UPDATE discount_requests SET status = 'approved', sale_id = NULL, updated_by = $3
-        WHERE sale_id = $1 AND status = 'used' AND NOT (id = ANY($2::uuid[]))`,
+        WHERE sale_id = $1 AND status = 'used' AND NOT (id = ANY($2::uuid[]))
+          AND (product_id IS NOT NULL OR bundle_id IS NOT NULL)`,
       [saleId, [...used], actor.userId],
+    );
+  },
+
+  async consumeOverall(
+    manager: EntityManager,
+    actor: Actor,
+    branchId: string,
+    saleId: string,
+    discount: OverallDiscount,
+  ) {
+    if (actor.isSuperAdmin) return;
+    const earlier = (await repo(DiscountRequest, manager).findBy({ saleId, status: 'used' })).find(isOverall);
+    const keep: string[] = [];
+    if (discount.discountAmount.gt(0)) {
+      const requestId = discount.discountRequestId ?? earlier?.id;
+      if (!requestId) {
+        throw AppError.unprocessable(
+          "The overall discount needs the Super Admin's approval. Send a discount request first.",
+          { field: 'discountPercent' },
+        );
+      }
+      const request = await lockRequest(manager, requestId);
+      const reusable = request.status === 'used' && request.saleId === saleId;
+      if (request.branchId !== branchId || !isOverall(request)) {
+        throw AppError.unprocessable('This approval is not for an overall discount of this branch', {
+          field: 'discountPercent',
+        });
+      }
+      if (request.status === 'pending') {
+        throw AppError.unprocessable('The overall discount is still waiting for the Super Admin', {
+          field: 'discountPercent',
+        });
+      }
+      if (request.status !== 'approved' && !reusable) {
+        throw AppError.unprocessable(`The overall discount request was ${request.status}`, {
+          field: 'discountPercent',
+        });
+      }
+      const allowed = toMoney(new Decimal(request.unitPrice).times(request.discountPercent).div(100));
+      if (discount.discountAmount.gt(allowed)) {
+        throw AppError.unprocessable(
+          `The approved overall discount is ${new Decimal(request.discountPercent).toFixed(2)}% (${allowed.toFixed(2)}). Ask again for a bigger discount.`,
+          { field: 'discountPercent' },
+        );
+      }
+      keep.push(request.id);
+      if (!reusable) {
+        request.status = 'used';
+        request.saleId = saleId;
+        request.updatedBy = actor.userId;
+        await repo(DiscountRequest, manager).save(request);
+      }
+    }
+    await manager.query(
+      `UPDATE discount_requests SET status = 'approved', sale_id = NULL, updated_by = $3
+        WHERE sale_id = $1 AND status = 'used' AND NOT (id = ANY($2::uuid[]))
+          AND product_id IS NULL AND bundle_id IS NULL`,
+      [saleId, keep, actor.userId],
     );
   },
 };

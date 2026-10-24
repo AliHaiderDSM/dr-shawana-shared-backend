@@ -2,7 +2,13 @@ import { z } from 'zod';
 import { branchQuerySchema, dataEnvelope, errorResponses, idParamsSchema, jsonContent } from '../../lib/http';
 import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
-import { moneyOutput, optionalText, positiveQuantityInput, quantityOutput } from '../../lib/validation';
+import {
+  moneyInput,
+  moneyOutput,
+  optionalText,
+  positiveQuantityInput,
+  quantityOutput,
+} from '../../lib/validation';
 import { DISCOUNT_REQUEST_STATUSES } from './discount-request.entity';
 
 const percent = z
@@ -17,7 +23,11 @@ export const createDiscountRequestSchema = registry.register(
     .object({
       productId: z.uuid().optional(),
       bundleId: z.uuid().optional(),
-      qty: positiveQuantityInput,
+      qty: positiveQuantityInput.optional(),
+      saleAmount: moneyInput.optional().openapi({
+        description:
+          'For an overall discount (no productId or bundleId): the sub amount of the sale the percent applies to',
+      }),
       discountPercent: percent,
       note: optionalText(500),
       patientId: z.uuid().optional().openapi({ description: 'The customer of the sale, when already saved' }),
@@ -28,9 +38,17 @@ export const createDiscountRequestSchema = registry.register(
         .optional()
         .openapi({ description: 'Name of a new customer that is not saved yet' }),
     })
-    .refine((v) => (v.productId ? 1 : 0) + (v.bundleId ? 1 : 0) === 1, {
+    .refine((v) => !(v.productId && v.bundleId), {
       message: 'Give either productId or bundleId',
       path: ['productId'],
+    })
+    .refine((v) => !(v.productId || v.bundleId) || v.qty !== undefined, {
+      message: 'Give the quantity',
+      path: ['qty'],
+    })
+    .refine((v) => Boolean(v.productId || v.bundleId) || Number(v.saleAmount ?? 0) > 0, {
+      message: 'Give the sale amount the overall discount applies to',
+      path: ['saleAmount'],
     }),
 );
 
@@ -59,6 +77,9 @@ export const discountRequestSchema = registry.register(
     requestNo: z.string(),
     branch: z.object({ id: z.uuid(), name: z.string(), code: z.string() }),
     requestedBy: person,
+    scope: z
+      .enum(['item', 'sale'])
+      .openapi({ description: 'item: one product or bundle; sale: overall discount' }),
     productId: z.uuid().nullable(),
     bundleId: z.uuid().nullable(),
     itemName: z.string(),
@@ -103,7 +124,8 @@ registry.registerPath({
   ...docs,
   method: 'post',
   path: '/branch/discount-requests',
-  summary: 'Ask the Super Admin to allow a discount on one product or bundle of a sale',
+  summary:
+    'Ask the Super Admin to allow a discount on one product or bundle of a sale, or an overall discount on the whole sale (saleAmount, no productId or bundleId)',
   request: {
     query: branchQuerySchema,
     body: { content: { 'application/json': { schema: createDiscountRequestSchema } } },

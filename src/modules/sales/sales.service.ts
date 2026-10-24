@@ -599,6 +599,7 @@ async function recompute(
       paymentStatus: totals.paymentStatus,
     },
   );
+  return totals;
 }
 
 function applyFilters(qb: SelectQueryBuilder<Sale>, query: SaleListQuery) {
@@ -904,6 +905,10 @@ export const salesService = {
         );
         await insertItems(em, actor, sale, lines);
         await discountRequestsService.consume(em, actor, branchId, sale.id, input.items);
+        await discountRequestsService.consumeOverall(em, actor, branchId, sale.id, {
+          discountAmount: totals.discountAmount,
+          discountRequestId: input.discountRequestId,
+        });
         for (const payment of input.payments) {
           const proofs = proofIndexesOf(payment).flatMap((index) => uploaded[index] ?? []);
           await insertPayment(em, actor, sale, payment, proofs);
@@ -1019,13 +1024,27 @@ export const salesService = {
         const patient = await patientsService.require(input.patientId, em);
         sale.patientCity = patient.city;
       }
-      const { items: _items, discountPercent, ...fields } = input;
+      const { items: _items, discountPercent, discountRequestId, ...fields } = input;
+      const earlier = {
+        percent: new Decimal(sale.discountPercent),
+        amount: new Decimal(sale.discountAmount),
+      };
       Object.assign(sale, fields, { updatedBy: actor.userId });
       delete sale.items;
       delete sale.payments;
       delete sale.patient;
       await sales.save(sale, em);
-      await recompute(em, sale, { discountPercent: discountPercent ?? sale.discountPercent });
+      const totals = await recompute(em, sale, { discountPercent: discountPercent ?? sale.discountPercent });
+      if (
+        discountRequestId ||
+        new Decimal(totals.discountPercent).gt(earlier.percent) ||
+        totals.discountAmount.gt(earlier.amount)
+      ) {
+        await discountRequestsService.consumeOverall(em, actor, branchId, id, {
+          discountAmount: totals.discountAmount,
+          discountRequestId,
+        });
+      }
       const after = toSaleDto(await getSale(branchId, id, em));
       await audit(actor, sale, 'update', em, before, after);
       return after;

@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Overall discount needs the Super Admin (2026-10-24)
+
+- A discount request without productId/bundleId is an overall request: `saleAmount` + `discountPercent` (stored as qty 1 × unit_price = sale amount). DTO has `scope: 'item' | 'sale'`. Migration `1794400000000-OverallDiscountRequests` lets product_id and bundle_id both be null.
+- Sale create (and `autoDiscount`) by anyone but the Super Admin needs `discountRequestId` of an approved overall request when the sale discount is above 0; the discount amount may not exceed the approved amount. The request becomes `used` by the sale.
+- Sale edit checks it only when the discount percent or amount grows; a lower or equal discount, or the Super Admin, needs nothing.
+- Tests: new overall test in `sales.test.ts`; older tests get approvals. Full suite: 299 passed.
+
 ## Office sales get a GDN (2026-10-23)
 
 - An office sale gets its GDN number when it is saved: `<branch code>-GDN-000001`, from the branch's own `gdn` sequence; `dispatched_by` is the cashier. The GDN print uses the sale date as its dispatch date.

@@ -67,6 +67,9 @@ const discountFields = {
     description: 'posSoft "Auto": any unpaid part becomes the discount (the percent is then fixed)',
   }),
   discountPercent: percentInput.optional(),
+  discountRequestId: z.uuid().optional().openapi({
+    description: 'The approved overall discount request (not needed for the Super Admin)',
+  }),
 };
 
 export const createSaleSchema = registry.register(
@@ -117,6 +120,10 @@ export const updateSaleSchema = registry.register(
         description: 'Every label on the sale after the edit. Leave out to keep the labels already sold.',
       }),
       discountPercent: percentInput,
+      discountRequestId: z.uuid().openapi({
+        description:
+          'The approved overall discount request when the discount grows (not needed for the Super Admin)',
+      }),
     }),
   ),
 );

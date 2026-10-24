@@ -14962,6 +14962,11 @@
           "discountPercent": {
             "type": "string",
             "example": "10"
+          },
+          "discountRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The approved overall discount request (not needed for the Super Admin)"
           }
         },
         "required": [
@@ -15049,6 +15054,11 @@
           "discountPercent": {
             "type": "string",
             "example": "10"
+          },
+          "discountRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The approved overall discount request when the discount grows (not needed for the Super Admin)"
           }
         }
       },
@@ -16085,6 +16095,11 @@
             "type": "string",
             "example": "10.000"
           },
+          "saleAmount": {
+            "type": "string",
+            "example": "1250.50",
+            "description": "For an overall discount (no productId or bundleId): the sub amount of the sale the percent applies to"
+          },
           "discountPercent": {
             "type": "string",
             "example": "15"
@@ -16108,7 +16123,6 @@
           }
         },
         "required": [
-          "qty",
           "discountPercent"
         ]
       },
@@ -16176,6 +16190,14 @@
               "name",
               "role"
             ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "item",
+              "sale"
+            ],
+            "description": "item: one product or bundle; sale: overall discount"
           },
           "productId": {
             "type": [
@@ -16313,6 +16335,7 @@
           "requestNo",
           "branch",
           "requestedBy",
+          "scope",
           "productId",
           "bundleId",
           "itemName",
@@ -52697,7 +52720,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Ask the Super Admin to allow a discount on one product or bundle of a sale",
+        "summary": "Ask the Super Admin to allow a discount on one product or bundle of a sale, or an overall discount on the whole sale (saleAmount, no productId or bundleId)",
         "parameters": [
           {
             "schema": {
