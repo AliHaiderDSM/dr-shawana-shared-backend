@@ -29,8 +29,9 @@ const daysBetween = (from: string, to: string) =>
 const sum = (rows: { total: string }[]) => rows.reduce((total, r) => total + Number(r.total), 0).toFixed(2);
 
 export const gdnReportService = {
-  async day(branchId: string, date: string, superAdmin: boolean, type: GdnReportType = 'online') {
+  async day(branchId: string, date: string, superAdmin: boolean, wanted: GdnReportType = 'online') {
     const dispatch = await isDispatchBranch(AppDataSource.manager, branchId);
+    const type: GdnReportType = superAdmin ? wanted : 'online';
     if (!superAdmin && !dispatch) {
       throw AppError.forbidden('The GDN report is for the Dispatch Department and the Super Admin');
     }
@@ -62,12 +63,13 @@ export const gdnReportService = {
             [branchId, date],
           )) as OrderRow[]);
     const officeRows =
-      type === 'online' || dispatch
+      type === 'online'
         ? []
         : ((await AppDataSource.query(
             `${select}
-        WHERE s.branch_id = $1 AND s.sale_type = 'office' AND s.deleted_at IS NULL AND s.date = $2::date
-        ORDER BY s.invoice_seq`,
+        WHERE (${dispatch ? '$1::uuid IS NOT NULL' : 's.branch_id = $1'}) AND s.sale_type = 'office' AND s.deleted_at IS NULL
+          AND s.date = $2::date
+        ORDER BY b.code, s.invoice_seq`,
             [branchId, date],
           )) as OrderRow[]);
     const rows = [...onlineRows, ...officeRows];

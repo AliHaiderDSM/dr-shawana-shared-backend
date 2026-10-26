@@ -170,6 +170,12 @@ describe('GDN day-end report', () => {
         .set(bearer(dispatcher))
     ).body.data.summary;
     expect(dispatchAll).toMatchObject({ office: 0, dispatched: 8 });
+    const everyCounter = (
+      await request(app)
+        .get(`/api/v1/branch/sales/gdn-report?date=2026-10-21&type=all&branchId=${dispatchId}`)
+        .set(bearer(superAdmin))
+    ).body.data.summary;
+    expect(everyCounter).toMatchObject({ office: 3, dispatched: 11 });
   });
 
   it('keeps the report to the Dispatch Department and the Super Admin', async () => {

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## GDN report: office sales on the Dispatch Department view (2026-10-26)
+
+- type=office|all on the Dispatch Department (Super Admin) now lists the office sales of every branch of that day; on a branch it stays that branch only. Non Super Admin callers always get type=online. Test in gdn-report.test.ts.
+
 ## Sale products report: Sr. and posSoft export (2026-10-26)
 
 - sale-products rows carry sr (newest = highest) and the Sr. column comes first.
