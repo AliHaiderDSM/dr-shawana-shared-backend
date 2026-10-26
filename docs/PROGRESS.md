@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Top products by day, month or year (2026-10-26)
+
+- GET /branch/dashboard/top-products?range=today|month|year: the six most sold products by units (all branches for the Super Admin without ?branchId=). Needs dashboard.view and sales.view. Test in reports.test.ts. Full suite: 307 passed.
+
 ## Audit fixes: packages, clinic day, safe logs, idempotency (2026-10-24)
 
 - Packages: `npm audit fix` (zod 4.6.7, multer 2.5.0, body-parser 2.4.0) and an `overrides` entry so `@vercel/cli-config` uses the same zod. `npm audit --omit=dev`: 0.

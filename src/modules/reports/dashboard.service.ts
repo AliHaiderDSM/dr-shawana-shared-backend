@@ -14,7 +14,27 @@ function branchClause(column: string, index: number) {
   return `($${index}::uuid IS NULL OR ${column} = $${index}::uuid)`;
 }
 
+export const TOP_PRODUCT_RANGES = ['today', 'month', 'year'] as const;
+export type TopProductRange = (typeof TOP_PRODUCT_RANGES)[number];
+
 export const dashboardService = {
+  async topProducts(scope: ReportScope, range: TopProductRange) {
+    const day = today();
+    const from =
+      range === 'today' ? day : range === 'month' ? `${day.slice(0, 7)}-01` : `${day.slice(0, 4)}-01-01`;
+    const rows = await many(
+      `SELECT pr.name AS product, SUM(si.qty)::numeric(12,3)::text AS qty
+         FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN products pr ON pr.id = si.product_id
+        WHERE s.deleted_at IS NULL AND si.deleted_at IS NULL AND ${branchClause('s.branch_id', 1)}
+          AND s.date BETWEEN $2 AND $3
+        GROUP BY pr.name
+        ORDER BY SUM(si.qty) DESC, pr.name
+        LIMIT 6`,
+      [scope.branchId, from, day],
+    );
+    return { range, from, to: day, items: rows.map((r) => ({ product: r.product, qty: r.qty })) };
+  },
+
   async kpis(actor: Actor, scope: ReportScope, year?: number, period: { from?: string; to?: string } = {}) {
     const day = today();
     const month = day.slice(0, 7);

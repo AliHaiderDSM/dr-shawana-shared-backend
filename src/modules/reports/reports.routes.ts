@@ -25,6 +25,7 @@ import {
   purchasesQuerySchema,
   saleProductsQuerySchema,
   stockReportQuerySchema,
+  topProductsQuerySchema,
 } from './reports.schemas';
 import { reportsService, type ReportScope } from './reports.service';
 
@@ -97,6 +98,18 @@ mount(
   reportsService.accountsBalance,
 );
 mount('expenses', requirePermission('expenses.view'), expensesReportQuerySchema, reportsService.expenses);
+
+reportsRouter.get(
+  '/branch/dashboard/top-products',
+  ...scoped,
+  requirePermission('dashboard.view'),
+  requirePermission('sales.view'),
+  validate({ query: topProductsQuerySchema }),
+  async (req, res) => {
+    const { range } = validQuery(req, topProductsQuerySchema);
+    sendOk(res, await dashboardService.topProducts(await scopeOf(req), range));
+  },
+);
 
 reportsRouter.get(
   '/branch/dashboard',

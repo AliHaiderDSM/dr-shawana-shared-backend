@@ -438,6 +438,24 @@ describe('accounts, expenses, reports and dashboard', () => {
       expect(all.body.data.byBranch.map((b: { branch: string }) => b.branch)).toEqual(['ISB', 'LHR']);
     });
 
+    it('lists the top products of today, this month or this year', async () => {
+      const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+      const top = (who: { id: string }, range: string) =>
+        api('get', `/branch/dashboard/top-products?range=${range}`, who);
+      const today = await top(admin, 'today');
+      expect(today.status).toBe(200);
+      expect(today.body.data).toMatchObject({ range: 'today', from: day, to: day });
+      expect((await top(admin, 'month')).body.data.from).toBe(`${day.slice(0, 7)}-01`);
+      const year = (await top(superAdmin, 'year')).body.data;
+      expect(year.from).toBe(`${day.slice(0, 4)}-01-01`);
+      if (day.startsWith('2026')) {
+        expect(year.items[0]).toMatchObject({ product: 'Serum' });
+        expect(Number(year.items[0].qty)).toBeGreaterThan(0);
+      }
+      expect((await top(admin, 'week')).status).toBe(400);
+      expect((await top(doctorUser, 'month')).status).toBe(403);
+    });
+
     it('limits the KPIs to a chosen period', async () => {
       const september = await api('get', '/branch/dashboard?from=2026-09-01&to=2026-09-30', admin);
       expect(september.body.data.period).toEqual({ from: '2026-09-01', to: '2026-09-30' });

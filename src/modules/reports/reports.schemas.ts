@@ -123,6 +123,14 @@ export type AccountsBalanceQuery = z.output<typeof accountsBalanceQuerySchema>;
 export type ExpensesReportQuery = z.output<typeof expensesReportQuerySchema>;
 export type DashboardQuery = z.output<typeof dashboardQuerySchema>;
 
+export const topProductsQuerySchema = z.object({
+  range: z
+    .enum(['today', 'month', 'year'])
+    .default('month')
+    .openapi({ description: 'today, this month or this year' }),
+  branchId: z.uuid().optional(),
+});
+
 const reportSchema = registry.register(
   'Report',
   z.object({
@@ -197,6 +205,19 @@ for (const [path, summary, query] of reports) {
     },
   });
 }
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/branch/dashboard/top-products',
+  summary:
+    'The six most sold products by units: today, this month or this year (all branches for the Super Admin without ?branchId=)',
+  request: { query: topProductsQuerySchema },
+  responses: {
+    200: { description: 'Top products', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
+    ...errorResponses,
+  },
+});
 
 registry.registerPath({
   ...docs,
