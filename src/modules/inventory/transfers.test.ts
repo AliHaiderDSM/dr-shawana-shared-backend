@@ -110,8 +110,15 @@ describe('Main Warehouse transfers to branches', () => {
     const received = await asAdmin('post', '/branch/stock-ins').send({
       date: '2026-10-01',
       items: [
-        { productId: serum, qty: '10', batch: 'B-001', expiryDate: '2028-01-31', labels: 'generate' },
-        { productId: toner, qty: '100', batch: 'T-01', expiryDate: '2027-06-30' },
+        {
+          unitCost: '100',
+          productId: serum,
+          qty: '10',
+          batch: 'B-001',
+          expiryDate: '2028-01-31',
+          labels: 'generate',
+        },
+        { unitCost: '100', productId: toner, qty: '100', batch: 'T-01', expiryDate: '2027-06-30' },
       ],
     });
     expect(received.status).toBe(201);
@@ -354,7 +361,7 @@ describe('Main Warehouse transfers to branches', () => {
   it('lets branches get stock only from the Main Warehouse', async () => {
     const stockIn = await asBranch('post', '/branch/stock-ins').send({
       date: '2026-10-04',
-      items: [{ productId: lahoreToner, qty: '5' }],
+      items: [{ unitCost: '100', productId: lahoreToner, qty: '5' }],
     });
     expect(stockIn.status).toBe(409);
     const purchase = await asAdmin('post', `/branch/products/${lahoreToner}/purchases`, lahoreId).send({
@@ -372,7 +379,7 @@ describe('Main Warehouse transfers to branches', () => {
     const soon = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
     await asAdmin('post', '/branch/stock-ins').send({
       date: '2026-10-04',
-      items: [{ productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
+      items: [{ unitCost: '100', productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
     });
     await confirmReceipts(app, keeper);
     await received(

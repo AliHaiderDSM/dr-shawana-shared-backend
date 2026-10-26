@@ -60,8 +60,15 @@ describe('Editing a GRN', () => {
     const entry = await as(lab, 'post', '/branch/stock-ins').send({
       date: '2026-10-05',
       items: [
-        { productId: toner, qty: '17', batch: 'T-1', expiryDate: '2028-06-30' },
-        { productId: serum, qty: '3', batch: 'S-1', expiryDate: '2028-06-30', labels: 'generate' },
+        { unitCost: '100', productId: toner, qty: '17', batch: 'T-1', expiryDate: '2028-06-30' },
+        {
+          unitCost: '100',
+          productId: serum,
+          qty: '3',
+          batch: 'S-1',
+          expiryDate: '2028-06-30',
+          labels: 'generate',
+        },
       ],
     });
     expect(entry.status).toBe(201);
@@ -75,7 +82,7 @@ describe('Editing a GRN', () => {
         { id: tonerLine.id, qty: '18' },
         { id: serumLine.id, qty: '5' },
       ],
-      add: [{ productId: cream, qty: '2', batch: 'C-1', expiryDate: '2028-06-30' }],
+      add: [{ unitCost: '100', productId: cream, qty: '2', batch: 'C-1', expiryDate: '2028-06-30' }],
     });
     expect(edited.status).toBe(200);
     expect(edited.body.data).toMatchObject({ applied: true, request: null });
@@ -178,7 +185,7 @@ describe('Editing a GRN', () => {
   it('deletes a whole confirmed entry only after the Super Admin approves', async () => {
     const entry = await as(lab, 'post', '/branch/stock-ins').send({
       date: '2026-10-06',
-      items: [{ productId: cream, qty: '4', batch: 'C-2', expiryDate: '2028-06-30' }],
+      items: [{ unitCost: '100', productId: cream, qty: '4', batch: 'C-2', expiryDate: '2028-06-30' }],
     });
     const grn = entry.body.data[0].grnNo as string;
     await as(keeper, 'post', `/branch/stock-receipts/${grn}/confirm`)

@@ -2481,7 +2481,7 @@
                 "unitCost": {
                   "type": "string",
                   "example": "1250.50",
-                  "description": "Purchase price per unit"
+                  "description": "Purchase price per unit (required)"
                 },
                 "labels": {
                   "type": "string",
@@ -2500,7 +2500,8 @@
               },
               "required": [
                 "productId",
-                "qty"
+                "qty",
+                "unitCost"
               ]
             },
             "minItems": 1,
@@ -7915,7 +7916,7 @@
                 "unitCost": {
                   "type": "string",
                   "example": "1250.50",
-                  "description": "Purchase price per unit"
+                  "description": "Purchase price per unit (required)"
                 },
                 "labels": {
                   "type": "string",
@@ -7934,7 +7935,8 @@
               },
               "required": [
                 "productId",
-                "qty"
+                "qty",
+                "unitCost"
               ]
             },
             "minItems": 1,
@@ -60190,6 +60192,125 @@
               "text/csv": {
                 "schema": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/profit-loss": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin profit and loss of products. A sale counts on its sale date (office) or dispatch date (online) with the payments approved so far; returns count on their date. Cost is the unit cost of the batch sold, or the last known cost of the product when the batch has none.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "required": true,
+            "name": "year",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "description": "1-12; the whole year when left out"
+            },
+            "required": false,
+            "description": "1-12; the whole year when left out",
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "One branch; every branch when left out"
+            },
+            "required": false,
+            "description": "One branch; every branch when left out",
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profit and loss",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
                 }
               }
             }

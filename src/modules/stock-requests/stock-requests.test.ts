@@ -56,8 +56,8 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     const stocked = await as(superAdmin, 'post', '/branch/stock-ins', warehouseId).send({
       date: '2026-10-01',
       items: [
-        { productId: serum, qty: '20', batch: 'S-1', expiryDate: '2028-01-31' },
-        { productId: toner, qty: '50', batch: 'T-1', expiryDate: '2028-06-30' },
+        { unitCost: '100', productId: serum, qty: '20', batch: 'S-1', expiryDate: '2028-01-31' },
+        { unitCost: '100', productId: toner, qty: '50', batch: 'T-1', expiryDate: '2028-06-30' },
       ],
     });
     expect(stocked.status).toBe(201);
@@ -367,7 +367,7 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     const before = Number(await stockOf('Rose Toner', warehouseId));
     const entry = await as(lab, 'post', '/branch/stock-ins').send({
       date: '2026-10-05',
-      items: [{ productId: toner, qty: '10', batch: 'T-2', expiryDate: '2028-06-30' }],
+      items: [{ unitCost: '100', productId: toner, qty: '10', batch: 'T-2', expiryDate: '2028-06-30' }],
     });
     expect(entry.status).toBe(201);
     const grn = entry.body.data[0].grnNo as string;

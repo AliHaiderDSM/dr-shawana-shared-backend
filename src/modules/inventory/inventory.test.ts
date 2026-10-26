@@ -66,8 +66,8 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
           date: '2026-09-10',
           note: 'Lab batch',
           items: [
-            { productId, qty: '20', batch: 'B-01' },
-            { productId: otherProductId, qty: '4', batch: 'B-01' },
+            { productId, qty: '20', batch: 'B-01', unitCost: '100' },
+            { productId: otherProductId, qty: '4', batch: 'B-01', unitCost: '100' },
           ],
         }),
       )
@@ -92,7 +92,7 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
     const res = await post('/branch/stock-ins', {
       supplierId: dispatcherId,
       date: '2026-09-10',
-      items: [{ productId, qty: '1' }],
+      items: [{ unitCost: '100', productId, qty: '1' }],
     });
     expect(res.status).toBe(400);
     const out = await post('/branch/stock-outs', {
@@ -130,7 +130,7 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
   it('editing reverses the old movement and posts the new one, with an audit log', async () => {
     const created = await post('/branch/stock-ins', {
       date: '2026-09-12',
-      items: [{ productId, qty: '10' }],
+      items: [{ unitCost: '100', productId, qty: '10' }],
     });
     const id = created.body.data[0].id;
     expect(await balance()).toBe('22.000');
@@ -163,7 +163,7 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
   it('refuses an edit that would make stock negative', async () => {
     const created = await post('/branch/stock-ins', {
       date: '2026-09-13',
-      items: [{ productId: otherProductId, qty: '2' }],
+      items: [{ unitCost: '100', productId: otherProductId, qty: '2' }],
     });
     await post('/branch/stock-outs', {
       date: '2026-09-13',
@@ -222,7 +222,7 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
     expect((await request(app).get('/api/v1/branch/stock-ins').set(bearer(frontDesk))).status).toBe(403);
     const created = await post(
       '/branch/stock-ins',
-      { date: '2026-09-14', items: [{ productId, qty: '1' }] },
+      { date: '2026-09-14', items: [{ unitCost: '100', productId, qty: '1' }] },
       pharmacy,
     );
     expect(created.status).toBe(201);
@@ -233,7 +233,10 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
   });
 
   it('isolates branches', async () => {
-    const created = await post('/branch/stock-ins', { date: '2026-09-15', items: [{ productId, qty: '1' }] });
+    const created = await post('/branch/stock-ins', {
+      date: '2026-09-15',
+      items: [{ unitCost: '100', productId, qty: '1' }],
+    });
     const id = created.body.data[0].id;
     expect(
       (await request(app).get(`/api/v1/branch/stock-ins/${id}`).set(bearer(islamabadAdmin))).status,
@@ -248,7 +251,7 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
     ).toBe(404);
     const foreign = await post(
       '/branch/stock-ins',
-      { date: '2026-09-15', items: [{ productId, qty: '100' }] },
+      { date: '2026-09-15', items: [{ unitCost: '100', productId, qty: '100' }] },
       islamabadAdmin,
     );
     expect(foreign.status).toBe(400);

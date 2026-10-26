@@ -25,8 +25,10 @@ import {
   purchasesQuerySchema,
   saleProductsQuerySchema,
   stockReportQuerySchema,
+  profitLossQuerySchema,
   topProductsQuerySchema,
 } from './reports.schemas';
+import { profitLossService } from './profit-loss.service';
 import { reportsService, type ReportScope } from './reports.service';
 
 export const reportsRouter = Router();
@@ -98,6 +100,17 @@ mount(
   reportsService.accountsBalance,
 );
 mount('expenses', requirePermission('expenses.view'), expensesReportQuerySchema, reportsService.expenses);
+
+reportsRouter.get(
+  '/admin/reports/profit-loss',
+  authenticate,
+  requireRole('super_admin'),
+  validate({ query: profitLossQuerySchema }),
+  async (req, res) => {
+    const { year, month, branchId } = validQuery(req, profitLossQuerySchema);
+    sendOk(res, await profitLossService.report(year, month ?? null, branchId ?? null));
+  },
+);
 
 reportsRouter.get(
   '/branch/dashboard/top-products',

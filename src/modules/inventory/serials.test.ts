@@ -29,7 +29,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
     request(app)[method](`/api/v1${path}`).set(bearer(who));
 
   const stockIn = (items: Record<string, unknown>[], date = '2026-09-01') =>
-    api('post', '/branch/stock-ins').send({ date, items });
+    api('post', '/branch/stock-ins').send({ date, items: items.map((i) => ({ unitCost: '100', ...i })) });
 
   const pieces = async (query: string) => {
     const all: { serial: string; status: string; batchNo: string | null }[] = [];

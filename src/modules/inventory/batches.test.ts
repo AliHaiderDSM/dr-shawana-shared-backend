@@ -29,7 +29,10 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     request(app)[method](`/api/v1${path}`).set(bearer(who));
 
   const stockIn = (items: Record<string, unknown>[], date = '2026-09-01') =>
-    api('post', '/branch/stock-ins', admin).send({ date, items });
+    api('post', '/branch/stock-ins', admin).send({
+      date,
+      items: items.map((i) => ({ unitCost: '100', ...i })),
+    });
 
   const sell = (productId: string, qty: string, date = '2026-10-01') =>
     api('post', '/branch/sales', frontDesk).send({

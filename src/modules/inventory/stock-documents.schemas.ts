@@ -35,7 +35,7 @@ const batchFields = {
   }),
   manufacturingDate: dateInput.nullable().optional(),
   expiryDate: dateInput.nullable().optional(),
-  unitCost: moneyInput.nullable().optional().openapi({ description: 'Purchase price per unit' }),
+  unitCost: moneyInput.openapi({ description: 'Purchase price per unit (required)' }),
 };
 
 interface BatchFieldValues {
@@ -134,7 +134,7 @@ export const updateStockInSchema = registry.register(
       batch: z.string().trim().max(100).nullable(),
       manufacturingDate: dateInput.nullable(),
       expiryDate: dateInput.nullable(),
-      unitCost: moneyInput.nullable(),
+      unitCost: moneyInput,
       note: z.string().trim().max(1000).nullable(),
     }),
   ).superRefine((value, ctx) => {

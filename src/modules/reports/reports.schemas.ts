@@ -123,6 +123,18 @@ export type AccountsBalanceQuery = z.output<typeof accountsBalanceQuerySchema>;
 export type ExpensesReportQuery = z.output<typeof expensesReportQuerySchema>;
 export type DashboardQuery = z.output<typeof dashboardQuerySchema>;
 
+export const profitLossQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(12)
+    .optional()
+    .openapi({ description: '1-12; the whole year when left out' }),
+  branchId: z.uuid().optional().openapi({ description: 'One branch; every branch when left out' }),
+});
+
 export const topProductsQuerySchema = z.object({
   range: z
     .enum(['today', 'month', 'year'])
@@ -205,6 +217,19 @@ for (const [path, summary, query] of reports) {
     },
   });
 }
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/admin/reports/profit-loss',
+  summary:
+    'Super Admin profit and loss of products. A sale counts on its sale date (office) or dispatch date (online) with the payments approved so far; returns count on their date. Cost is the unit cost of the batch sold, or the last known cost of the product when the batch has none.',
+  request: { query: profitLossQuerySchema },
+  responses: {
+    200: { description: 'Profit and loss', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
+    ...errorResponses,
+  },
+});
 
 registry.registerPath({
   ...docs,

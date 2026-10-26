@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Profit & loss report, unit cost required (2026-10-26)
+
+- GET /admin/reports/profit-loss?year=&month=&branchId= (Super Admin only, `profit-loss.service.ts`). A sale counts on its sale date (office) or dispatch date (online); revenue is the approved payments (capped at the sale total) less refunds of returns dated in the period. Cost is ABS(qty) x batch unit cost of the sale movements, less the cost of restocked returns; a batch without cost uses the last known cost of the product (same root product), flagged as estimated. Overall discount and unpaid part are shared over the lines by line total. Returns: summary, 12 months, products (list price, last cost, avg sale/cost, margin), branches.
+- Stock In now requires unitCost (create, update, GRN edit add/update cannot clear it). Tests send a cost.
+- Note: purchase entries on products (posSoft initial purchase) still copy their unit price into the product sale price.
+- Tests: profit-loss.test.ts. Full suite: 310 passed.
+
 ## Top products by day, month or year (2026-10-26)
 
 - GET /branch/dashboard/top-products?range=today|month|year: the six most sold products by units (all branches for the Super Admin without ?branchId=). Needs dashboard.view and sales.view. Test in reports.test.ts. Full suite: 307 passed.

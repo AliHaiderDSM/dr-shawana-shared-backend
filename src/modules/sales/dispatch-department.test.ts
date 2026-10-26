@@ -123,8 +123,15 @@ describe('Dispatch Department ships every online order from its own stock', () =
     await as(superAdmin, 'post', '/branch/stock-ins', warehouseId).send({
       date: '2026-10-01',
       items: [
-        { productId: serum, qty: '10', batch: 'S-1', expiryDate: '2028-01-31', labels: 'generate' },
-        { productId: toner, qty: '60', batch: 'T-1', expiryDate: '2028-01-31' },
+        {
+          unitCost: '100',
+          productId: serum,
+          qty: '10',
+          batch: 'S-1',
+          expiryDate: '2028-01-31',
+          labels: 'generate',
+        },
+        { unitCost: '100', productId: toner, qty: '60', batch: 'T-1', expiryDate: '2028-01-31' },
       ],
     });
     keeper = await createStaff(fake, { role: 'warehouse_keeper', branchId: warehouseId });

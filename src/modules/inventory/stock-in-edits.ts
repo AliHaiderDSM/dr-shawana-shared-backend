@@ -29,7 +29,7 @@ const lineChange = z.object({
   batch: z.string().trim().max(100).nullable().optional(),
   manufacturingDate: dateInput.nullable().optional(),
   expiryDate: dateInput.nullable().optional(),
-  unitCost: moneyInput.nullable().optional(),
+  unitCost: moneyInput.optional(),
 });
 
 export const editGrnSchema = registry.register(
