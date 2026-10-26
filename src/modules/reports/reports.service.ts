@@ -48,6 +48,104 @@ function build(
   };
 }
 
+async function saleProductsByProduct(scope: ReportScope, rows: Row[]): Promise<Report> {
+  const lines = rows.length
+    ? await query(
+        `SELECT si.sale_id AS "saleId", pr.name, SUM(si.qty)::text AS qty, SUM(si.line_total)::text AS price
+           FROM sale_items si JOIN products pr ON pr.id = si.product_id
+          WHERE si.sale_id = ANY($1::uuid[]) AND si.deleted_at IS NULL
+          GROUP BY si.sale_id, pr.name`,
+        [rows.map((r) => r.id)],
+      )
+    : [];
+  const names = [...new Set(lines.map((l) => String(l.name)))].sort((a, b) => a.localeCompare(b));
+  const keyOf = new Map(names.map((name, i) => [name, `p${i}`]));
+  const productColumns = names.flatMap((name) => {
+    const key = keyOf.get(name)!;
+    return [
+      { key: `${key}Name`, label: name },
+      { key: `${key}Qty`, label: 'Qty' },
+      { key: `${key}Price`, label: 'Price' },
+    ];
+  });
+  const bySale = new Map<string, Row[]>();
+  for (const line of lines)
+    bySale.set(String(line.saleId), [...(bySale.get(String(line.saleId)) ?? []), line]);
+  const totals: Record<string, Decimal> = {};
+  const out = rows.map((row) => {
+    const cells: Row = {
+      sr: row.sr,
+      branch: row.branch,
+      invoiceNo: row.invoiceNo,
+      date: row.date,
+      customer: row.customer,
+      phone: row.phone,
+      totalQty: row.totalQty,
+      subAmount: row.subAmount,
+      discount: row.discount,
+      received: row.received,
+      remaining: row.remaining,
+      payment: row.payment,
+    };
+    for (const name of names) {
+      const key = keyOf.get(name)!;
+      cells[`${key}Name`] = '-';
+      cells[`${key}Qty`] = '-';
+      cells[`${key}Price`] = '-';
+    }
+    for (const line of bySale.get(String(row.id)) ?? []) {
+      const key = keyOf.get(String(line.name))!;
+      cells[`${key}Name`] = line.name;
+      cells[`${key}Qty`] = trimNumber(line.qty);
+      cells[`${key}Price`] = trimNumber(line.price);
+      for (const [field, value] of [
+        [`${key}Qty`, line.qty],
+        [`${key}Price`, line.price],
+      ] as const)
+        totals[field] = (totals[field] ?? new Decimal(0)).plus(String(value ?? 0));
+    }
+    return cells;
+  });
+  const sums = sumBy(rows, ['totalQty', 'subAmount', 'discount', 'received', 'remaining'], 2);
+  const report = build(
+    scope,
+    'Sale Products Report',
+    [
+      { key: 'sr', label: 'Sr.' },
+      { key: 'invoiceNo', label: 'Sale ID' },
+      { key: 'date', label: 'Date' },
+      { key: 'customer', label: 'Customer' },
+      { key: 'phone', label: 'Phone' },
+      ...productColumns,
+      { key: 'totalQty', label: 'Total Qty' },
+      { key: 'subAmount', label: 'Total Amount' },
+      { key: 'discount', label: 'Discount' },
+      { key: 'received', label: 'Received' },
+      { key: 'remaining', label: 'Remaining' },
+      { key: 'payment', label: 'Payment' },
+    ],
+    out,
+  );
+  return {
+    ...report,
+    columns: srFirst(report.columns),
+    totals: {
+      ...sums,
+      totalQty: trimNumber(sums.totalQty),
+      ...Object.fromEntries(
+        Object.entries(totals).map(([key, value]) => [key, trimNumber(value.toString())]),
+      ),
+    },
+  };
+}
+
+const trimNumber = (value: unknown) => (value === null || value === undefined ? null : String(Number(value)));
+
+const srFirst = (columns: ReportColumn[]) => [
+  ...columns.filter((c) => c.key === 'sr'),
+  ...columns.filter((c) => c.key !== 'sr'),
+];
+
 function scoped(scope: ReportScope, column: string) {
   return new SqlFilter().when(scope.branchId, `${column} = ?`, scope.branchId);
 }
@@ -89,7 +187,7 @@ export const reportsService = {
         q.accountSheetId,
       );
     const rows = await query(
-      `SELECT b.code AS branch, s.invoice_no AS "invoiceNo", to_char(s.date, 'YYYY-MM-DD') AS date,
+      `SELECT s.id, b.code AS branch, s.invoice_no AS "invoiceNo", to_char(s.date, 'YYYY-MM-DD') AS date,
               to_char(s.created_at, 'YYYY-MM-DD') AS "entryDate",
               p.name AS customer, p.phone, COALESCE(s.patient_city, p.city) AS "customerCity",
               s.sale_type AS "saleType", s.city,
@@ -110,10 +208,15 @@ export const reportsService = {
         ORDER BY s.date DESC, s.invoice_seq DESC`,
       f.params,
     );
+    rows.forEach((row, index) => {
+      row.sr = rows.length - index;
+    });
+    if (q.layout === 'products') return saleProductsByProduct(scope, rows);
     const report = build(
       scope,
       'Sale Products Report',
       [
+        { key: 'sr', label: 'Sr.' },
         { key: 'invoiceNo', label: 'Invoice' },
         { key: 'date', label: 'Date' },
         { key: 'entryDate', label: 'Entry Date' },
@@ -135,7 +238,11 @@ export const reportsService = {
       rows,
       ['subAmount', 'discount', 'total', 'received', 'remaining'],
     );
-    return { ...report, totals: { ...report.totals, ...sumBy(rows, ['totalQty'], 3) } };
+    return {
+      ...report,
+      columns: srFirst(report.columns),
+      totals: { ...report.totals, ...sumBy(rows, ['totalQty'], 3) },
+    };
   },
 
   async purchases(scope: ReportScope, q: PurchasesQuery) {

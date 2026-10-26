@@ -25,6 +25,10 @@ export const saleProductsQuerySchema = z.object({
   createdFrom: dateInput.optional(),
   createdTo: dateInput.optional(),
   createdBy: z.uuid().optional(),
+  layout: z.enum(['list', 'products']).default('list').openapi({
+    description:
+      'list: one Products cell per sale; products: posSoft layout with a name, Qty and Price column for every product',
+  }),
 });
 
 export const purchasesQuerySchema = z.object({

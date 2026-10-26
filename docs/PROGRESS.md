@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Sale products report: Sr. and posSoft export (2026-10-26)
+
+- sale-products rows carry sr (newest = highest) and the Sr. column comes first.
+- ?layout=products (used by the dashboard export) gives the posSoft sheet: Sr., Sale ID, Date, Customer, Phone, then a name / Qty / Price column for every product sold in the period (- when not in the sale; Price is the line total), then Total Qty, Total Amount, Discount, Received, Remaining, Payment, with totals per product. Tests in reports.test.ts.
+
 ## Profit & loss report, unit cost required (2026-10-26)
 
 - GET /admin/reports/profit-loss?year=&month=&branchId= (Super Admin only, `profit-loss.service.ts`). A sale counts on its sale date (office) or dispatch date (online); revenue is the approved payments (capped at the sale total) less refunds of returns dated in the period. Cost is ABS(qty) x batch unit cost of the sale movements, less the cost of restocked returns; a batch without cost uses the last known cost of the product (same root product), flagged as estimated. Overall discount and unpaid part are shared over the lines by line total. Returns: summary, 12 months, products (list price, last cost, avg sale/cost, margin), branches.

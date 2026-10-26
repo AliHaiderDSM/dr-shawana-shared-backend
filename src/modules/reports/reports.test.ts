@@ -330,6 +330,33 @@ describe('accounts, expenses, reports and dashboard', () => {
         invoiceNo: 'LHR-000001',
       });
       expect(sales.body.data.totals).toMatchObject({ total: '2000.00', totalQty: '2.000' });
+      expect(sales.body.data.columns[0]).toEqual({ key: 'sr', label: 'Sr.' });
+      expect(sales.body.data.rows[0].sr).toBe(1);
+      const wide = (await report('sale-products', frontDesk, 'month=2026-09&layout=products')).body.data;
+      expect(wide.columns.map((c: { label: string }) => c.label)).toEqual([
+        'Sr.',
+        'Sale ID',
+        'Date',
+        'Customer',
+        'Phone',
+        'Serum',
+        'Qty',
+        'Price',
+        'Total Qty',
+        'Total Amount',
+        'Discount',
+        'Received',
+        'Remaining',
+        'Payment',
+      ]);
+      expect(wide.rows[0]).toMatchObject({ sr: 1, p0Name: 'Serum', p0Qty: '2', p0Price: '2000' });
+      expect(wide.totals).toMatchObject({ p0Qty: '2', p0Price: '2000', totalQty: '2', received: '2000.00' });
+      const csv = await request(app)
+        .get('/api/v1/branch/reports/sale-products?month=2026-09&layout=products&format=csv')
+        .set(bearer(frontDesk));
+      expect(csv.text.split(String.fromCharCode(13, 10))[0]).toContain(
+        'Sr.,Sale ID,Date,Customer,Phone,Serum,Qty,Price',
+      );
       const byCustomer = await report('sale-products', frontDesk, 'month=2026-09&customer=ayes');
       expect(byCustomer.body.data.rows).toHaveLength(1);
       const online = await report('sale-products', frontDesk, 'month=2026-09&saleType=online');
@@ -387,9 +414,9 @@ describe('accounts, expenses, reports and dashboard', () => {
       expect(csv.headers['content-disposition']).toContain('sale-products-report.csv');
       const lines = csv.text.replace('﻿', '').trim().split('\r\n');
       expect(lines[0]).toBe(
-        'Invoice,Date,Entry Date,Customer,Phone,City,Sale Type,Sale City,Products,Total Qty,Total Amount,Discount,After Discount,Received,Remaining,Payment,Account',
+        'Sr.,Invoice,Date,Entry Date,Customer,Phone,City,Sale Type,Sale City,Products,Total Qty,Total Amount,Discount,After Discount,Received,Remaining,Payment,Account',
       );
-      expect(lines[1]).toContain('LHR-000001,2026-09-10,');
+      expect(lines[1]).toContain('1,LHR-000001,2026-09-10,');
       expect(lines[1]).toContain(',Ayesha,');
       expect(lines[2]?.startsWith('Total,')).toBe(true);
     });

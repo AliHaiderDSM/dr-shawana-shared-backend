@@ -58409,6 +58409,21 @@
             "required": false,
             "name": "createdBy",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "list",
+                "products"
+              ],
+              "default": "list",
+              "description": "list: one Products cell per sale; products: posSoft layout with a name, Qty and Price column for every product"
+            },
+            "required": false,
+            "description": "list: one Products cell per sale; products: posSoft layout with a name, Qty and Price column for every product",
+            "name": "layout",
+            "in": "query"
           }
         ],
         "responses": {
