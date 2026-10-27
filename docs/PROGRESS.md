@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Appointment payments report is a ledger (2026-10-27)
+
+- Replaces the day/month endpoints with GET /admin/reports/appointment-payments?from&to&branchId (Super Admin, up to 366 days): one entry per booking without a same-day payment, advance (before the visit day), balance (on or after it) and refund, oldest first. Each entry carries the appointment (no, visit, fee), the total paid and refunded after it, remaining after it, the state after it and fullyPaidHere. Entries never drop out when an appointment is fully paid. Summary: bookings, advance, balance, refunds, net, fully paid.
+
 ## Appointment refunds and appointment payments report (2026-10-27)
 
 - Migration `1794600000000-AppointmentRefunds`: table appointment_refunds (amount, method, account, date, note; RLS on) and account_movements gains appointment refunds as credit.

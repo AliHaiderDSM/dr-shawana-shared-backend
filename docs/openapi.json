@@ -60608,7 +60608,7 @@
         }
       }
     },
-    "/admin/reports/appointment-payments/day": {
+    "/admin/reports/appointment-payments": {
       "get": {
         "tags": [
           "Reports"
@@ -60618,18 +60618,30 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Super Admin day-end of appointment money: due from earlier days, advances (paid before the visit day), balances (on or after the visit day), refunds, appointments fully paid and still due tonight",
+        "summary": "Super Admin ledger of appointment money between two days: one entry per booking without payment, advance (paid before the visit day), balance (on or after it) and refund, each with the appointment total paid and remaining after it",
         "parameters": [
           {
             "schema": {
               "type": "string",
               "format": "date",
               "example": "2026-09-30",
-              "description": "The day; today when left out"
+              "description": "First day; today when left out"
             },
             "required": false,
-            "description": "The day; today when left out",
-            "name": "date",
+            "description": "First day; today when left out",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30",
+              "description": "Last day; the same as from when left out"
+            },
+            "required": false,
+            "description": "Last day; the same as from when left out",
+            "name": "to",
             "in": "query"
           },
           {
@@ -60646,113 +60658,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Day",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/reports/appointment-payments/month": {
-      "get": {
-        "tags": [
-          "Reports"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Super Admin month of appointment money, one line per day",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
-              "description": "YYYY-MM; this month when left out"
-            },
-            "required": false,
-            "description": "YYYY-MM; this month when left out",
-            "name": "month",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Month",
+            "description": "Entries",
             "content": {
               "application/json": {
                 "schema": {

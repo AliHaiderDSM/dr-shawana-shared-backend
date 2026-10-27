@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { today } from '../../lib/validation';
 import { ageBatch, bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
@@ -175,7 +176,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
   });
 
   it('refuses stock that expires within 45 days', async () => {
-    const soon = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
+    const soon = today(new Date(Date.now() + 20 * 86_400_000));
     const refused = await stockIn([{ productId: cream, qty: '1', batch: 'SHORT', expiryDate: soon }]);
     expect(refused.status).toBe(422);
     expect(refused.body.error.message).toContain('less than 45 days');

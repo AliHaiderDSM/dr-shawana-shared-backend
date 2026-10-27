@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { today } from '../../lib/validation';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
@@ -6,7 +7,7 @@ import { createApp } from '../../app';
 const fake = installFakeSupabase();
 const app = createApp();
 
-const isoIn = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+const isoIn = (days: number) => today(new Date(Date.now() + days * 86_400_000));
 
 describe('patient app', () => {
   let frontDesk: { id: string };

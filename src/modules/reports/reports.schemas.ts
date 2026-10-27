@@ -127,19 +127,16 @@ export type AccountsBalanceQuery = z.output<typeof accountsBalanceQuerySchema>;
 export type ExpensesReportQuery = z.output<typeof expensesReportQuerySchema>;
 export type DashboardQuery = z.output<typeof dashboardQuerySchema>;
 
-export const appointmentPaymentsDayQuerySchema = z.object({
-  date: dateInput.optional().openapi({ description: 'The day; today when left out' }),
-  branchId: z.uuid().optional().openapi({ description: 'One branch; every branch when left out' }),
-});
-
-export const appointmentPaymentsMonthQuerySchema = z.object({
-  month: z
-    .string()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM')
-    .optional()
-    .openapi({ description: 'YYYY-MM; this month when left out' }),
-  branchId: z.uuid().optional(),
-});
+export const appointmentPaymentsQuerySchema = z
+  .object({
+    from: dateInput.optional().openapi({ description: 'First day; today when left out' }),
+    to: dateInput.optional().openapi({ description: 'Last day; the same as from when left out' }),
+    branchId: z.uuid().optional().openapi({ description: 'One branch; every branch when left out' }),
+  })
+  .refine((v) => !v.from || !v.to || v.to >= v.from, {
+    message: 'to must be on or after from',
+    path: ['to'],
+  });
 
 export const profitLossQuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100),
@@ -239,24 +236,12 @@ for (const [path, summary, query] of reports) {
 registry.registerPath({
   ...docs,
   method: 'get',
-  path: '/admin/reports/appointment-payments/day',
+  path: '/admin/reports/appointment-payments',
   summary:
-    'Super Admin day-end of appointment money: due from earlier days, advances (paid before the visit day), balances (on or after the visit day), refunds, appointments fully paid and still due tonight',
-  request: { query: appointmentPaymentsDayQuerySchema },
+    'Super Admin ledger of appointment money between two days: one entry per booking without payment, advance (paid before the visit day), balance (on or after it) and refund, each with the appointment total paid and remaining after it',
+  request: { query: appointmentPaymentsQuerySchema },
   responses: {
-    200: { description: 'Day', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
-    ...errorResponses,
-  },
-});
-
-registry.registerPath({
-  ...docs,
-  method: 'get',
-  path: '/admin/reports/appointment-payments/month',
-  summary: 'Super Admin month of appointment money, one line per day',
-  request: { query: appointmentPaymentsMonthQuerySchema },
-  responses: {
-    200: { description: 'Month', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
+    200: { description: 'Entries', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
     ...errorResponses,
   },
 });

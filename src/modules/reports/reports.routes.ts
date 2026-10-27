@@ -25,8 +25,7 @@ import {
   purchasesQuerySchema,
   saleProductsQuerySchema,
   stockReportQuerySchema,
-  appointmentPaymentsDayQuerySchema,
-  appointmentPaymentsMonthQuerySchema,
+  appointmentPaymentsQuerySchema,
   profitLossQuerySchema,
   topProductsQuerySchema,
 } from './reports.schemas';
@@ -105,24 +104,18 @@ mount(
 mount('expenses', requirePermission('expenses.view'), expensesReportQuerySchema, reportsService.expenses);
 
 reportsRouter.get(
-  '/admin/reports/appointment-payments/day',
+  '/admin/reports/appointment-payments',
   authenticate,
   requireRole('super_admin'),
-  validate({ query: appointmentPaymentsDayQuerySchema }),
+  validate({ query: appointmentPaymentsQuerySchema }),
   async (req, res) => {
-    const { date, branchId } = validQuery(req, appointmentPaymentsDayQuerySchema);
-    sendOk(res, await appointmentPaymentsReportService.day(date ?? today(), branchId ?? null));
-  },
-);
-
-reportsRouter.get(
-  '/admin/reports/appointment-payments/month',
-  authenticate,
-  requireRole('super_admin'),
-  validate({ query: appointmentPaymentsMonthQuerySchema }),
-  async (req, res) => {
-    const { month, branchId } = validQuery(req, appointmentPaymentsMonthQuerySchema);
-    sendOk(res, await appointmentPaymentsReportService.month(month ?? today().slice(0, 7), branchId ?? null));
+    const query = validQuery(req, appointmentPaymentsQuerySchema);
+    const from = query.from ?? today();
+    const to = query.to ?? from;
+    const problem = periodProblem({ from, to }, today());
+    if (problem)
+      throw AppError.validation([{ path: 'query.from', message: problem, code: 'custom' }], problem);
+    sendOk(res, await appointmentPaymentsReportService.entries(from, to, query.branchId ?? null));
   },
 );
 

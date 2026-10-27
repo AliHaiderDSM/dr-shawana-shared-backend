@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { today } from '../../lib/validation';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
@@ -376,7 +377,7 @@ describe('Main Warehouse transfers to branches', () => {
   });
 
   it('warns about batches that expire within three months, everywhere for the Super Admin', async () => {
-    const soon = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+    const soon = today(new Date(Date.now() + 60 * 86_400_000));
     await asAdmin('post', '/branch/stock-ins').send({
       date: '2026-10-04',
       items: [{ unitCost: '100', productId: toner, qty: '10', batch: 'SOON-1', expiryDate: soon }],
