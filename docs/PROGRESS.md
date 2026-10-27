@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Appointment refunds and appointment payments report (2026-10-27)
+
+- Migration `1794600000000-AppointmentRefunds`: table appointment_refunds (amount, method, account, date, note; RLS on) and account_movements gains appointment refunds as credit.
+- POST/DELETE /branch/appointments/:id/refunds (Super Admin only, Idempotency-Key on POST): only a cancelled appointment, at most received − refunded. Detail returns refunds and refundedAmount. An appointment with refunds cannot go back to booked; a payment edit or delete that would leave less than the refunds is refused; deleting an appointment removes its refunds.
+- GET /admin/reports/appointment-payments/day?date&branchId and /month?month&branchId (Super Admin). A payment dated before the visit day is an advance, on or after it a balance; fully paid = payments reach the fee; still due = visit day passed and fee not covered (cancelled excluded); cancelled with money kept = held. Day: opening due, advance, balance, fully paid, refunds, closing due, one row per appointment (sr, booked day, fee, advance, paid today, refund, total, remaining/held, state). Month: one line per day plus totals.
+- Tests: appointment-refunds.test.ts. Full suite: 314 passed.
+
 ## GDN report: office sales on the Dispatch Department view (2026-10-26)
 
 - type=office|all on the Dispatch Department (Super Admin) now lists the office sales of every branch of that day; on a branch it stays that branch only. Non Super Admin callers always get type=online. Test in gdn-report.test.ts.

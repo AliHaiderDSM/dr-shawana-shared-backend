@@ -1,4 +1,10 @@
 import { Decimal, toMoney } from '../../database/transformers';
+import {
+  appointmentRefundsService,
+  refundedOf,
+  refundsFor,
+  toRefundDto,
+} from './appointment-refunds.service';
 import { AppDataSource } from '../../database/data-source';
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
@@ -94,6 +100,7 @@ async function loadDetail(viewer: Viewer, id: string, manager?: EntityManager) {
   const record = await appointmentsWithParties(viewer, manager).andWhere('a.id = :id', { id }).getOne();
   if (!record) throw AppError.notFound('Appointment');
   const paid = (await paymentsFor(viewer.branchId, [id], manager)).get(id) ?? [];
+  const returned = (await refundsFor(viewer.branchId, [id], manager)).get(id) ?? [];
   const files = await attachments
     .query(viewer.branchId, manager)
     .andWhere('att.appointmentId = :id', { id })
@@ -108,6 +115,8 @@ async function loadDetail(viewer: Viewer, id: string, manager?: EntityManager) {
   return {
     ...toAppointmentDto(record, paid),
     payments: paid.map(toPaymentDto),
+    refunds: returned.map(toRefundDto),
+    refundedAmount: refundedOf(returned),
     attachments: files.map(toFileDto),
     medicalRecords: records.map((r) => ({
       id: r.id,
@@ -370,6 +379,14 @@ export const appointmentsService = {
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
         const record = await getAppointmentRecord(viewer, id, em);
+        if (
+          input.status !== 'cancelled' &&
+          ((await refundsFor(viewer.branchId, [id], em)).get(id) ?? []).length
+        ) {
+          throw AppError.conflict(
+            'This appointment has refunds. Remove the refunds before booking it again.',
+          );
+        }
         const before = { status: record.status, remark: record.remark };
         record.status = input.status;
         if (input.remark !== undefined) record.remark = input.remark;
@@ -397,6 +414,7 @@ export const appointmentsService = {
     await withTransaction(async (em) => {
       const before = await loadDetail(viewer, id, em);
       const record = await getAppointmentRecord(viewer, id, em);
+      await appointmentRefundsService.removeAllFor(actor, viewer.branchId, id, em);
       await appointmentPaymentsService.removeAllFor(actor, viewer.branchId, id, em);
       await appointments.softDelete(record, actor.userId, em);
       await auditService.record(

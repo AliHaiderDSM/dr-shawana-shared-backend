@@ -182,6 +182,18 @@ export const paymentReportQuerySchema = listQuerySchema(['date'], '-date').exten
 
 export const attachmentParamsSchema = z.object({ id: z.uuid(), attachmentId: z.uuid() });
 export const paymentParamsSchema = z.object({ id: z.uuid(), paymentId: z.uuid() });
+export const refundParamsSchema = z.object({ id: z.uuid(), refundId: z.uuid() });
+
+export const refundInputSchema = registry.register(
+  'AppointmentRefundInput',
+  z.object({
+    amount: positiveMoney,
+    method: z.enum(PAYMENT_METHODS),
+    accountSheetId: z.uuid().openapi({ description: 'The account the money is paid back from' }),
+    date: dateInput.optional().openapi({ description: 'Today when left out' }),
+    note: optionalText(500),
+  }),
+);
 
 const refSchema = z.object({ id: z.uuid(), name: z.string() });
 const fileSchema = z.object({
@@ -257,11 +269,29 @@ export const appointmentSchema = registry.register(
   }),
 );
 
+export const refundSchema = registry.register(
+  'AppointmentRefund',
+  z.object({
+    id: z.uuid(),
+    appointmentId: z.uuid(),
+    amount: moneyOutput,
+    method: z.enum(PAYMENT_METHODS),
+    date: z.iso.date(),
+    accountSheetId: z.uuid(),
+    accountSheet: z.object({ id: z.uuid(), accountName: z.string(), accountCode: z.string() }).nullable(),
+    note: z.string().nullable(),
+    createdBy: z.uuid().nullable(),
+    createdAt: z.iso.datetime(),
+  }),
+);
+
 export const appointmentDetailSchema = registry.register(
   'AppointmentDetail',
   z.object({
     ...appointmentBase,
     payments: z.array(paymentSchema),
+    refunds: z.array(refundSchema),
+    refundedAmount: moneyOutput,
     attachments: z.array(fileSchema),
     medicalRecords: z.array(
       z.object({ id: z.uuid(), date: z.iso.date(), note: z.string().nullable(), files: z.array(fileSchema) }),
@@ -311,6 +341,7 @@ export type AppointmentListQuery = z.output<typeof appointmentListQuerySchema>;
 export type CalendarQuery = z.output<typeof calendarQuerySchema>;
 export type PaymentInput = z.output<typeof paymentInputSchema>;
 export type UpdatePaymentInput = z.output<typeof updatePaymentSchema>;
+export type RefundInput = z.output<typeof refundInputSchema>;
 export type PaymentReportQuery = z.output<typeof paymentReportQuerySchema>;
 
 const signedUrl = {
@@ -337,6 +368,28 @@ const detail = (description: string) => ({
 });
 const onePayment = (description: string) => ({ description, ...jsonContent(dataEnvelope(paymentSchema)) });
 const paymentRequest = { params: paymentParamsSchema, query: branchQuerySchema };
+
+registry.registerPath({
+  ...paymentDocs,
+  method: 'post',
+  path: `${item}/refunds`,
+  summary:
+    'Super Admin pays back money of a cancelled appointment (at most what was received less earlier refunds)',
+  request: { ...byIdRequest, body: jsonContent(refundInputSchema) },
+  responses: {
+    201: { description: 'Refunded', ...jsonContent(dataEnvelope(refundSchema)) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...paymentDocs,
+  method: 'delete',
+  path: `${item}/refunds/{refundId}`,
+  summary: 'Super Admin removes a refund entered by mistake',
+  request: { params: refundParamsSchema, query: branchQuerySchema },
+  responses: { 204: { description: 'Removed' }, ...errorResponses },
+});
 
 registry.registerPath({
   ...appointmentDocs,

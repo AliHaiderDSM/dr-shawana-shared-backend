@@ -25,9 +25,12 @@ import {
   purchasesQuerySchema,
   saleProductsQuerySchema,
   stockReportQuerySchema,
+  appointmentPaymentsDayQuerySchema,
+  appointmentPaymentsMonthQuerySchema,
   profitLossQuerySchema,
   topProductsQuerySchema,
 } from './reports.schemas';
+import { appointmentPaymentsReportService } from './appointment-payments-report.service';
 import { profitLossService } from './profit-loss.service';
 import { reportsService, type ReportScope } from './reports.service';
 
@@ -100,6 +103,28 @@ mount(
   reportsService.accountsBalance,
 );
 mount('expenses', requirePermission('expenses.view'), expensesReportQuerySchema, reportsService.expenses);
+
+reportsRouter.get(
+  '/admin/reports/appointment-payments/day',
+  authenticate,
+  requireRole('super_admin'),
+  validate({ query: appointmentPaymentsDayQuerySchema }),
+  async (req, res) => {
+    const { date, branchId } = validQuery(req, appointmentPaymentsDayQuerySchema);
+    sendOk(res, await appointmentPaymentsReportService.day(date ?? today(), branchId ?? null));
+  },
+);
+
+reportsRouter.get(
+  '/admin/reports/appointment-payments/month',
+  authenticate,
+  requireRole('super_admin'),
+  validate({ query: appointmentPaymentsMonthQuerySchema }),
+  async (req, res) => {
+    const { month, branchId } = validQuery(req, appointmentPaymentsMonthQuerySchema);
+    sendOk(res, await appointmentPaymentsReportService.month(month ?? today().slice(0, 7), branchId ?? null));
+  },
+);
 
 reportsRouter.get(
   '/admin/reports/profit-loss',

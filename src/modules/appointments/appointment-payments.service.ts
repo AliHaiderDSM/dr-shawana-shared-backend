@@ -1,4 +1,5 @@
 import { type EntityManager, type SelectQueryBuilder } from 'typeorm';
+import { assertRefundsCovered } from './appointment-refunds.service';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
 import { Decimal, toMoney } from '../../database/transformers';
@@ -272,6 +273,7 @@ export const appointmentPaymentsService = {
       }
       delete payment.accountSheet;
       await payments.save(payment, em);
+      await assertRefundsCovered(viewer.branchId, appointmentId, em);
       const after = await reloadDto(viewer.branchId, appointmentId, paymentId, em);
       await auditService.record(
         {
@@ -338,6 +340,7 @@ export const appointmentPaymentsService = {
       await getAppointmentRecord(viewer, appointmentId, em);
       const payment = await getPayment(viewer.branchId, appointmentId, paymentId, em);
       await payments.softDelete(payment, actor.userId, em);
+      await assertRefundsCovered(viewer.branchId, appointmentId, em);
       await auditService.record(
         {
           actor,

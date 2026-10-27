@@ -15,12 +15,14 @@ import {
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
+import { requireRole } from '../../middleware/requireRole';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import { AppError } from '../../lib/errors';
 import { hasPermission } from '../../lib/permissions';
 import { doctorsService } from '../doctors/doctors.service';
 import { medicalFileParamsSchema } from '../patients/patients.schemas';
 import { appointmentPaymentsService } from './appointment-payments.service';
+import { appointmentRefundsService } from './appointment-refunds.service';
 import {
   appointmentListQuerySchema,
   appointmentStatusSchema,
@@ -30,6 +32,8 @@ import {
   createPaymentSchema,
   paymentParamsSchema,
   paymentReportQuerySchema,
+  refundInputSchema,
+  refundParamsSchema,
   updateAppointmentSchema,
   updatePaymentSchema,
 } from './appointments.schemas';
@@ -183,6 +187,36 @@ appointmentsRouter.get(
   async (req, res) => {
     const { id, fileId } = validParams(req, medicalFileParamsSchema);
     sendOk(res, await appointmentsService.medicalFileUrl(await viewerOf(req), id, fileId));
+  },
+);
+
+appointmentsRouter.post(
+  `${path}/:id/refunds`,
+  requireRole('super_admin'),
+  byId,
+  idempotent('appointment-refund'),
+  validate({ body: refundInputSchema }),
+  async (req, res) => {
+    sendCreated(
+      res,
+      await appointmentRefundsService.add(
+        actorFrom(req),
+        await viewerOf(req),
+        idOf(req),
+        validBody(req, refundInputSchema),
+      ),
+    );
+  },
+);
+
+appointmentsRouter.delete(
+  `${path}/:id/refunds/:refundId`,
+  requireRole('super_admin'),
+  validate({ params: refundParamsSchema }),
+  async (req, res) => {
+    const { id, refundId } = validParams(req, refundParamsSchema);
+    await appointmentRefundsService.remove(actorFrom(req), await viewerOf(req), id, refundId);
+    sendNoContent(res);
   },
 );
 
