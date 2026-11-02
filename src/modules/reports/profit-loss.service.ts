@@ -81,7 +81,7 @@ const add = (target: Totals, part: Partial<Totals>) => {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export const profitLossService = {
-  async report(year: number, month: number | null, branchId: string | null) {
+  async report(year: number, month: number | null, branchId: string | null, only: string | null = null) {
     const yearFrom = `${year}-01-01`;
     const yearTo = `${year}-12-31`;
     const periodFrom = month ? `${year}-${String(month).padStart(2, '0')}-01` : yearFrom;
@@ -168,27 +168,39 @@ export const profitLossService = {
       return branches.get(code)!;
     };
 
+    const wanted = (name: unknown) => !only || name === only;
+    const soldNames = new Set<string>();
+
     for (const sale of sales) {
       const day = sale.day as string;
       const subtotal = new Decimal(sale.subtotal ?? 0);
       const total = new Decimal(sale.total ?? 0);
       const received = Decimal.min(new Decimal(sale.received ?? 0), total);
+      const share = subtotal.gt(0) ? received.div(subtotal) : new Decimal(0);
+      const invoiceShare = subtotal.gt(0) ? total.div(subtotal) : new Decimal(0);
+      const saleLines = linesOf.get(sale.id as string) ?? [];
       const costs = saleCostsOf.get(sale.id as string) ?? [];
-      const saleCost = costs.reduce((sum, c) => sum.plus(c.cost ?? 0), new Decimal(0));
-      const part = { invoiced: total, received, saleCost };
+      for (const line of saleLines) soldNames.add(line.product as string);
+      const myLines = saleLines.filter((l) => wanted(l.product));
+      const myCosts = costs.filter((c) => wanted(c.product));
+      if (only && myLines.length === 0 && myCosts.length === 0) continue;
+      const lineSum = myLines.reduce((sum, l) => sum.plus(l.lineTotal ?? 0), new Decimal(0));
+      const part = {
+        invoiced: only ? lineSum.times(invoiceShare) : total,
+        received: only ? lineSum.times(share) : received,
+        saleCost: myCosts.reduce((sum, c) => sum.plus(c.cost ?? 0), new Decimal(0)),
+      };
       add(months[Number(day.slice(5, 7)) - 1]!, part);
       if (!inPeriod(day)) continue;
       add(period, part);
       add(branchOf(sale.branchCode as string, sale.branchName as string), part);
-      const share = subtotal.gt(0) ? received.div(subtotal) : new Decimal(0);
-      const invoiceShare = subtotal.gt(0) ? total.div(subtotal) : new Decimal(0);
-      for (const line of linesOf.get(sale.id as string) ?? []) {
+      for (const line of myLines) {
         const product = productOf(line.product as string);
         product.qtySold = product.qtySold.plus(line.qty ?? 0);
         product.received = product.received.plus(new Decimal(line.lineTotal ?? 0).times(share));
         product.invoiced = product.invoiced.plus(new Decimal(line.lineTotal ?? 0).times(invoiceShare));
       }
-      for (const c of costs) {
+      for (const c of myCosts) {
         const product = productOf(c.product as string);
         product.saleCost = product.saleCost.plus(c.cost ?? 0);
         product.estimatedQty = product.estimatedQty.plus(c.estimated ?? 0);
@@ -199,24 +211,30 @@ export const profitLossService = {
     for (const ret of returns) {
       const day = ret.day as string;
       const refund = new Decimal(ret.refund ?? 0);
+      const items = returnItemsOf.get(ret.id as string) ?? [];
       const costs = returnCostsOf.get(ret.id as string) ?? [];
-      const returnedCost = costs.reduce((sum, c) => sum.plus(c.cost ?? 0), new Decimal(0));
-      const part = { refunds: refund, returnedCost };
+      const value = items.reduce((sum, i) => sum.plus(i.value ?? 0), new Decimal(0));
+      const portionOf = (item: Row) =>
+        value.gt(0) ? new Decimal(item.value ?? 0).div(value) : new Decimal(1).div(items.length || 1);
+      const myItems = items.filter((i) => wanted(i.product));
+      const myCosts = costs.filter((c) => wanted(c.product));
+      if (only && myItems.length === 0 && myCosts.length === 0) continue;
+      const part = {
+        refunds: only
+          ? myItems.reduce((sum, i) => sum.plus(refund.times(portionOf(i))), new Decimal(0))
+          : refund,
+        returnedCost: myCosts.reduce((sum, c) => sum.plus(c.cost ?? 0), new Decimal(0)),
+      };
       add(months[Number(day.slice(5, 7)) - 1]!, part);
       if (!inPeriod(day)) continue;
       add(period, part);
       add(branchOf(ret.branchCode as string, ret.branchName as string), part);
-      const items = returnItemsOf.get(ret.id as string) ?? [];
-      const value = items.reduce((sum, i) => sum.plus(i.value ?? 0), new Decimal(0));
-      for (const item of items) {
+      for (const item of myItems) {
         const product = productOf(item.product as string);
         product.qtyReturned = product.qtyReturned.plus(item.qty ?? 0);
-        const portion = value.gt(0)
-          ? new Decimal(item.value ?? 0).div(value)
-          : new Decimal(1).div(items.length || 1);
-        product.refunds = product.refunds.plus(refund.times(portion));
+        product.refunds = product.refunds.plus(refund.times(portionOf(item)));
       }
-      for (const c of costs) {
+      for (const c of myCosts) {
         const product = productOf(c.product as string);
         product.returnedCost = product.returnedCost.plus(c.cost ?? 0);
       }
@@ -268,9 +286,15 @@ export const profitLossService = {
       month,
       period: { from: periodFrom, to: periodTo },
       branchId,
+      product: only,
+      productNames: [...soldNames].sort((a, b) => a.localeCompare(b)),
       summary: {
         ...figures(period),
-        sales: sales.filter((s) => inPeriod(s.day as string)).length,
+        sales: sales.filter(
+          (s) =>
+            inPeriod(s.day as string) &&
+            (!only || (linesOf.get(s.id as string) ?? []).some((l) => l.product === only)),
+        ).length,
         estimatedCostUnits: toQuantity(estimatedQty).toFixed(3),
         unknownCostUnits: toQuantity(unknownQty).toFixed(3),
       },

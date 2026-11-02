@@ -125,8 +125,8 @@ reportsRouter.get(
   requireRole('super_admin'),
   validate({ query: profitLossQuerySchema }),
   async (req, res) => {
-    const { year, month, branchId } = validQuery(req, profitLossQuerySchema);
-    sendOk(res, await profitLossService.report(year, month ?? null, branchId ?? null));
+    const { year, month, branchId, product } = validQuery(req, profitLossQuerySchema);
+    sendOk(res, await profitLossService.report(year, month ?? null, branchId ?? null, product ?? null));
   },
 );
 

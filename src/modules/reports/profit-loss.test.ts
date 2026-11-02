@@ -114,6 +114,52 @@ describe('Profit and loss', () => {
     expect(estimated.products[0]).toMatchObject({ lastCost: '450.00', avgCost: '450.00' });
   });
 
+  it('narrows every figure to one product when a product is chosen', async () => {
+    const categoryId = (await owned('/branch/categories').send({ name: 'Toners' })).body.data.id;
+    const toner = (
+      await owned('/branch/products').send({ name: 'Profit Toner', categoryId, salePrice: '300' })
+    ).body.data.id as string;
+    await owned('/branch/stock-ins')
+      .send({ date: '2026-09-01', items: [{ productId: toner, qty: '5', batch: 'T-1', unitCost: '100' }] })
+      .expect(201);
+    const patientId = (
+      await api('post', '/branch/patients', admin).send({
+        name: 'Sara',
+        phone: '923007778880',
+        city: 'Lahore',
+      })
+    ).body.data.id;
+    const sale = await api('post', '/branch/sales', admin).send({
+      patientId,
+      date: '2026-09-15',
+      saleType: 'office',
+      items: [{ productId: toner, qty: '1' }],
+      payments: [{ method: 'cash', amount: '300', accountSheetId: cashSheet, date: '2026-09-15' }],
+    });
+    expect(sale.status).toBe(201);
+    await api('post', `/branch/sales/${sale.body.data.id}/payments/approve`, admin).send({}).expect(200);
+
+    const all = (await report('year=2026&month=9')).body.data;
+    expect(all.productNames).toEqual(['Profit Serum', 'Profit Toner']);
+    const tonerOnly = (await report('year=2026&month=9&product=Profit%20Toner')).body.data;
+    expect(tonerOnly.product).toBe('Profit Toner');
+    expect(tonerOnly.products.map((r: { product: string }) => r.product)).toEqual(['Profit Toner']);
+    expect(tonerOnly.summary).toMatchObject({
+      revenue: '300.00',
+      cost: '100.00',
+      profit: '200.00',
+      sales: 1,
+    });
+    expect(tonerOnly.months.find((m: { month: string }) => m.month === '2026-09')).toMatchObject({
+      revenue: '300.00',
+    });
+    expect(tonerOnly.productNames).toEqual(['Profit Serum', 'Profit Toner']);
+    const serumOnly = (await report('year=2026&month=9&product=Profit%20Serum')).body.data;
+    expect(serumOnly.products.map((r: { product: string }) => r.product)).toEqual(['Profit Serum']);
+    expect(serumOnly.summary.revenue).toBe(serumOnly.products[0].revenue);
+    expect(Number(all.summary.revenue)).toBeCloseTo(Number(serumOnly.summary.revenue) + 300, 2);
+  });
+
   it('is for the Super Admin only', async () => {
     expect((await api('get', '/admin/reports/profit-loss?year=2026', admin)).status).toBe(403);
     expect((await report('year=2026&month=13')).status).toBe(400);

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Profit & loss by product (2026-11-02)
+
+- /admin/reports/profit-loss takes ?product=<name>: summary, months, branches and the products table count only that product (its share of the received money by line total, its own cost, its share of refunds by item value, its returned cost). The response adds product and productNames (every product sold in the year, for the filter). Test in profit-loss.test.ts. Full suite: 315 passed.
+
 ## Appointment payments report is a ledger (2026-10-27)
 
 - Replaces the day/month endpoints with GET /admin/reports/appointment-payments?from&to&branchId (Super Admin, up to 366 days): one entry per booking without a same-day payment, advance (before the visit day), balance (on or after it) and refund, oldest first. Each entry carries the appointment (no, visit, fee), the total paid and refunded after it, remaining after it, the state after it and fullyPaidHere. Entries never drop out when an appointment is fully paid. Summary: bookings, advance, balance, refunds, net, fully paid.

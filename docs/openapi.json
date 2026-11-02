@@ -60773,6 +60773,18 @@
             "description": "One branch; every branch when left out",
             "name": "branchId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Only this product (by name); every product when left out"
+            },
+            "required": false,
+            "description": "Only this product (by name); every product when left out",
+            "name": "product",
+            "in": "query"
           }
         ],
         "responses": {

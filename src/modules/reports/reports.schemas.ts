@@ -148,6 +148,13 @@ export const profitLossQuerySchema = z.object({
     .optional()
     .openapi({ description: '1-12; the whole year when left out' }),
   branchId: z.uuid().optional().openapi({ description: 'One branch; every branch when left out' }),
+  product: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .optional()
+    .openapi({ description: 'Only this product (by name); every product when left out' }),
 });
 
 export const topProductsQuerySchema = z.object({
