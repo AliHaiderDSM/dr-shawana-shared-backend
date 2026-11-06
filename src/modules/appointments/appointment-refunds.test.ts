@@ -28,11 +28,11 @@ describe('appointment advances, balances, refunds and the payment report', () =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
   const ownerApi = (method: 'get' | 'post' | 'delete', path: string) =>
     api(method, `${path}${path.includes('?') ? '&' : '?'}branchId=${branchId}`, owner);
-  const book = (timeFrom: string, timeTo: string, fee: string) =>
+  const book = (timeFrom: string, timeTo: string, fee: string, date = visit) =>
     api('post', '/branch/appointments', admin).send({
       patientId,
       doctorId,
-      date: visit,
+      date,
       timeFrom,
       timeTo,
       mode: 'physical',
@@ -74,14 +74,15 @@ describe('appointment advances, balances, refunds and the payment report', () =>
   });
 
   it('counts money before the visit as advance and on the visit day as balance', async () => {
-    const booked = await book('10:00', '10:30', '5000');
+    const before = shift(day0, -1);
+    const booked = await book('10:00', '10:30', '5000', day0);
     expect(booked.status).toBe(201);
     const id = booked.body.data.id as string;
-    expect((await pay(id, '2000', day0)).status).toBe(201);
+    expect((await pay(id, '2000', before)).status).toBe(201);
 
-    const first = (await ledger(day0)).body.data;
+    const first = (await ledger(before)).body.data;
     expect(first.summary).toMatchObject({
-      bookings: 1,
+      bookings: 0,
       advance: 1,
       advanceAmount: '2000.00',
       balanceAmount: '0.00',
@@ -96,8 +97,9 @@ describe('appointment advances, balances, refunds and the payment report', () =>
       stateAfter: 'advance',
     });
 
-    expect((await pay(id, '3000', visit)).status).toBe(201);
-    const whole = (await ledger(day0, visit)).body.data;
+    expect((await pay(id, '3000', shift(day0, 1))).status).toBe(400);
+    expect((await pay(id, '3000', day0)).status).toBe(201);
+    const whole = (await ledger(before, day0)).body.data;
     const mine = whole.rows.filter((r: { appointment: { id: string } }) => r.appointment.id === id);
     expect(
       mine.map((r: { kind: string; amount: string; stateAfter: string; fullyPaidHere: boolean }) => [
@@ -111,7 +113,7 @@ describe('appointment advances, balances, refunds and the payment report', () =>
       ['balance', '3000.00', 'paid', true],
     ]);
     expect(whole.summary).toMatchObject({ balanceAmount: '3000.00', fullyPaid: 1 });
-    expect((await ledger(shift(visit, 1))).body.data.rows).toEqual([]);
+    expect((await ledger(shift(day0, -2))).body.data.rows).toEqual([]);
   });
 
   it('shows a booking without money as its own entry', async () => {

@@ -331,6 +331,51 @@ export const stockLedger = {
     return this.replace(manager, ref, [], { reverseExisting: true, reversalNote: note });
   },
 
+  async redate(manager: EntityManager, ref: StockReference, date: string, note: string) {
+    const existing = (await unreversedMovements(manager, ref)).filter((m) => m.date !== date);
+    if (existing.length === 0) return [];
+    const reversals = existing.map((m) => ({
+      productId: m.productId,
+      type: m.type,
+      qty: m.qty.negated(),
+      batchId: m.batchId,
+      unitCost: m.unitCost,
+      date: m.date,
+      note,
+      reversalOfId: m.id,
+    }));
+    const moved = existing.map((m) => ({
+      productId: m.productId,
+      type: m.type,
+      qty: new Decimal(m.qty),
+      batchId: m.batchId,
+      unitCost: m.unitCost,
+      date,
+      note: m.note,
+      reversalOfId: null,
+    }));
+    const postings = await resolvePostings(manager, ref.branchId, [...reversals, ...moved]);
+    const repository = manager.getRepository(StockMovement);
+    return repository.save(
+      postings.map((m) =>
+        repository.create({
+          branchId: ref.branchId,
+          productId: m.productId,
+          batchId: m.batchId,
+          type: m.type,
+          qty: m.qty,
+          unitCost: m.unitCost === null ? null : new Decimal(m.unitCost),
+          referenceType: ref.referenceType,
+          referenceId: ref.referenceId,
+          reversalOfId: m.reversalOfId,
+          date: m.date,
+          note: m.note,
+          createdBy: ref.actorId,
+        }),
+      ),
+    );
+  },
+
   async replace(
     manager: EntityManager,
     ref: StockReference,

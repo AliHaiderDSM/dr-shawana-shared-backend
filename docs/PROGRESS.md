@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Sale date moves its stock, no future appointment payments (2026-11-06)
+
+- Saving an office sale with a date now moves its stock movements to that date (stockLedger.redate: reverses each live movement on its old date and posts it again on the new one; the ledger stays append-only). Before, a changed sale date left the stock on the old day, so the inventory report counted it in the wrong month. Test in sales.test.ts.
+- Appointment payment date (add and edit) cannot be after today. appointment-refunds.test.ts now uses past dates and checks the 400. Full suite: 317 passed.
+
 ## Batch cost edits, office payments, GDN period (2026-11-06)
 
 - Editing a stock in's unit cost now overwrites its batch cost and copies it to the branch copies of that batch and to their transfer receipts (syncBatchCost next to syncBatchDates), so Profit & Loss uses the corrected cost. Test in transfers.test.ts.

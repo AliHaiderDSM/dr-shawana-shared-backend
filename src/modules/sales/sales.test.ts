@@ -276,6 +276,18 @@ describe('POS sales', () => {
     expect(log).not.toBeNull();
   });
 
+  it('moves the stock of an office sale to its new date when the date is changed', async () => {
+    const res = await api('patch', `/branch/sales/${saleId}`, frontDesk).send({ date: '2026-08-15' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.date).toBe('2026-08-15');
+    expect(await stock(serum)).toBe('8.000');
+    const moves = await AppDataSource.getRepository(StockMovement).find({ where: { referenceId: saleId } });
+    const reversed = new Set(moves.map((m) => m.reversalOfId).filter(Boolean));
+    const live = moves.filter((m) => !m.reversalOfId && !reversed.has(m.id));
+    expect(live.length).toBeGreaterThan(0);
+    expect(live.every((m) => m.date === '2026-08-15')).toBe(true);
+  });
+
   it('recomputes totals when payments change', async () => {
     const payments = (await api('get', `/branch/sales/${saleId}`, frontDesk)).body.data.payments;
     const removed = await api('delete', `/branch/sales/${saleId}/payments/${payments[0].id}`, frontDesk);

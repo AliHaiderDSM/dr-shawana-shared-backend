@@ -1031,11 +1031,15 @@ export const salesService = {
         percent: new Decimal(sale.discountPercent),
         amount: new Decimal(sale.discountAmount),
       };
+      const movedDate = input.date && sale.saleType === 'office' ? input.date : null;
       Object.assign(sale, fields, { updatedBy: actor.userId });
       delete sale.items;
       delete sale.payments;
       delete sale.patient;
       await sales.save(sale, em);
+      if (movedDate) {
+        await stockLedger.redate(em, ledgerRef(actor, sale), movedDate, `${sale.invoiceNo} date changed`);
+      }
       const totals = await recompute(em, sale, { discountPercent: discountPercent ?? sale.discountPercent });
       if (
         discountRequestId ||

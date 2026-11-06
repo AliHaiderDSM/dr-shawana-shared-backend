@@ -11,7 +11,14 @@ import {
 import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
 import { listQuerySchema } from '../../lib/pagination';
-import { atLeastOneField, dateInput, moneyInput, moneyOutput, optionalText } from '../../lib/validation';
+import {
+  atLeastOneField,
+  dateInput,
+  moneyInput,
+  moneyOutput,
+  optionalText,
+  today,
+} from '../../lib/validation';
 import { BHRT_STATUSES } from '../patients/patient.entity';
 import { patientFields } from '../patients/patients.schemas';
 import {
@@ -29,6 +36,8 @@ export const timeInput = z
   .transform((v) => (v.length === 5 ? `${v}:00` : v))
   .openapi({ example: '10:30' });
 
+const paymentDate = dateInput.refine((d) => d <= today(), 'The payment date cannot be in the future');
+
 const positiveMoney = moneyInput.refine((v) => Number(v) > 0, 'Must be greater than zero');
 
 const senderFields = {
@@ -42,7 +51,7 @@ export const paymentInputSchema = registry.register(
   z.object({
     method: z.enum(PAYMENT_METHODS),
     amount: positiveMoney,
-    date: dateInput.optional(),
+    date: paymentDate.optional(),
     accountSheetId: z.uuid().openapi({ description: 'The receiving account sheet' }),
     ...senderFields,
     proofIndex: z
@@ -119,7 +128,7 @@ export const updatePaymentSchema = registry.register(
     z.object({
       method: z.enum(PAYMENT_METHODS),
       amount: positiveMoney,
-      date: dateInput,
+      date: paymentDate,
       accountSheetId: z.uuid(),
       senderBank: z.string().trim().max(150).nullable(),
       senderAccountTitle: z.string().trim().max(150).nullable(),
