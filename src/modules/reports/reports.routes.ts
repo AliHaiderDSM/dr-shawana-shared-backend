@@ -113,7 +113,7 @@ reportsRouter.get(
     if (query.all === 'true') {
       sendOk(
         res,
-        await appointmentPaymentsReportService.entries('2000-01-01', today(), query.branchId ?? null),
+        await appointmentPaymentsReportService.entries('2000-01-01', '9999-12-31', query.branchId ?? null),
       );
       return;
     }

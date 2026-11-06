@@ -135,7 +135,7 @@ export const appointmentPaymentsQuerySchema = z
     all: z
       .enum(['true', 'false'])
       .optional()
-      .openapi({ description: 'true: every entry up to today, from and to are ignored' }),
+      .openapi({ description: 'true: every entry of every date, from and to are ignored' }),
   })
   .refine((v) => !v.from || !v.to || v.to >= v.from, {
     message: 'to must be on or after from',

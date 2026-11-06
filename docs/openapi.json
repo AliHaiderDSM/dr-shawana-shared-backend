@@ -60322,10 +60322,10 @@
                 "true",
                 "false"
               ],
-              "description": "true: every entry up to today, from and to are ignored"
+              "description": "true: every entry of every date, from and to are ignored"
             },
             "required": false,
-            "description": "true: every entry up to today, from and to are ignored",
+            "description": "true: every entry of every date, from and to are ignored",
             "name": "all",
             "in": "query"
           }

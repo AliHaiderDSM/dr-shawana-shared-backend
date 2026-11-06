@@ -26,7 +26,7 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 - Sale and appointment payments: cash must go to a cash account sheet and online to a bank sheet (400 otherwise), on add and on edit. Test in sales.test.ts.
 - /branch/inventory/report without from covers every date (was this month).
-- /admin/reports/appointment-payments?all=true returns every entry up to today. Test in appointment-refunds.test.ts. Full suite: 318 passed.
+- /admin/reports/appointment-payments?all=true returns every entry of every date (also payments dated after today, like the Month view). Test in appointment-refunds.test.ts. Full suite: 318 passed.
 
 ## Sale date moves its stock, no future appointment payments (2026-11-06)
 
