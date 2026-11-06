@@ -151,20 +151,15 @@ describe('POS sales', () => {
       total: '3330.00',
       received: '2500.00',
       remaining: '830.00',
-      paymentStatus: 'awaiting_approval',
+      paymentStatus: 'partial',
       paymentMethods: ['cash', 'online'],
     });
-    expect(res.body.data.payments.every((p: { approvedAt: string | null }) => p.approvedAt === null)).toBe(
+    expect(res.body.data.payments.every((p: { approvedAt: string | null }) => p.approvedAt !== null)).toBe(
       true,
     );
     expect((await api('post', `/branch/sales/${saleId}/payments/approve`, frontDesk).send({})).status).toBe(
       403,
     );
-    const approved = await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({});
-    expect(approved.body.data.paymentStatus).toBe('partial');
-    expect(
-      approved.body.data.payments.every((p: { approvedAt: string | null }) => p.approvedAt !== null),
-    ).toBe(true);
     expect((await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({})).status).toBe(409);
     expect(
       res.body.data.items.map((i: { unitPrice: string; bundleId: string | null }) => [
@@ -301,11 +296,8 @@ describe('POS sales', () => {
     expect(added.body.data).toMatchObject({
       received: '1000.00',
       remaining: '0.00',
-      paymentStatus: 'awaiting_approval',
+      paymentStatus: 'paid',
     });
-    expect(
-      (await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({})).body.data.paymentStatus,
-    ).toBe('paid');
   });
 
   it('keeps several screenshots on an online payment', async () => {

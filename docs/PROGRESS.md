@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Batch cost edits, office payments, GDN period (2026-11-06)
+
+- Editing a stock in's unit cost now overwrites its batch cost and copies it to the branch copies of that batch and to their transfer receipts (syncBatchCost next to syncBatchDates), so Profit & Loss uses the corrected cost. Test in transfers.test.ts.
+- Office sale payments are approved when they are saved (create, add, money edit); only online order payments wait for approval. Tests updated.
+- GDN report takes from and to (up to a year): opening = waiting before from, dispatched/cancelled = within the period, closing = still waiting at to; office sales of the period. date still works for one day. Test in gdn-report.test.ts. Full suite: 316 passed.
+
 ## Stock in takes no files (2026-11-06)
 
 - /branch/stock-ins create is JSON only (no multipart "files") and its /attachments routes are gone (404); stock outs keep attachments. OpenAPI updated. inventory.test.ts checks it. Full suite: 315 passed.

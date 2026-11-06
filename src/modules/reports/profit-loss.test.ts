@@ -55,7 +55,6 @@ describe('Profit and loss', () => {
     expect(sale.status).toBe(201);
     expect(sale.body.data.total).toBe('2000.00');
     saleId = sale.body.data.id;
-    await api('post', `/branch/sales/${saleId}/payments/approve`, admin).send({}).expect(200);
   });
 
   it('counts only the money received, against the cost of the batch sold', async () => {
@@ -137,7 +136,6 @@ describe('Profit and loss', () => {
       payments: [{ method: 'cash', amount: '300', accountSheetId: cashSheet, date: '2026-09-15' }],
     });
     expect(sale.status).toBe(201);
-    await api('post', `/branch/sales/${sale.body.data.id}/payments/approve`, admin).send({}).expect(200);
 
     const all = (await report('year=2026&month=9')).body.data;
     expect(all.productNames).toEqual(['Profit Serum', 'Profit Toner']);

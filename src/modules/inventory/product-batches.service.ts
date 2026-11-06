@@ -97,6 +97,24 @@ async function syncBatchDates(manager: EntityManager, batch: ProductBatch) {
   );
 }
 
+async function syncBatchCost(manager: EntityManager, batch: ProductBatch) {
+  if (batch.unitCost === null) return;
+  const cost = toMoney(batch.unitCost).toFixed(2);
+  await manager.query(
+    `UPDATE product_batches c SET unit_cost = $3, updated_at = now()
+       FROM products p
+      WHERE c.product_id = p.id AND p.origin_product_id = $1 AND c.batch_no = $2 AND c.deleted_at IS NULL`,
+    [batch.productId, batch.batchNo, cost],
+  );
+  await manager.query(
+    `UPDATE stock_ins s SET unit_cost = $3
+      WHERE s.deleted_at IS NULL AND s.transfer_out_id IS NOT NULL AND s.batch_id IN (
+        SELECT c.id FROM product_batches c JOIN products p ON p.id = c.product_id
+         WHERE p.origin_product_id = $1 AND c.batch_no = $2 AND c.deleted_at IS NULL)`,
+    [batch.productId, batch.batchNo, cost],
+  );
+}
+
 const BATCH_SELECT = `
   SELECT b.id, b.product_id AS "productId", p.name AS "productName", p.unit, b.batch_no AS "batchNo",
          to_char(b.manufacturing_date, 'YYYY-MM-DD') AS "manufacturingDate",
@@ -153,12 +171,19 @@ export const productBatchesService = {
       throw AppError.badRequest('Expiry date must be on or after the manufacturing date');
     }
     existing.supplierId ??= details.supplierId ?? null;
-    if (existing.unitCost === null && details.unitCost !== undefined && details.unitCost !== null) {
+    if (
+      (overwrite || existing.unitCost === null) &&
+      details.unitCost !== undefined &&
+      details.unitCost !== null
+    ) {
       existing.unitCost = toMoney(details.unitCost);
     }
     existing.updatedBy = actor.userId;
     const saved = await batches.save(existing, manager);
-    if (overwrite) await syncBatchDates(manager, saved);
+    if (overwrite) {
+      await syncBatchDates(manager, saved);
+      await syncBatchCost(manager, saved);
+    }
     return saved;
   },
 

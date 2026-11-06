@@ -162,6 +162,8 @@ export const GDN_REPORT_TYPES = ['online', 'office', 'all'] as const;
 
 export const gdnReportQuerySchema = z.object({
   date: dateInput.optional().openapi({ description: 'The day of the report; today when left out' }),
+  from: dateInput.optional().openapi({ description: 'Start of a period (with to); overrides date' }),
+  to: dateInput.optional().openapi({ description: 'End of a period (with from)' }),
   type: z
     .enum(GDN_REPORT_TYPES)
     .default('online')

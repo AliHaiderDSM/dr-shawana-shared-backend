@@ -131,6 +131,24 @@ describe('GDN day-end report', () => {
     });
   });
 
+  it('covers a period: opening before it, dispatched within it, closing at its end', async () => {
+    const period = (q: string) =>
+      request(app).get(`/api/v1/branch/sales/gdn-report?${q}`).set(bearer(dispatcher));
+    const res = await period('from=2026-10-20&to=2026-10-21');
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ from: '2026-10-20', to: '2026-10-21' });
+    expect(res.body.data.summary).toMatchObject({
+      opening: 0,
+      newOrders: 14,
+      dispatched: 11,
+      cancelled: 1,
+      closing: 2,
+    });
+    const later = (await period('from=2026-10-21&to=2026-10-31')).body.data.summary;
+    expect(later).toMatchObject({ opening: 7, newOrders: 4, dispatched: 8, cancelled: 1, closing: 2 });
+    expect((await period('from=2026-10-22&to=2026-10-21')).status).toBe(400);
+  });
+
   it('lets the Super Admin open any branch report', async () => {
     const res = await request(app)
       .get(`/api/v1/branch/sales/gdn-report?date=2026-10-21&branchId=${dispatchId}`)

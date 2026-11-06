@@ -327,10 +327,11 @@ const uploadProofs = (branchId: string, files: Express.Multer.File[]) =>
 async function insertPayment(
   manager: EntityManager,
   actor: Actor,
-  sale: Pick<Sale, 'id' | 'branchId' | 'date'>,
+  sale: Pick<Sale, 'id' | 'branchId' | 'date' | 'saleType'>,
   input: Omit<SalePaymentInput, 'proofIndex' | 'proofIndexes'>,
   proofs: UploadedFile[],
 ) {
+  const approval = sale.saleType === 'office' ? { approvedAt: new Date(), approvedBy: actor.userId } : {};
   await assertAccountSheet(sale.branchId, input.accountSheetId, manager);
   const details =
     input.method === 'cash'
@@ -350,6 +351,7 @@ async function insertPayment(
       date: input.date ?? sale.date,
       accountSheetId: input.accountSheetId,
       ...details,
+      ...approval,
     } as Partial<SalePayment>,
     manager,
   );
@@ -876,7 +878,7 @@ export const salesService = {
           : await patientsService.require(input.patientId as string, em);
         const lines = await resolveLines(branchId, input.items, em, fulfiller?.id ?? branchId);
         const received = input.payments.reduce((sum, p) => sum.plus(p.amount), new Decimal(0));
-        const totals = saleTotals(lines, received, input, input.payments.length > 0);
+        const totals = saleTotals(lines, received, input, online && input.payments.length > 0);
         const seq = await nextSequence(em, branchId, 'sale');
         const date = input.date ?? today();
         const gdnNo = online
@@ -1411,7 +1413,13 @@ export const salesService = {
         (key) => key in input && String(input[key]) !== String(payment[key]),
       );
       Object.assign(payment, input, { updatedBy: actor.userId });
-      if (money) Object.assign(payment, { approvedAt: null, approvedBy: null });
+      if (money)
+        Object.assign(
+          payment,
+          sale.saleType === 'office'
+            ? { approvedAt: new Date(), approvedBy: actor.userId }
+            : { approvedAt: null, approvedBy: null },
+        );
       if (payment.method === 'cash') {
         removedProofs = await dropProofs(em, actor, branchId, payment.id);
         Object.assign(payment, CASH_CLEARED);

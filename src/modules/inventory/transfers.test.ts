@@ -284,25 +284,33 @@ describe('Main Warehouse transfers to branches', () => {
     );
   });
 
-  it('corrects batch dates from the warehouse entry everywhere the batch went', async () => {
+  it('corrects batch dates and unit cost from the warehouse entry everywhere the batch went', async () => {
     const t01 = (s: { batch: string | null }) => s.batch === 'T-01';
     const entry = (await asAdmin('get', '/branch/stock-ins')).body.data.find(t01);
     const res = await asAdmin('patch', `/branch/stock-ins/${entry.id}`).send({
       batch: 'T-01',
       manufacturingDate: '2026-06-01',
       expiryDate: '2027-07-31',
+      unitCost: '70',
     });
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ manufacturingDate: '2026-06-01', expiryDate: '2027-07-31' });
+    const own = (await asAdmin('get', `/branch/inventory/batches?productId=${entry.productId}`)).body.data;
+    expect(own.find((b: { batchNo: string }) => b.batchNo === 'T-01')).toMatchObject({ unitCost: '70.00' });
 
     const batches = (await asBranch('get', `/branch/inventory/batches?productId=${lahoreToner}`)).body.data;
     expect(batches[0]).toMatchObject({
       batchNo: 'T-01',
       manufacturingDate: '2026-06-01',
       expiryDate: '2027-07-31',
+      unitCost: '70.00',
     });
     const received = (await asBranch('get', '/branch/stock-ins')).body.data.find(t01);
-    expect(received).toMatchObject({ manufacturingDate: '2026-06-01', expiryDate: '2027-07-31' });
+    expect(received).toMatchObject({
+      manufacturingDate: '2026-06-01',
+      expiryDate: '2027-07-31',
+      unitCost: '70.00',
+    });
   });
 
   it('lets the branch sell the transferred pieces and reuses its product on the next transfer', async () => {

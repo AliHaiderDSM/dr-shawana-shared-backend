@@ -30,6 +30,18 @@ const sum = (rows: { total: string }[]) => rows.reduce((total, r) => total + Num
 
 export const gdnReportService = {
   async day(branchId: string, date: string, superAdmin: boolean, wanted: GdnReportType = 'online') {
+    return this.period(branchId, date, date, superAdmin, wanted);
+  },
+
+  async period(
+    branchId: string,
+    from: string,
+    to: string,
+    superAdmin: boolean,
+    wanted: GdnReportType = 'online',
+  ) {
+    if (from > to) throw AppError.badRequest('The start date must be on or before the end date');
+    if (daysBetween(from, to) > 366) throw AppError.badRequest('Choose at most one year');
     const dispatch = await isDispatchBranch(AppDataSource.manager, branchId);
     const type: GdnReportType = superAdmin ? wanted : 'online';
     if (!superAdmin && !dispatch) {
@@ -55,12 +67,12 @@ export const gdnReportService = {
         : ((await AppDataSource.query(
             `${select}
         WHERE ${column} = $1 AND s.sale_type = 'online' AND s.deleted_at IS NULL
-          AND s.date <= $2::date
+          AND s.date <= $3::date
           AND (s.dispatched_on IS NULL OR s.dispatched_on >= $2::date)
           AND (s.cancelled_on IS NULL OR s.cancelled_on >= $2::date)
           AND NOT (s.delivery_status = 'cancelled' AND s.cancelled_on IS NULL)
         ORDER BY s.date, s.invoice_seq`,
-            [branchId, date],
+            [branchId, from, to],
           )) as OrderRow[]);
     const officeRows =
       type === 'online'
@@ -68,9 +80,9 @@ export const gdnReportService = {
         : ((await AppDataSource.query(
             `${select}
         WHERE (${dispatch ? '$1::uuid IS NOT NULL' : 's.branch_id = $1'}) AND s.sale_type = 'office' AND s.deleted_at IS NULL
-          AND s.date = $2::date
-        ORDER BY b.code, s.invoice_seq`,
-            [branchId, date],
+          AND s.date BETWEEN $2::date AND $3::date
+        ORDER BY s.date, b.code, s.invoice_seq`,
+            [branchId, from, to],
           )) as OrderRow[]);
     const rows = [...onlineRows, ...officeRows];
     const items = rows.length
@@ -86,9 +98,10 @@ export const gdnReportService = {
       : [];
     const orders = rows.map((r) => {
       const office = r.saleType === 'office';
-      const fromBefore = !office && r.date < date;
-      const dispatchedToday = office || r.dispatchedOn === date;
-      const cancelledToday = r.cancelledOn === date;
+      const fromBefore = !office && r.date < from;
+      const inPeriod = (day: string | null) => day !== null && day >= from && day <= to;
+      const dispatchedToday = office || inPeriod(r.dispatchedOn);
+      const cancelledToday = inPeriod(r.cancelledOn);
       return {
         id: r.id,
         invoiceNo: r.invoiceNo,
@@ -98,7 +111,7 @@ export const gdnReportService = {
         dispatchedOn: dispatchedToday ? (r.dispatchedOn ?? r.date) : null,
         status: dispatchedToday ? 'dispatched' : cancelledToday ? 'cancelled' : 'pending',
         fromBefore,
-        waitingDays: daysBetween(r.date, date),
+        waitingDays: daysBetween(r.date, dispatchedToday ? (r.dispatchedOn ?? r.date) : to),
         paymentStatus: r.paymentStatus,
         total: Number(r.total).toFixed(2),
         city: r.city,
@@ -116,7 +129,9 @@ export const gdnReportService = {
     const closing = orders.filter((o) => o.status === 'pending');
     const counter = orders.filter((o) => o.saleType === 'office');
     return {
-      date,
+      date: from,
+      from,
+      to,
       type,
       branch: { ...branch, dispatch },
       summary: {

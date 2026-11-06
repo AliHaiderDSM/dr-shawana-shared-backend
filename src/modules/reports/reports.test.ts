@@ -153,7 +153,6 @@ describe('accounts, expenses, reports and dashboard', () => {
     expect(
       (await api('post', `/branch/sales/${sale.body.data.id}/payments/approve`, frontDesk).send({})).status,
     ).toBe(403);
-    await api('post', `/branch/sales/${sale.body.data.id}/payments/approve`, accountant).send({});
   });
 
   describe('journal', () => {
