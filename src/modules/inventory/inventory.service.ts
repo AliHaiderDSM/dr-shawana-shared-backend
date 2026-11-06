@@ -45,7 +45,7 @@ const REPORT_COLUMNS = [
 ] as const;
 type ReportColumn = (typeof REPORT_COLUMNS)[number];
 
-const firstDayOfMonth = () => `${today().slice(0, 7)}-01`;
+const ALL_TIME_START = '2000-01-01';
 
 async function openingBalance(branchId: string, productId: string, before: string): Promise<string> {
   const [row] = (await AppDataSource.query(
@@ -200,7 +200,7 @@ export const inventoryService = {
   },
 
   async report(branchId: string, query: InventoryReportQuery) {
-    const from = query.from ?? firstDayOfMonth();
+    const from = query.from ?? ALL_TIME_START;
     const to = query.to ?? today();
     const params: unknown[] = [branchId, from, to];
     const filters: string[] = [];

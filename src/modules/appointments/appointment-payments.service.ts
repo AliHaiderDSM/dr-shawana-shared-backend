@@ -53,9 +53,18 @@ const proofFields = (file: UploadedFile | undefined) =>
     ? { proofFilePath: file.path, proofOriginalName: file.originalName, proofContentType: file.contentType }
     : {};
 
-async function assertAccountSheet(branchId: string, id: string, manager: EntityManager) {
+async function assertAccountSheet(
+  branchId: string,
+  id: string,
+  manager: EntityManager,
+  method?: 'cash' | 'online',
+) {
   const sheet = await accountSheetsRepository.findById(branchId, id, manager);
   if (!sheet) throw AppError.badRequest('The selected receiving account was not found in this branch');
+  if (method === 'cash' && sheet.type !== 'cash')
+    throw AppError.badRequest('A cash payment goes to a cash account. Choose a cash account sheet.');
+  if (method === 'online' && sheet.type !== 'bank')
+    throw AppError.badRequest('An online payment goes to a bank account. Choose a bank account sheet.');
 }
 
 export function assertProofIndexes(inputs: PaymentInput[], proofCount: number) {
@@ -99,7 +108,7 @@ async function insertPayment(
   input: PaymentInput,
   proof: UploadedFile | undefined,
 ) {
-  await assertAccountSheet(branchId, input.accountSheetId, manager);
+  await assertAccountSheet(branchId, input.accountSheetId, manager, input.method);
   const { proofIndex: _proofIndex, ...fields } = input;
   const details =
     fields.method === 'cash'
@@ -267,6 +276,8 @@ export const appointmentPaymentsService = {
       if (input.accountSheetId) await assertAccountSheet(viewer.branchId, input.accountSheetId, em);
       const before = toPaymentDto(payment);
       Object.assign(payment, input, { updatedBy: actor.userId });
+      if (input.method || input.accountSheetId)
+        await assertAccountSheet(viewer.branchId, payment.accountSheetId, em, payment.method);
       if (payment.method === 'cash') {
         removedProof = payment.proofFilePath;
         Object.assign(payment, CASH_CLEARED);

@@ -60314,6 +60314,20 @@
             "description": "One branch; every branch when left out",
             "name": "branchId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "true: every entry up to today, from and to are ignored"
+            },
+            "required": false,
+            "description": "true: every entry up to today, from and to are ignored",
+            "name": "all",
+            "in": "query"
           }
         ],
         "responses": {

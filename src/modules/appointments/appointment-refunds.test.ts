@@ -114,6 +114,8 @@ describe('appointment advances, balances, refunds and the payment report', () =>
     ]);
     expect(whole.summary).toMatchObject({ balanceAmount: '3000.00', fullyPaid: 1 });
     expect((await ledger(shift(day0, -2))).body.data.rows).toEqual([]);
+    const all = (await ownerApi('get', '/admin/reports/appointment-payments?all=true')).body.data;
+    expect(all.rows.filter((r: { appointment: { id: string } }) => r.appointment.id === id)).toHaveLength(2);
   });
 
   it('shows a booking without money as its own entry', async () => {

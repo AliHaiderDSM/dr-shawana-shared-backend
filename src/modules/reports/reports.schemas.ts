@@ -132,6 +132,10 @@ export const appointmentPaymentsQuerySchema = z
     from: dateInput.optional().openapi({ description: 'First day; today when left out' }),
     to: dateInput.optional().openapi({ description: 'Last day; the same as from when left out' }),
     branchId: z.uuid().optional().openapi({ description: 'One branch; every branch when left out' }),
+    all: z
+      .enum(['true', 'false'])
+      .optional()
+      .openapi({ description: 'true: every entry up to today, from and to are ignored' }),
   })
   .refine((v) => !v.from || !v.to || v.to >= v.from, {
     message: 'to must be on or after from',

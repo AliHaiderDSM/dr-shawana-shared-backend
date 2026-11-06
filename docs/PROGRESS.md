@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Cash goes to cash accounts, all-dates reports (2026-11-06)
+
+- Sale and appointment payments: cash must go to a cash account sheet and online to a bank sheet (400 otherwise), on add and on edit. Test in sales.test.ts.
+- /branch/inventory/report without from covers every date (was this month).
+- /admin/reports/appointment-payments?all=true returns every entry up to today. Test in appointment-refunds.test.ts. Full suite: 318 passed.
+
 ## Sale date moves its stock, no future appointment payments (2026-11-06)
 
 - Saving an office sale with a date now moves its stock movements to that date (stockLedger.redate: reverses each live movement on its old date and posts it again on the new one; the ledger stays append-only). Before, a changed sale date left the stock on the old day, so the inventory report counted it in the wrong month. Test in sales.test.ts.

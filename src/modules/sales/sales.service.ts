@@ -270,10 +270,18 @@ async function resolveLines(
   return lines;
 }
 
-async function assertAccountSheet(branchId: string, id: string, manager: EntityManager) {
-  if (!(await accountSheetsRepository.findById(branchId, id, manager))) {
-    throw AppError.badRequest('The selected receiving account was not found in this branch');
-  }
+async function assertAccountSheet(
+  branchId: string,
+  id: string,
+  manager: EntityManager,
+  method?: 'cash' | 'online',
+) {
+  const sheet = await accountSheetsRepository.findById(branchId, id, manager);
+  if (!sheet) throw AppError.badRequest('The selected receiving account was not found in this branch');
+  if (method === 'cash' && sheet.type !== 'cash')
+    throw AppError.badRequest('A cash payment goes to a cash account. Choose a cash account sheet.');
+  if (method === 'online' && sheet.type !== 'bank')
+    throw AppError.badRequest('An online payment goes to a bank account. Choose a bank account sheet.');
 }
 
 function assertProofIndexes(inputs: SalePaymentInput[], proofCount: number) {
@@ -332,7 +340,7 @@ async function insertPayment(
   proofs: UploadedFile[],
 ) {
   const approval = sale.saleType === 'office' ? { approvedAt: new Date(), approvedBy: actor.userId } : {};
-  await assertAccountSheet(sale.branchId, input.accountSheetId, manager);
+  await assertAccountSheet(sale.branchId, input.accountSheetId, manager, input.method);
   const details =
     input.method === 'cash'
       ? CASH_CLEARED
@@ -1417,6 +1425,8 @@ export const salesService = {
         (key) => key in input && String(input[key]) !== String(payment[key]),
       );
       Object.assign(payment, input, { updatedBy: actor.userId });
+      if (input.method || input.accountSheetId)
+        await assertAccountSheet(branchId, payment.accountSheetId, em, payment.method);
       if (money)
         Object.assign(
           payment,

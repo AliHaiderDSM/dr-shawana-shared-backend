@@ -110,6 +110,13 @@ reportsRouter.get(
   validate({ query: appointmentPaymentsQuerySchema }),
   async (req, res) => {
     const query = validQuery(req, appointmentPaymentsQuerySchema);
+    if (query.all === 'true') {
+      sendOk(
+        res,
+        await appointmentPaymentsReportService.entries('2000-01-01', today(), query.branchId ?? null),
+      );
+      return;
+    }
     const from = query.from ?? today();
     const to = query.to ?? from;
     const problem = periodProblem({ from, to }, today());

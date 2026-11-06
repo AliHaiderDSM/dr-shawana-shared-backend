@@ -288,6 +288,21 @@ describe('POS sales', () => {
     expect(live.every((m) => m.date === '2026-08-15')).toBe(true);
   });
 
+  it('sends cash only to a cash account and online only to a bank account', async () => {
+    const cashToBank = await api('post', `/branch/sales/${saleId}/payments`, frontDesk).send({
+      method: 'cash',
+      amount: '1',
+      accountSheetId: bankSheet,
+    });
+    expect(cashToBank.status).toBe(400);
+    const onlineToCash = await api('post', `/branch/sales/${saleId}/payments`, frontDesk).send({
+      method: 'online',
+      amount: '1',
+      accountSheetId: cashSheet,
+    });
+    expect(onlineToCash.status).toBe(400);
+  });
+
   it('recomputes totals when payments change', async () => {
     const payments = (await api('get', `/branch/sales/${saleId}`, frontDesk)).body.data.payments;
     const removed = await api('delete', `/branch/sales/${saleId}/payments/${payments[0].id}`, frontDesk);
