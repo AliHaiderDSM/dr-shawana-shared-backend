@@ -17,14 +17,57 @@ The project rules are in [CLAUDE.md](CLAUDE.md), the business flow in [docs/BUSI
 
 ## Scripts
 
-| Script                                                  | Purpose                                               |
-| ------------------------------------------------------- | ----------------------------------------------------- |
-| `dev`                                                   | nodemon + ts-node dev server                          |
-| `build` / `start`                                       | compile to `dist/` and run it                         |
-| `test`                                                  | Jest + supertest against `TEST_DATABASE_URL`          |
-| `lint` / `typecheck` / `format`                         | code quality                                          |
-| `migration:generate -- src/database/migrations/<Name>`  | generate a migration from entity changes (review it!) |
-| `migration:create -- src/database/migrations/<Name>`    | create an empty migration                             |
-| `migration:run` / `migration:revert` / `migration:show` | apply, undo or list migrations                        |
-| `seed`                                                  | run the idempotent seeds                              |
-| `openapi:export`                                        | write `docs/openapi.json`                             |
+| Script                                                  | Purpose                                                    |
+| ------------------------------------------------------- | ---------------------------------------------------------- |
+| `dev`                                                   | nodemon + ts-node dev server                               |
+| `build` / `start`                                       | compile to `dist/` and run it                              |
+| `test`                                                  | Jest + supertest against `TEST_DATABASE_URL`               |
+| `lint` / `typecheck` / `format`                         | code quality                                               |
+| `migration:generate -- src/database/migrations/<Name>`  | generate a migration from entity changes (review it!)      |
+| `migration:create -- src/database/migrations/<Name>`    | create an empty migration                                  |
+| `migration:run` / `migration:revert` / `migration:show` | apply, undo or list migrations                             |
+| `seed`                                                  | run the idempotent seeds                                   |
+| `seed:super-admin`                                      | create the Super Admin from `SUPER_ADMIN_EMAIL`/`PASSWORD` |
+| `openapi:export`                                        | write `docs/openapi.json`                                  |
+
+## Reset the database (start from zero)
+
+This deletes **every** record and login. Take a backup first (Supabase → Database → Backups) and never do it on a live clinic by mistake.
+
+### 1. Empty the app data (public schema)
+
+Run in Supabase → SQL Editor:
+
+```sql
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT USAGE ON SCHEMA public TO postgres, service_role;
+GRANT ALL ON SCHEMA public TO postgres, service_role;
+```
+
+The backend connects as `postgres` and every table has row level security with no policies, so `anon` and `authenticated` get no access, which is what the app expects.
+
+### 2. Delete every login (auth users)
+
+Run in Supabase → SQL Editor:
+
+```sql
+DELETE FROM auth.users;
+SELECT count(*) AS users_left FROM auth.users;
+```
+
+Deleting a user also removes its identities, sessions and refresh tokens. Do **not** drop the `auth` schema; Supabase owns it. This logs everyone out, the Super Admin too.
+
+### 3. Uploaded files (optional)
+
+Files stay in Supabase Storage (medical records, payment proofs, chat voice, signatures, stock files, product images). To remove them, empty each bucket in Supabase → Storage. Keep the buckets themselves.
+
+### 4. Build it again
+
+```bash
+npm run migration:run      # tables, views and indexes
+npm run seed:super-admin   # Super Admin from SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD in .env
+npm run seed               # company info and the prescription catalogue
+```
+
+Then sign in as the Super Admin and add branches, staff, doctors, products and account sheets again. Remove `SUPER_ADMIN_PASSWORD` from `.env` after the seed.

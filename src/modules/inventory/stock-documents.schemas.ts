@@ -269,6 +269,7 @@ function registerDocumentPaths(
   create: z.ZodType,
   update: z.ZodType,
   list: z.ZodObject,
+  files: boolean,
 ) {
   const common = securedDocs(tag);
   const byId = { params: idParamsSchema, query: branchQuerySchema };
@@ -286,9 +287,10 @@ function registerDocumentPaths(
     ...common,
     method: 'post',
     path,
-    summary:
-      'Create one entry per item. Send JSON, or multipart with a "data" JSON field plus "files" (shared by every item, like posSoft).',
-    request: { query: branchQuerySchema, body: multipartFiles(create) },
+    summary: files
+      ? 'Create one entry per item. Send JSON, or multipart with a "data" JSON field plus "files" (shared by every item, like posSoft).'
+      : 'Create one entry per item.',
+    request: { query: branchQuerySchema, body: files ? multipartFiles(create) : jsonContent(create) },
     responses: {
       201: { description: 'Created', ...jsonContent(dataEnvelope(z.array(entity))) },
       422: { ...errorResponses[409], description: 'Not enough stock' },
@@ -319,6 +321,7 @@ function registerDocumentPaths(
     request: byId,
     responses: { 204: { description: 'Removed' }, ...errorResponses },
   });
+  if (!files) return;
   registry.registerPath({
     ...common,
     method: 'post',
@@ -358,6 +361,7 @@ registerDocumentPaths(
   createStockInSchema,
   updateStockInSchema,
   stockInListQuerySchema,
+  false,
 );
 registerDocumentPaths(
   '/branch/stock-outs',
@@ -366,4 +370,5 @@ registerDocumentPaths(
   createStockOutSchema,
   updateStockOutSchema,
   stockOutListQuerySchema,
+  true,
 );

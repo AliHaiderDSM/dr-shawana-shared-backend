@@ -22,6 +22,15 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Stock in takes no files (2026-11-06)
+
+- /branch/stock-ins create is JSON only (no multipart "files") and its /attachments routes are gone (404); stock outs keep attachments. OpenAPI updated. inventory.test.ts checks it. Full suite: 315 passed.
+
+## posSoft data import to production (2026-11-05)
+
+- Imported from the posSoft MySQL dump with one-off scripts (not in the repo): 8 doctors (LHR: Shawana Mufti, Nazeel Faryal, Mishal Zaman; MUL: muskan; KRH: Shazia; ISB: Zahra, Ayesha Mohsin, Sawaira) with temporary passwords and forced change; banks (Meezan Bank, easypaisa, jazzcash, Al barka) and 6 account sheets per branch from the old accounts_sheet; 4733 patients; 5834 live appointments keeping APP numbers; 6770 payments (Rs 39,355,452). appointments_appointment_no_seq set to 7700.
+- Rules: deleted appointments skipped; branch = doctor's branch; fee = sum of payments; patients merged by phone last 9 digits (108 merged), 11 patients with unusable phones got placeholder numbers (+99 + old id); 140 wrong time ranges fixed (12-hour slip, else 45 minutes); blank mode → physical (22); blank New/Followup → new for the patient's first visit, followup after (4077); remarks and issues converted from HTML to text; "Select Cash"/"Select Account" payments → Cash sheet; payment proof and remark screenshots not migrated. Doctorless APP#48 → Nazeel Faryal, APP#74 and APP#3860 → Shawana Mufti (as posSoft lists them).
+
 ## Profit & loss by product (2026-11-02)
 
 - /admin/reports/profit-loss takes ?product=<name>: summary, months, branches and the products table count only that product (its share of the received money by line total, its own cost, its share of refunds by item value, its returned cost). The response adds product and productNames (every product sold in the year, for the filter). Test in profit-loss.test.ts. Full suite: 315 passed.

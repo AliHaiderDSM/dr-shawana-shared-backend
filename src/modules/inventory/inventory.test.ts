@@ -55,37 +55,27 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
     ).body.data.id;
   });
 
-  it('stock in creates one entry per item, shares files and adds stock', async () => {
-    const res = await request(app)
-      .post('/api/v1/branch/stock-ins')
-      .set(bearer(pharmacy))
-      .field(
-        'data',
-        JSON.stringify({
-          supplierId,
-          date: '2026-09-10',
-          note: 'Lab batch',
-          items: [
-            { productId, qty: '20', batch: 'B-01', unitCost: '100' },
-            { productId: otherProductId, qty: '4', batch: 'B-01', unitCost: '100' },
-          ],
-        }),
-      )
-      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'invoice.pdf', contentType: 'application/pdf' });
+  it('stock in creates one entry per item, takes no files and adds stock', async () => {
+    const res = await post('/branch/stock-ins', {
+      supplierId,
+      date: '2026-09-10',
+      note: 'Lab batch',
+      items: [
+        { productId, qty: '20', batch: 'B-01', unitCost: '100' },
+        { productId: otherProductId, qty: '4', batch: 'B-01', unitCost: '100' },
+      ],
+    });
     expect(res.status).toBe(201);
     expect(res.body.data).toHaveLength(2);
     expect(res.body.data[0]).toMatchObject({ qty: '20.000', batch: 'B-01', supplier: { name: 'Falcon' } });
-    expect(res.body.data[0].attachments).toHaveLength(1);
-    expect(res.body.data[1].attachments).toHaveLength(1);
+    expect(res.body.data[0].attachments).toEqual([]);
     expect(await balance()).toBe('20.000');
 
-    const url = await request(app)
-      .get(
-        `/api/v1/branch/stock-ins/${res.body.data[0].id}/attachments/${res.body.data[0].attachments[0].id}/url`,
-      )
-      .set(bearer(pharmacy));
-    expect(url.status).toBe(200);
-    expect(url.body.data.url).toContain('stock-files');
+    const upload = await request(app)
+      .post(`/api/v1/branch/stock-ins/${res.body.data[0].id}/attachments`)
+      .set(bearer(pharmacy))
+      .attach('files', Buffer.from('%PDF-1.4'), { filename: 'invoice.pdf', contentType: 'application/pdf' });
+    expect(upload.status).toBe(404);
   });
 
   it('checks the supplier type', async () => {

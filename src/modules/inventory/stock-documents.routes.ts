@@ -53,6 +53,7 @@ function mountDocumentRoutes(
   path: string,
   service: StockDocumentService,
   schemas: { list: z.ZodType; create: z.ZodType; update: z.ZodType },
+  files: boolean,
 ) {
   const byId = validate({ params: idParamsSchema });
   const byAttachment = validate({ params: attachmentParamsSchema });
@@ -73,12 +74,14 @@ function mountDocumentRoutes(
   stockDocumentsRouter.post(
     path,
     requirePermission('stock.create'),
-    documentsUpload('files'),
-    jsonDataField,
+    ...(files ? [documentsUpload('files'), jsonDataField] : []),
     validate({ body: schemas.create }),
     async (req: Request, res: Response) => {
       const input = validBody(req, schemas.create) as never;
-      sendCreated(res, await service.create(actorFrom(req), branchIdOf(req), input, uploadedFiles(req)));
+      sendCreated(
+        res,
+        await service.create(actorFrom(req), branchIdOf(req), input, files ? uploadedFiles(req) : []),
+      );
     },
   );
 
@@ -100,6 +103,8 @@ function mountDocumentRoutes(
     await service.remove(actorFrom(req), branchIdOf(req), idOf(req));
     sendNoContent(res);
   });
+
+  if (!files) return;
 
   stockDocumentsRouter.post(
     `${path}/:id/attachments`,
@@ -136,14 +141,24 @@ function mountDocumentRoutes(
   );
 }
 
-mountDocumentRoutes('/branch/stock-ins', stockInService, {
-  list: stockInListQuerySchema,
-  create: createStockInSchema,
-  update: updateStockInSchema,
-});
+mountDocumentRoutes(
+  '/branch/stock-ins',
+  stockInService,
+  {
+    list: stockInListQuerySchema,
+    create: createStockInSchema,
+    update: updateStockInSchema,
+  },
+  false,
+);
 
-mountDocumentRoutes('/branch/stock-outs', stockOutService as unknown as StockDocumentService, {
-  list: stockOutListQuerySchema,
-  create: createStockOutSchema,
-  update: updateStockOutSchema,
-});
+mountDocumentRoutes(
+  '/branch/stock-outs',
+  stockOutService as unknown as StockDocumentService,
+  {
+    list: stockOutListQuerySchema,
+    create: createStockOutSchema,
+    update: updateStockOutSchema,
+  },
+  true,
+);
