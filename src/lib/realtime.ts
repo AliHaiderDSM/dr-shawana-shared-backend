@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { env } from '../config/env';
 import { logger } from './logger';
+import { linkSecret } from './signed-token';
 
 export type RealtimeAudience = 'patient' | 'doctor' | 'staff';
 
@@ -10,12 +11,8 @@ export interface RealtimeConfig {
   topic: string;
 }
 
-function topicSecret() {
-  return env.PATIENT_LINK_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY ?? 'local-realtime-secret';
-}
-
 export function realtimeTopic(audience: RealtimeAudience, id: string) {
-  const digest = createHmac('sha256', topicSecret()).update(`${audience}:${id}`).digest('hex').slice(0, 40);
+  const digest = createHmac('sha256', linkSecret()).update(`${audience}:${id}`).digest('hex').slice(0, 40);
   return `chat-${audience}-${digest}`;
 }
 

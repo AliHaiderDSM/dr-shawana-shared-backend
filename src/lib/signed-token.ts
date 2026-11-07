@@ -1,10 +1,12 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { env } from '../config/env';
 
-const fallbackSecret = randomBytes(32).toString('hex');
+const developmentSecret = randomBytes(32).toString('hex');
+
+export const linkSecret = () => env.PATIENT_LINK_SECRET ?? developmentSecret;
 
 function secret() {
-  const base = env.PATIENT_LINK_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY ?? fallbackSecret;
+  const base = linkSecret();
   return createHmac('sha256', base).update('dsm-signed-token-v1').digest();
 }
 

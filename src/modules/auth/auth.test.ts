@@ -197,29 +197,36 @@ describe('auth', () => {
 
     it('keeps the dashboard refresh token in an HttpOnly cookie', async () => {
       await createStaff(fake, { role: 'front_desk', branchId, username: 'cookie.one' });
-      const agent = request.agent(app);
-      const res = await agent
+      const cookieOf = (res: request.Response) =>
+        String(res.headers['set-cookie']).match(/dsm_refresh=[^;]*/)?.[0] ?? '';
+      const viaCookie = (path: string, cookie: string) =>
+        request(app).post(path).set('X-Auth-Transport', 'cookie').set('Cookie', cookie).send({});
+
+      const res = await request(app)
         .post('/api/v1/auth/login')
         .set('X-Auth-Transport', 'cookie')
         .send({ identifier: 'cookie.one', password: TEST_PASSWORD });
       expect(res.status).toBe(200);
       expect(res.body.data.refreshToken).toBeNull();
-      const cookie = String(res.headers['set-cookie']);
-      expect(cookie).toMatch(/dsm_refresh=/);
-      expect(cookie).toMatch(/HttpOnly/i);
-      expect(cookie).toMatch(/Path=\/api\/v1\/auth/);
+      const header = String(res.headers['set-cookie']);
+      expect(header).toMatch(/HttpOnly/i);
+      expect(header).toMatch(/Path=\/api\/v1\/auth/);
+      const first = cookieOf(res);
+      expect(first).toMatch(/^dsm_refresh=.{20,}/);
 
-      expect((await agent.post('/api/v1/auth/refresh').send({})).status).toBe(401);
-      const renewed = await agent.post('/api/v1/auth/refresh').set('X-Auth-Transport', 'cookie').send({});
+      expect((await request(app).post('/api/v1/auth/refresh').set('Cookie', first).send({})).status).toBe(
+        401,
+      );
+      const renewed = await viaCookie('/api/v1/auth/refresh', first);
       expect(renewed.status).toBe(200);
       expect(renewed.body.data.refreshToken).toBeNull();
+      const second = cookieOf(renewed);
+      expect(second).not.toBe(first);
 
-      const out = await agent.post('/api/v1/auth/logout').set('X-Auth-Transport', 'cookie').send({});
+      const out = await viaCookie('/api/v1/auth/logout', second);
       expect(out.status).toBe(204);
       expect(String(out.headers['set-cookie'])).toMatch(/dsm_refresh=;/);
-      expect(
-        (await agent.post('/api/v1/auth/refresh').set('X-Auth-Transport', 'cookie').send({})).status,
-      ).toBe(401);
+      expect((await viaCookie('/api/v1/auth/refresh', second)).status).toBe(401);
     });
 
     it('rejects an unknown refresh token and a missing one', async () => {

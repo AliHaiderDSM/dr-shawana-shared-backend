@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## PATIENT_LINK_SECRET is its own secret (2026-11-07)
+
+- Patient history links, patient app access tokens and chat channel names are signed only with PATIENT_LINK_SECRET (required in production). The fallback to SUPABASE_SERVICE_ROLE_KEY is gone, so dropping Supabase later breaks none of them. Links signed before this change stop working (the data was still dummy).
+- The service role key is now used only by Storage and the Realtime broadcast.
+- AUTH_COOKIE_SAMESITE accepts any letter case (None, Lax).
+
 ## Own staff authentication instead of Supabase Auth (2026-11-07)
 
 - Staff passwords move to `staff_credentials` (scrypt N=2^15 r=8 p=3). Migration StaffCredentials1794700000000 copies the bcrypt hashes from `auth.users` (checked on prod: 11 of 11 staff have one), so nobody resets a password; the first login upgrades the hash to scrypt. It also drops `FK_staff_profiles_auth_user`, so new staff no longer need a Supabase user.
