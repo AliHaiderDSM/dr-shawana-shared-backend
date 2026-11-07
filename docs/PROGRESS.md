@@ -22,6 +22,15 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Own staff authentication instead of Supabase Auth (2026-11-07)
+
+- Staff passwords move to `staff_credentials` (scrypt N=2^15 r=8 p=3). Migration StaffCredentials1794700000000 copies the bcrypt hashes from `auth.users` (checked on prod: 11 of 11 staff have one), so nobody resets a password; the first login upgrades the hash to scrypt. It also drops `FK_staff_profiles_auth_user`, so new staff no longer need a Supabase user.
+- Access tokens are our own HS256 JWTs (15 min; iss, aud, typ, sub, sid, exp checked, no expiry grace) signed with `JWT_SECRET` (required in production).
+- Refresh sessions in `staff_sessions`: rotate on every refresh; the previous token replayed within 30 s (two tabs) is refused without harm, later it revokes the session (reuse). 30-day idle and 90-day absolute limit.
+- New `POST /auth/logout` (body or cookie). Password change ends the other sessions; reset, deactivate and delete end all of them. 10 wrong passwords lock the account for 15 minutes (429); an unknown login spends the same hashing time.
+- The dashboard sends `X-Auth-Transport: cookie`: the refresh token comes back as an HttpOnly cookie on /api/v1/auth (`AUTH_COOKIE_SAMESITE`, `AUTH_COOKIE_DOMAIN`) and the body has refreshToken null. The mobile app keeps sending it in the body.
+- Supabase stays for Storage and Realtime only. Tests: auth.test.ts rewritten (rotation, reuse, logout, cookie, lockout, legacy hash), jwt.test.ts. Full suite: 326 passed.
+
 ## Cash goes to cash accounts, all-dates reports (2026-11-06)
 
 - Sale and appointment payments: cash must go to a cash account sheet and online to a bank sheet (400 otherwise), on add and on edit. Test in sales.test.ts.

@@ -43,6 +43,10 @@ const envSchema = z
     SUPABASE_ANON_KEY: supabaseVar,
     PATIENT_LINK_SECRET: z.string().min(32).optional(),
 
+    JWT_SECRET: isProd ? z.string().min(32) : z.string().min(32).optional(),
+    AUTH_COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+    AUTH_COOKIE_DOMAIN: z.string().trim().min(1).optional(),
+
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
     KV_REST_API_URL: z.url().optional(),

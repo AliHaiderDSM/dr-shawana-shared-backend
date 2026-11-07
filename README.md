@@ -47,16 +47,9 @@ GRANT ALL ON SCHEMA public TO postgres, service_role;
 
 The backend connects as `postgres` and every table has row level security with no policies, so `anon` and `authenticated` get no access, which is what the app expects.
 
-### 2. Delete every login (auth users)
+### 2. Logins
 
-Run in Supabase → SQL Editor:
-
-```sql
-DELETE FROM auth.users;
-SELECT count(*) AS users_left FROM auth.users;
-```
-
-Deleting a user also removes its identities, sessions and refresh tokens. Do **not** drop the `auth` schema; Supabase owns it. This logs everyone out, the Super Admin too.
+Staff logins live in `staff_credentials` and `staff_sessions` in the public schema, so the reset above already removes them. Run `npm run seed:super-admin` again to create the Super Admin.
 
 ### 3. Uploaded files (optional)
 

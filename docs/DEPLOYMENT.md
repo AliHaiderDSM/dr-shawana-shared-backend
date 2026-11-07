@@ -24,11 +24,14 @@ The API runs on Vercel as one serverless function:
 | `SUPABASE_URL` | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only) |
 | `SUPABASE_ANON_KEY` | Anon key |
+| `JWT_SECRET` | Required, at least 32 random characters. Signs the staff access tokens. Changing it logs all staff out. |
+| `AUTH_COOKIE_SAMESITE` | `lax` when the dashboard and API share a site (e.g. `app.example.com` and `api.example.com`); `none` when they are on different sites (e.g. two `*.vercel.app` URLs). Safari can block a `none` cookie, so a shared domain is the safe setup. |
+| `AUTH_COOKIE_DOMAIN` | Optional, only to share the cookie across subdomains |
 | `PATIENT_LINK_SECRET` | Optional, at least 32 characters. Signs the patient history links. If it is not set, the links are signed with a key derived from the service role key, and rotating that key ends every open link. |
 | `CORS_ORIGINS` | The dashboard URL(s), comma separated, e.g. `https://dsm-dashboard.vercel.app` |
 | `LOG_LEVEL` | `info` |
 
-The app refuses to start in production without the Supabase variables. On Vercel that shows up as `500 FUNCTION_INVOCATION_FAILED`. Check **Deployments → Functions → Logs** for the exact message.
+The app refuses to start in production without the Supabase variables or `JWT_SECRET`. On Vercel that shows up as `500 FUNCTION_INVOCATION_FAILED`. Check **Deployments → Functions → Logs** for the exact message.
 
 ## 3. Database
 

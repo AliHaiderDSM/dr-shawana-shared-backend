@@ -2,13 +2,25 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { authController } from './auth.controller';
-import { changePasswordSchema, loginSchema, refreshSchema, updateOwnProfileSchema } from './auth.schemas';
+import {
+  changePasswordSchema,
+  loginSchema,
+  logoutSchema,
+  refreshSchema,
+  updateOwnProfileSchema,
+} from './auth.schemas';
 import { limiter, loginGuard } from '../../lib/rate-limit';
 
 export const authRouter = Router();
 
 const loginLimiter = loginGuard('staff-login', (body) => body.identifier);
 const refreshLimiter = limiter('staff-refresh', {
+  windowMs: 15 * 60_000,
+  limit: 60,
+  byIp: true,
+  message: 'Too many attempts, try again in a few minutes',
+});
+const logoutLimiter = limiter('staff-logout', {
   windowMs: 15 * 60_000,
   limit: 60,
   byIp: true,
@@ -23,6 +35,7 @@ const passwordLimiter = limiter('staff-password', {
 
 authRouter.post('/auth/login', ...loginLimiter, validate({ body: loginSchema }), authController.login);
 authRouter.post('/auth/refresh', refreshLimiter, validate({ body: refreshSchema }), authController.refresh);
+authRouter.post('/auth/logout', logoutLimiter, validate({ body: logoutSchema }), authController.logout);
 authRouter.get('/auth/me', authenticate, authController.me);
 authRouter.patch(
   '/auth/me',

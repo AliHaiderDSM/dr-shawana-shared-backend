@@ -441,12 +441,24 @@
         "properties": {
           "refreshToken": {
             "type": "string",
-            "minLength": 10
+            "minLength": 10,
+            "maxLength": 200,
+            "description": "Mobile apps send the refresh token here. The dashboard leaves it out and sends the HttpOnly cookie with X-Auth-Transport: cookie."
           }
         },
-        "required": [
-          "refreshToken"
-        ]
+        "default": {}
+      },
+      "Logout": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 200,
+            "description": "Mobile apps send the refresh token here. The dashboard leaves it out and sends the HttpOnly cookie with X-Auth-Transport: cookie."
+          }
+        },
+        "default": {}
       },
       "ChangePassword": {
         "type": "object",
@@ -597,10 +609,15 @@
         "type": "object",
         "properties": {
           "accessToken": {
-            "type": "string"
+            "type": "string",
+            "description": "Short-lived JWT, send as Authorization: Bearer"
           },
           "refreshToken": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Null when X-Auth-Transport: cookie is sent; the token is then in an HttpOnly cookie"
           },
           "tokenType": {
             "type": "string",
@@ -617,6 +634,9 @@
               "null"
             ]
           },
+          "refreshExpiresAt": {
+            "type": "string"
+          },
           "me": {
             "$ref": "#/components/schemas/Me"
           }
@@ -627,6 +647,7 @@
           "tokenType",
           "expiresIn",
           "expiresAt",
+          "refreshExpiresAt",
           "me"
         ]
       },
@@ -19091,7 +19112,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Exchange a refresh token for a new session",
+        "summary": "Exchange a refresh token for a new session. The refresh token rotates on every call; replaying an old one ends the session.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -19119,6 +19140,78 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "End the session of this refresh token (body or cookie) and clear the cookie",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Logout"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Logged out"
           },
           "400": {
             "description": "Validation error",

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
 import { QueryFailedError } from 'typeorm';
@@ -99,7 +100,7 @@ describe('authenticate', () => {
   });
 
   it('401 for a valid login that has no staff profile', async () => {
-    const orphan = fake.addUser('orphan@test.dsm', 'x');
+    const orphan = randomUUID();
     expect(
       (
         await request(app)

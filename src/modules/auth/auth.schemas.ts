@@ -14,9 +14,24 @@ export const loginSchema = registry.register(
   }),
 );
 
+const refreshTokenField = z
+  .string()
+  .min(10)
+  .max(200)
+  .optional()
+  .openapi({
+    description:
+      'Mobile apps send the refresh token here. The dashboard leaves it out and sends the HttpOnly cookie with X-Auth-Transport: cookie.',
+  });
+
 export const refreshSchema = registry.register(
   'RefreshSession',
-  z.object({ refreshToken: z.string().min(10) }),
+  z.object({ refreshToken: refreshTokenField }).default({}),
+);
+
+export const logoutSchema = registry.register(
+  'Logout',
+  z.object({ refreshToken: refreshTokenField }).default({}),
 );
 
 export const changePasswordSchema = registry.register(
@@ -69,11 +84,17 @@ export const meSchema = registry.register(
 export const sessionSchema = registry.register(
   'Session',
   z.object({
-    accessToken: z.string(),
-    refreshToken: z.string(),
+    accessToken: z.string().openapi({ description: 'Short-lived JWT, send as Authorization: Bearer' }),
+    refreshToken: z
+      .string()
+      .nullable()
+      .openapi({
+        description: 'Null when X-Auth-Transport: cookie is sent; the token is then in an HttpOnly cookie',
+      }),
     tokenType: z.literal('bearer'),
     expiresIn: z.number().int(),
     expiresAt: z.number().int().nullable(),
+    refreshExpiresAt: z.string(),
     me: meSchema,
   }),
 );
@@ -99,12 +120,22 @@ registry.registerPath({
   ...publicRoute,
   method: 'post',
   path: '/auth/refresh',
-  summary: 'Exchange a refresh token for a new session',
+  summary:
+    'Exchange a refresh token for a new session. The refresh token rotates on every call; replaying an old one ends the session.',
   request: { body: jsonContent(refreshSchema) },
   responses: {
     200: { description: 'Session', ...jsonContent(dataEnvelope(sessionSchema)) },
     ...errorResponses,
   },
+});
+
+registry.registerPath({
+  ...publicRoute,
+  method: 'post',
+  path: '/auth/logout',
+  summary: 'End the session of this refresh token (body or cookie) and clear the cookie',
+  request: { body: jsonContent(logoutSchema) },
+  responses: { 204: { description: 'Logged out' }, ...errorResponses },
 });
 
 registry.registerPath({

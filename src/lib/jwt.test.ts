@@ -1,59 +1,56 @@
-import { generateKeyPairSync, sign } from 'node:crypto';
-import { checkSupabaseJwt, type Jwk } from './jwt';
+import { createHmac, randomUUID } from 'node:crypto';
+import { ACCESS_TOKEN_TTL_SECONDS, signAccessToken, verifyAccessToken } from './jwt';
 
-const ISSUER = 'https://demo.supabase.co/auth/v1';
-const { privateKey, publicKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-const jwk = { ...(publicKey.export({ format: 'jwk' }) as Jwk), kid: 'key-1', alg: 'ES256' };
-const other = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+const userId = randomUUID();
+const sessionId = randomUUID();
+const now = 1_800_000_000;
 
-const part = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-function token(
-  payload: object,
-  header: object = { alg: 'ES256', kid: 'key-1', typ: 'JWT' },
-  key = privateKey,
-) {
-  const data = `${part(header)}.${part(payload)}`;
-  const signature = sign('sha256', Buffer.from(data), { key, dsaEncoding: 'ieee-p1363' }).toString(
-    'base64url',
-  );
-  return `${data}.${signature}`;
+function reSigned(token: string, change: (claims: Record<string, unknown>) => Record<string, unknown>) {
+  const [header, payload, signature] = token.split('.') as [string, string, string];
+  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+  return `${header}.${part(change(claims))}.${signature}`;
 }
 
-const now = 1_800_000_000;
-const good = { sub: 'user-1', aud: 'authenticated', iss: ISSUER, exp: now + 3600, role: 'authenticated' };
-
-describe('checkSupabaseJwt', () => {
-  it('accepts a token signed by a Supabase key', () => {
-    expect(checkSupabaseJwt(token(good), [jwk], ISSUER, now)).toEqual({ userId: 'user-1' });
+describe('access tokens', () => {
+  it('round-trips the user and session', () => {
+    const { token, expiresAt } = signAccessToken(userId, sessionId, now);
+    expect(expiresAt).toBe(now + ACCESS_TOKEN_TTL_SECONDS);
+    expect(verifyAccessToken(token, now + 60)).toEqual({ userId, sessionId, expiresAt });
   });
 
-  it('rejects expired, forged and foreign tokens', () => {
-    expect(checkSupabaseJwt(token({ ...good, exp: now - 120 }), [jwk], ISSUER, now)).toEqual({
-      invalid: 'Token expired',
-    });
-    expect(checkSupabaseJwt(token(good, undefined, other.privateKey), [jwk], ISSUER, now)).toEqual({
-      invalid: 'Bad signature',
-    });
+  it('rejects an expired token with no grace', () => {
+    const { token } = signAccessToken(userId, sessionId, now);
+    expect(verifyAccessToken(token, now + ACCESS_TOKEN_TTL_SECONDS)).toBeNull();
+  });
+
+  it('rejects changed claims, a forged signature and other algorithms', () => {
+    const { token } = signAccessToken(userId, sessionId, now);
     expect(
-      checkSupabaseJwt(token({ ...good, iss: 'https://evil.example/auth/v1' }), [jwk], ISSUER, now),
-    ).toEqual({ unknown: true });
-    expect(checkSupabaseJwt(token({ ...good, aud: 'anon' }), [jwk], ISSUER, now)).toEqual({
-      unknown: true,
-    });
-    const [h, p] = token(good).split('.');
-    expect(checkSupabaseJwt(`${h}.${p}.${'A'.repeat(86)}`, [jwk], ISSUER, now)).toEqual({
-      invalid: 'Bad signature',
-    });
+      verifyAccessToken(
+        reSigned(token, (c) => ({ ...c, sub: randomUUID() })),
+        now,
+      ),
+    ).toBeNull();
+    expect(
+      verifyAccessToken(
+        reSigned(token, (c) => ({ ...c, aud: 'other' })),
+        now,
+      ),
+    ).toBeNull();
+    const [, payload] = token.split('.') as [string, string];
+    const forgedHeader = part({ alg: 'HS256', typ: 'JWT' });
+    const forged = createHmac('sha256', 'guessed-secret')
+      .update(`${forgedHeader}.${payload}`)
+      .digest('base64url');
+    expect(verifyAccessToken(`${forgedHeader}.${payload}.${forged}`, now)).toBeNull();
+    expect(verifyAccessToken(`${part({ alg: 'none', typ: 'JWT' })}.${payload}.`, now)).toBeNull();
+    expect(verifyAccessToken('a-staff-uuid', now)).toBeNull();
   });
 
-  it('leaves unknown keys, other algorithms and non-JWT tokens to Supabase', () => {
-    expect(checkSupabaseJwt(token(good, { alg: 'ES256', kid: 'key-2' }), [jwk], ISSUER, now)).toEqual({
-      unknown: true,
-    });
-    expect(checkSupabaseJwt(token(good, { alg: 'HS256', kid: 'key-1' }), [jwk], ISSUER, now)).toEqual({
-      unknown: true,
-    });
-    expect(checkSupabaseJwt('a-staff-uuid', [jwk], ISSUER, now)).toEqual({ unknown: true });
+  it('rejects a token issued in the future', () => {
+    const { token } = signAccessToken(userId, sessionId, now + 600);
+    expect(verifyAccessToken(token, now)).toBeNull();
   });
 });

@@ -1,8 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { type EntityManager } from 'typeorm';
 import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
-import { logger } from '../../lib/logger';
 import { canManageRole, DISPATCH_ROLES, WAREHOUSE_ROLES, type Role } from '../../lib/permissions';
 import { auditService } from '../audit/audit.service';
 import { branchesRepository } from '../branches/branches.repository';
@@ -137,53 +137,42 @@ export const staffService = {
     afterInsert?: (manager: EntityManager, profile: StaffProfile) => Promise<void>,
   ) {
     await assertUnique(input.email, input.username);
-    const userId = await staffAccounts.create(input.email, input.password, {
-      firstName: input.firstName,
-      lastName: input.lastName,
-      role: input.role,
+    const userId = randomUUID();
+    const passwordHash = await staffAccounts.hashPassword(input.password);
+    return withTransaction(async (em) => {
+      const profile = await staffRepository.insert(
+        {
+          id: userId,
+          branchId,
+          role: input.role,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          username: input.username,
+          phone: input.phone ?? null,
+          gender: input.gender ?? null,
+          designation: input.designation ?? null,
+          status: 'active',
+          mustChangePassword: true,
+          createdBy: actor?.userId ?? null,
+        },
+        em,
+      );
+      await staffAccounts.saveHash(profile.id, passwordHash, em);
+      await auditService.record(
+        {
+          actor,
+          branchId,
+          action: 'create',
+          entity: 'staff',
+          entityId: profile.id,
+          after: toStaffDto(profile),
+        },
+        em,
+      );
+      await afterInsert?.(em, profile);
+      return profile;
     });
-
-    try {
-      const created = await withTransaction(async (em) => {
-        const profile = await staffRepository.insert(
-          {
-            id: userId,
-            branchId,
-            role: input.role,
-            firstName: input.firstName,
-            lastName: input.lastName,
-            email: input.email,
-            username: input.username,
-            phone: input.phone ?? null,
-            gender: input.gender ?? null,
-            designation: input.designation ?? null,
-            status: 'active',
-            mustChangePassword: true,
-            createdBy: actor?.userId ?? null,
-          },
-          em,
-        );
-        await auditService.record(
-          {
-            actor,
-            branchId,
-            action: 'create',
-            entity: 'staff',
-            entityId: profile.id,
-            after: toStaffDto(profile),
-          },
-          em,
-        );
-        await afterInsert?.(em, profile);
-        return profile;
-      });
-      return created;
-    } catch (err) {
-      await staffAccounts.remove(userId).catch((cleanupError: unknown) => {
-        logger.error({ err: cleanupError, userId }, 'Failed to remove auth user after profile insert failed');
-      });
-      throw err;
-    }
   },
 
   async create(actor: Actor, branchId: string, input: NewStaffAccount) {
@@ -223,7 +212,6 @@ export const staffService = {
       if (email !== profile.email || username !== profile.username) await assertUnique(email, username, id);
 
       const before = toStaffDto(profile);
-      const emailChanged = email !== profile.email;
       Object.assign(profile, input, { updatedBy: actor.userId });
       const saved = await staffRepository.save(profile, em);
       await ensureDoctorProfile(em, actor, saved);
@@ -239,12 +227,12 @@ export const staffService = {
         },
         em,
       );
-      if (emailChanged) await staffAccounts.setEmail(id, email);
       return toStaffDto(saved);
     });
   },
 
   async resetPassword(actor: Actor, branchId: string, id: string, password: string) {
+    const passwordHash = await staffAccounts.hashPassword(password);
     const result = await withTransaction(async (em) => {
       const profile = await getInBranch(branchId, id, em);
       assertNotSelf(actor, profile);
@@ -256,7 +244,8 @@ export const staffService = {
         { actor, branchId, action: 'reset_password', entity: 'staff', entityId: id },
         em,
       );
-      await staffAccounts.setPassword(id, password);
+      await staffAccounts.saveHash(id, passwordHash, em);
+      await staffAccounts.endSessions(id, 'password_reset', em);
       return toStaffDto(saved);
     });
     return result;
@@ -285,7 +274,7 @@ export const staffService = {
         },
         em,
       );
-      await staffAccounts.setBlocked(id, status === 'inactive');
+      if (status === 'inactive') await staffAccounts.endSessions(id, 'deactivated', em);
       return toStaffDto(saved);
     });
   },
@@ -300,7 +289,7 @@ export const staffService = {
         { actor, branchId, action: 'delete', entity: 'staff', entityId: id, before: toStaffDto(profile) },
         em,
       );
-      await staffAccounts.setBlocked(id, true);
+      await staffAccounts.endSessions(id, 'deleted', em);
     });
   },
 };

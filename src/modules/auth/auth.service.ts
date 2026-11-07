@@ -1,18 +1,20 @@
-import { type Session } from '@supabase/supabase-js';
 import { AppDataSource } from '../../database/data-source';
 import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
+import { ACCESS_TOKEN_TTL_SECONDS, signAccessToken } from '../../lib/jwt';
+import { spendPasswordCheck } from '../../lib/password';
 import { permissionsFor } from '../../lib/permissions';
-import { createSupabaseAuthClient } from '../../lib/supabase';
 import { auditService } from '../audit/audit.service';
 import { type StaffProfile } from '../staff/staff-profile.entity';
 import { staffAccounts } from '../staff/staff-accounts';
 import { staffRepository } from '../staff/staff.repository';
 import { toStaffDto } from '../staff/staff.service';
 import { type UpdateOwnProfileInput } from './auth.schemas';
+import { staffSessions, type IssuedRefresh, type SessionMeta } from './staff-sessions';
 
 const INVALID_CREDENTIALS = 'Invalid username/email or password';
+const LOCKED = 'Too many failed attempts. Try again in 15 minutes.';
 
 function assertCanSignIn(profile: StaffProfile | null): asserts profile is StaffProfile {
   if (!profile) throw AppError.unauthorized('No staff account is linked to this login');
@@ -53,52 +55,57 @@ async function loadProfile(userId: string) {
   return profile;
 }
 
-async function toSession(session: Session, profile: StaffProfile) {
+async function toSession(issued: IssuedRefresh, profile: StaffProfile) {
+  const access = signAccessToken(profile.id, issued.sessionId);
   return {
-    accessToken: session.access_token,
-    refreshToken: session.refresh_token,
+    accessToken: access.token,
+    refreshToken: issued.refreshToken as string | null,
     tokenType: 'bearer' as const,
-    expiresIn: session.expires_in,
-    expiresAt: session.expires_at ?? null,
+    expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+    expiresAt: access.expiresAt,
+    refreshExpiresAt: issued.refreshExpiresAt.toISOString(),
     me: await toMe(profile),
   };
 }
 
-async function verifyPassword(email: string, password: string): Promise<Session | null> {
-  const { data, error } = await createSupabaseAuthClient().auth.signInWithPassword({ email, password });
-  return error || !data.session ? null : data.session;
-}
+export type StaffSession = Awaited<ReturnType<typeof toSession>>;
+
+const noMeta: SessionMeta = { device: null, ip: null };
 
 export const authService = {
-  async resolveContext(userId: string): Promise<Express.AuthContext> {
+  async resolveContext(userId: string, sessionId: string | null = null): Promise<Express.AuthContext> {
     const profile = await loadProfile(userId);
     return {
       userId: profile.id,
       role: profile.role,
       branchId: profile.branchId,
       isSuperAdmin: profile.role === 'super_admin',
+      sessionId,
     };
   },
 
-  async login(identifier: string, password: string) {
+  async login(identifier: string, password: string, meta: SessionMeta = noMeta) {
     const account = await staffRepository.findByLogin(identifier);
-    if (!account) throw AppError.unauthorized(INVALID_CREDENTIALS);
-
-    const session = await verifyPassword(account.email, password);
-    if (!session) throw AppError.unauthorized(INVALID_CREDENTIALS);
+    if (!account) {
+      await spendPasswordCheck(password);
+      throw AppError.unauthorized(INVALID_CREDENTIALS);
+    }
+    const check = await staffAccounts.checkPassword(account.id, password);
+    if (check === 'locked') throw new AppError(429, 'RATE_LIMITED', LOCKED);
+    if (check !== 'ok') throw AppError.unauthorized(INVALID_CREDENTIALS);
 
     const profile = await loadProfile(account.id);
     await staffRepository.touchLastLogin(profile.id);
-    return toSession(session, profile);
+    return toSession(await staffSessions.open(profile.id, meta), profile);
   },
 
-  async refresh(refreshToken: string) {
-    const { data, error } = await createSupabaseAuthClient().auth.refreshSession({
-      refresh_token: refreshToken,
-    });
-    if (error || !data.session || !data.user)
-      throw AppError.unauthorized('Session expired, please log in again');
-    return toSession(data.session, await loadProfile(data.user.id));
+  async refresh(refreshToken: string, meta: SessionMeta = noMeta) {
+    const issued = await staffSessions.rotate(refreshToken, meta);
+    return toSession(issued, await loadProfile(issued.staffId));
+  },
+
+  async logout(refreshToken: string) {
+    await staffSessions.revokeByToken(refreshToken);
   },
 
   async me(userId: string) {
@@ -114,13 +121,16 @@ export const authService = {
 
   async changePassword(actor: Actor, currentPassword: string, newPassword: string) {
     const profile = await loadProfile(actor.userId);
-    if (!(await verifyPassword(profile.email, currentPassword))) {
-      throw AppError.badRequest('Current password is incorrect');
-    }
+    const check = await staffAccounts.checkPassword(profile.id, currentPassword);
+    if (check === 'locked') throw new AppError(429, 'RATE_LIMITED', LOCKED);
+    if (check !== 'ok') throw AppError.badRequest('Current password is incorrect');
+    const hash = await staffAccounts.hashPassword(newPassword);
     await withTransaction(async (em) => {
       profile.mustChangePassword = false;
       profile.updatedBy = actor.userId;
       await staffRepository.save(profile, em);
+      await staffAccounts.saveHash(profile.id, hash, em);
+      await staffAccounts.endSessions(profile.id, 'password_changed', em, actor.sessionId ?? undefined);
       await auditService.record(
         {
           actor,
@@ -131,7 +141,6 @@ export const authService = {
         },
         em,
       );
-      await staffAccounts.setPassword(profile.id, newPassword);
     });
   },
 };

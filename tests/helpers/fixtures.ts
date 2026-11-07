@@ -1,13 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { AppDataSource } from '../../src/database/data-source';
+import { signAccessToken } from '../../src/lib/jwt';
+import { hashPassword } from '../../src/lib/password';
 import { type Role } from '../../src/lib/permissions';
 import { Branch, type BranchStatus } from '../../src/modules/branches/branch.entity';
 import { StaffProfile, type StaffStatus } from '../../src/modules/staff/staff-profile.entity';
+import { staffAccounts } from '../../src/modules/staff/staff-accounts';
 import { type FakeSupabase } from './supabase-fake';
 
 export const TEST_PASSWORD = 'Passw0rd!';
 
 let sequence = 0;
+let passwordHash: Promise<string> | null = null;
 const next = () => (sequence += 1);
 
 export async function ageBatch(batchNo: string, expiryDate: string) {
@@ -34,15 +38,15 @@ export async function createBranch(overrides: Partial<Branch> & { status?: Branc
 }
 
 export async function createStaff(
-  fake: FakeSupabase,
+  _storage: FakeSupabase,
   options: { role: Role; branchId: string | null; status?: StaffStatus; username?: string },
 ) {
   const n = next();
   const username = options.username ?? `user${n}`;
   const email = `${username}@test.dsm`;
-  const id = fake.addUser(email, TEST_PASSWORD, randomUUID());
+  const id = randomUUID();
   const profiles = AppDataSource.getRepository(StaffProfile);
-  return profiles.save(
+  const profile = await profiles.save(
     profiles.create({
       id,
       branchId: options.branchId,
@@ -55,6 +59,14 @@ export async function createStaff(
       mustChangePassword: false,
     }),
   );
+  passwordHash ??= hashPassword(TEST_PASSWORD);
+  await staffAccounts.saveHash(id, await passwordHash);
+  return profile;
 }
 
-export const bearer = (staff: { id: string }) => ({ Authorization: `Bearer ${staff.id}` });
+const testSession = randomUUID();
+
+export const tokenFor = (staff: { id: string }, sessionId = testSession) =>
+  signAccessToken(staff.id, sessionId).token;
+
+export const bearer = (staff: { id: string }) => ({ Authorization: `Bearer ${tokenFor(staff)}` });

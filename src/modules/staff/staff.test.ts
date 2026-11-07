@@ -162,15 +162,20 @@ describe('branch staff', () => {
         .set(bearer(lahoreAdmin))
         .send({ password: 'Another1Pass' });
       expect(reset.status).toBe(200);
-      expect(fake.users.get(id)?.password).toBe('Another1Pass');
+      const login = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ identifier: reset.body.data.username, password: 'Another1Pass' });
+      expect(login.status).toBe(200);
 
       const off = await request(app).post(`/api/v1/branch/staff/${id}/deactivate`).set(bearer(lahoreAdmin));
       expect(off.body.data.status).toBe('inactive');
-      expect(fake.users.get(id)?.banned).toBe(true);
+      const blocked = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: login.body.data.refreshToken });
+      expect(blocked.status).toBe(401);
 
       const on = await request(app).post(`/api/v1/branch/staff/${id}/activate`).set(bearer(lahoreAdmin));
       expect(on.body.data.status).toBe('active');
-      expect(fake.users.get(id)?.banned).toBe(false);
 
       expect((await request(app).delete(`/api/v1/branch/staff/${id}`).set(bearer(lahoreAdmin))).status).toBe(
         204,

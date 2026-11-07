@@ -129,12 +129,17 @@ describe('super admin branches', () => {
       username: 'bilal.khan',
       mustChangePassword: true,
     });
-    expect(fake.users.get(res.body.data.id)?.email).toBe('bilal@dsm.test');
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ identifier: 'bilal.khan', password: newAdmin.password });
+    expect(login.status).toBe(200);
   });
 
-  it('removes the auth user again when the profile insert fails', async () => {
+  it('saves no login when the profile insert fails', async () => {
     const branch = await createBranch({ code: 'FSD' });
-    const usersBefore = fake.users.size;
+    const [{ count: before }] = await AppDataSource.query(
+      `SELECT count(*)::int AS count FROM staff_credentials`,
+    );
     const spy = jest.spyOn(staffRepository, 'insert').mockRejectedValueOnce(new Error('db down'));
 
     const res = await request(app)
@@ -144,7 +149,10 @@ describe('super admin branches', () => {
 
     spy.mockRestore();
     expect(res.status).toBe(500);
-    expect(fake.users.size).toBe(usersBefore);
+    const [{ count: after }] = await AppDataSource.query(
+      `SELECT count(*)::int AS count FROM staff_credentials`,
+    );
+    expect(after).toBe(before);
     expect(
       await AppDataSource.getRepository(StaffProfile).count({ where: { email: 'rollback@dsm.test' } }),
     ).toBe(0);

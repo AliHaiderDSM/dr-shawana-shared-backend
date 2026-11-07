@@ -1,96 +1,72 @@
-import { createPublicKey, verify as verifySignature, type JsonWebKey, type KeyObject } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { env } from '../config/env';
 
-export interface Jwk extends JsonWebKey {
-  kid?: string;
-  alg?: string;
+export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
+
+const ISSUER = 'dsm-api';
+const AUDIENCE = 'dsm-staff';
+const CLOCK_SKEW_SECONDS = 30;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const HEADER = encode({ alg: 'HS256', typ: 'JWT' });
+const developmentSecret = randomBytes(48).toString('hex');
+
+const signingKey = () => env.JWT_SECRET ?? developmentSecret;
+const signatureOf = (input: string) => createHmac('sha256', signingKey()).update(input).digest();
+
+export interface AccessClaims {
+  userId: string;
+  sessionId: string;
+  expiresAt: number;
 }
 
-export type JwtCheck = { userId: string } | { invalid: string } | { unknown: true };
+const nowInSeconds = () => Math.floor(Date.now() / 1000);
 
-const LEEWAY_SECONDS = 30;
-const JWKS_TTL_MS = 10 * 60_000;
-const ALGORITHMS: Record<string, { hash: string; dsa?: 'ieee-p1363' }> = {
-  ES256: { hash: 'sha256', dsa: 'ieee-p1363' },
-  RS256: { hash: 'RSA-SHA256' },
-};
+export function signAccessToken(userId: string, sessionId: string, now = nowInSeconds()) {
+  const expiresAt = now + ACCESS_TOKEN_TTL_SECONDS;
+  const payload = encode({
+    iss: ISSUER,
+    aud: AUDIENCE,
+    sub: userId,
+    sid: sessionId,
+    typ: 'access',
+    iat: now,
+    nbf: now,
+    exp: expiresAt,
+    jti: randomUUID(),
+  });
+  const body = `${HEADER}.${payload}`;
+  return { token: `${body}.${signatureOf(body).toString('base64url')}`, expiresAt };
+}
 
-const decode = (part: string) =>
-  JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as Record<string, unknown>;
+function decode(part: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
 
-export function checkSupabaseJwt(
-  token: string,
-  keys: Jwk[],
-  issuer: string,
-  nowSeconds = Math.floor(Date.now() / 1000),
-): JwtCheck {
+export function verifyAccessToken(token: string, now = nowInSeconds()): AccessClaims | null {
   const parts = token.split('.');
-  if (parts.length !== 3) return { unknown: true };
+  if (parts.length !== 3) return null;
   const [rawHeader, rawPayload, rawSignature] = parts as [string, string, string];
-  let header: Record<string, unknown>;
-  let payload: Record<string, unknown>;
-  try {
-    header = decode(rawHeader);
-    payload = decode(rawPayload);
-  } catch {
-    return { invalid: 'Malformed token' };
-  }
-  const algorithm = ALGORITHMS[String(header.alg)];
-  if (!algorithm) return { unknown: true };
-  const jwk = keys.find((k) => k.kid === header.kid);
-  if (!jwk) return { unknown: true };
-  let key: KeyObject;
-  try {
-    key = createPublicKey({ key: jwk, format: 'jwk' });
-  } catch {
-    return { unknown: true };
-  }
-  const signed = verifySignature(
-    algorithm.hash,
-    Buffer.from(`${rawHeader}.${rawPayload}`),
-    algorithm.dsa ? { key, dsaEncoding: algorithm.dsa } : key,
-    Buffer.from(rawSignature, 'base64url'),
-  );
-  if (!signed) return { invalid: 'Bad signature' };
-  if (typeof payload.exp !== 'number' || payload.exp + LEEWAY_SECONDS < nowSeconds) {
-    return { invalid: 'Token expired' };
-  }
-  if (typeof payload.nbf === 'number' && payload.nbf - LEEWAY_SECONDS > nowSeconds) {
-    return { invalid: 'Token not active yet' };
-  }
-  if (payload.iss !== issuer) return { unknown: true };
-  const audience = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!audience.includes('authenticated')) return { unknown: true };
-  if (typeof payload.sub !== 'string' || payload.sub.length === 0) return { invalid: 'No subject' };
-  return { userId: payload.sub };
-}
-
-let cache: { keys: Jwk[]; at: number } | null = null;
-let lastForced = 0;
-const FORCE_GAP_MS = 60_000;
-
-async function loadKeys(force = false): Promise<Jwk[]> {
-  if (!env.SUPABASE_URL) return [];
-  if (force && Date.now() - lastForced < FORCE_GAP_MS) return cache?.keys ?? [];
-  if (force) lastForced = Date.now();
-  if (!force && cache && Date.now() - cache.at < JWKS_TTL_MS) return cache.keys;
-  try {
-    const response = await fetch(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`, {
-      signal: AbortSignal.timeout(3_000),
-    });
-    if (!response.ok) return cache?.keys ?? [];
-    const body = (await response.json()) as { keys?: Jwk[] };
-    cache = { keys: body.keys ?? [], at: Date.now() };
-    return cache.keys;
-  } catch {
-    return cache?.keys ?? [];
-  }
-}
-
-export async function verifySupabaseJwt(token: string): Promise<JwtCheck> {
-  if (!env.SUPABASE_URL || token.split('.').length !== 3) return { unknown: true };
-  const issuer = `${env.SUPABASE_URL.replace(/\/+$/, '')}/auth/v1`;
-  const first = checkSupabaseJwt(token, await loadKeys(), issuer);
-  if (!('unknown' in first)) return first;
-  return checkSupabaseJwt(token, await loadKeys(true), issuer);
+  const header = decode(rawHeader);
+  if (!header || header.alg !== 'HS256' || header.typ !== 'JWT') return null;
+  const expected = signatureOf(`${rawHeader}.${rawPayload}`);
+  const given = Buffer.from(rawSignature, 'base64url');
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  const claims = decode(rawPayload);
+  if (!claims) return null;
+  if (claims.iss !== ISSUER || claims.aud !== AUDIENCE || claims.typ !== 'access') return null;
+  if (typeof claims.exp !== 'number' || claims.exp <= now) return null;
+  if (typeof claims.nbf === 'number' && claims.nbf - CLOCK_SKEW_SECONDS > now) return null;
+  if (typeof claims.iat !== 'number' || claims.iat - CLOCK_SKEW_SECONDS > now) return null;
+  if (typeof claims.sub !== 'string' || !UUID.test(claims.sub)) return null;
+  if (typeof claims.sid !== 'string' || !UUID.test(claims.sid)) return null;
+  return { userId: claims.sub, sessionId: claims.sid, expiresAt: claims.exp };
 }

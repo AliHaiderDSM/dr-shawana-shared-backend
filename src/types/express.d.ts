@@ -7,6 +7,7 @@ declare global {
       role: Role;
       branchId: string | null;
       isSuperAdmin: boolean;
+      sessionId?: string | null;
     }
 
     interface Request {

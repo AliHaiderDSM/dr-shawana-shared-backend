@@ -40,15 +40,15 @@ This is the multi-branch rebuild of the old PHP system **posSoft**, built one ph
   - Generate one with `npm run migration:generate -- src/database/migrations/<Name>`, then REVIEW the file.
   - Create an empty one with `npm run migration:create -- src/database/migrations/<Name>`.
   - Other scripts: `migration:run`, `migration:revert`, `migration:show`.
-  - Put raw SQL in the migration for anything TypeORM cannot express: enabling RLS, views, functions, triggers, and FKs to Supabase's `auth.users`.
+  - Put raw SQL in the migration for anything TypeORM cannot express: enabling RLS, views, functions and triggers.
   - CHECK constraints: write them in the migration AND declare them on the entity with `@Check('<same name>', ...)`, otherwise the next generate drops them. Raw-SQL indexes need `@Index('<same name>', { synchronize: false })`.
-  - The FK to `auth.users` is added only when `auth.users` exists (a DO block), so migrations also run on a plain Postgres test DB.
-  - When generating against Supabase, TypeORM adds a DROP + ADD of `FK_staff_profiles_auth_user`. Delete those two lines from the generated file.
+  - `staff_profiles` no longer references `auth.users` (StaffCredentials migration drops that FK).
   - After generating, run `migration:generate` once more: it must report "No changes".
   - The migrations table is `typeorm_migrations`.
 - **Tests without a second Supabase project:** start any throwaway Postgres (e.g. embedded-postgres outside the repo) and pass `TEST_DATABASE_URL=... DATABASE_SSL=false` on the command line only. The user does not keep `TEST_DATABASE_URL` in `.env`.
-- **Supabase Auth and Storage:** accessed through `@supabase/supabase-js`, SERVER-SIDE ONLY (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, in `src/lib/supabase.ts`).
-  - Used to verify access tokens, create staff users, upload files and issue signed URLs.
+- **Staff auth is our own** (no Supabase Auth): passwords in `staff_credentials` (scrypt, `src/lib/password.ts`; bcrypt hashes copied from Supabase are checked once and upgraded), HS256 access tokens from `src/lib/jwt.ts` (15 min, `JWT_SECRET`), rotating refresh sessions in `staff_sessions` (`src/modules/auth/staff-sessions.ts`; replaying an old token revokes the session). The dashboard gets the refresh token as an HttpOnly cookie when it sends `X-Auth-Transport: cookie`; the mobile app keeps it in SecureStore.
+- **Supabase Storage and Realtime:** accessed through `@supabase/supabase-js`, SERVER-SIDE ONLY (`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, in `src/lib/supabase.ts`).
+  - Used to upload files and issue signed URLs.
   - The service-role key never leaves the backend.
 - **Validation:** Zod (v4) for every request and for env (`src/config/env.ts`). Add new env vars to both `env.ts` and `.env.example`.
 - **HTTP middleware:** pino logging (`src/lib/logger.ts`; never use `console` in `src/`), helmet, cors with an allowlist from `CORS_ORIGINS`, and express-rate-limit.

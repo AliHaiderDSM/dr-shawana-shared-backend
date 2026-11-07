@@ -1,80 +1,78 @@
+import { type EntityManager } from 'typeorm';
 import { AppDataSource } from '../../database/data-source';
-import { AppError } from '../../lib/errors';
-import { getSupabaseAdmin } from '../../lib/supabase';
+import { hashPassword, needsRehash, spendPasswordCheck, verifyPassword } from '../../lib/password';
+import { logger } from '../../lib/logger';
+import { staffSessions, type RevokeReason } from '../auth/staff-sessions';
 
-const PERMANENT_BAN = '876000h';
-const PAGE_SIZE = 1000;
+const MAX_FAILURES = 10;
+const LOCK_MINUTES = 15;
 
-async function findAuthUserId(email: string): Promise<string | null> {
-  const target = email.toLowerCase();
-  for (let page = 1; ; page++) {
-    const { data, error } = await getSupabaseAdmin().auth.admin.listUsers({ page, perPage: PAGE_SIZE });
-    if (error) return null;
-    const match = data.users.find((u) => u.email?.toLowerCase() === target);
-    if (match) return match.id;
-    if (data.users.length < PAGE_SIZE) return null;
-  }
-}
+export type PasswordCheck = 'ok' | 'invalid' | 'locked';
 
-async function hasProfile(userId: string) {
-  const rows = (await AppDataSource.query(`SELECT 1 FROM staff_profiles WHERE id = $1 LIMIT 1`, [
-    userId,
-  ])) as unknown[];
-  return rows.length > 0;
-}
+const db = (manager?: EntityManager) => manager ?? AppDataSource.manager;
 
-async function reclaimOrphan(email: string, password: string, metadata: Record<string, unknown>) {
-  const userId = await findAuthUserId(email);
-  if (!userId || (await hasProfile(userId))) return null;
-  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
-    password,
-    email_confirm: true,
-    user_metadata: metadata,
-    ban_duration: 'none',
-  });
-  return error ? null : userId;
+interface CredentialRow {
+  passwordHash: string;
+  failedAttempts: number;
+  lockedUntil: Date | null;
 }
 
 export const staffAccounts = {
-  async create(email: string, password: string, metadata: Record<string, unknown>): Promise<string> {
-    const { data, error } = await getSupabaseAdmin().auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: metadata,
-    });
-    if (error || !data.user) {
-      if (error?.status === 422 || /already/i.test(error?.message ?? '')) {
-        const reclaimed = await reclaimOrphan(email, password, metadata);
-        if (reclaimed) return reclaimed;
-        throw AppError.conflict('A login with this email already exists');
-      }
-      throw AppError.badGateway(`Could not create login: ${error?.message ?? 'unknown error'}`);
+  hashPassword,
+
+  async saveHash(staffId: string, passwordHash: string, manager?: EntityManager): Promise<void> {
+    await db(manager).query(
+      `INSERT INTO staff_credentials (staff_id, password_hash, password_changed_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (staff_id) DO UPDATE SET password_hash = EXCLUDED.password_hash,
+         password_changed_at = now(), failed_attempts = 0, locked_until = NULL, updated_at = now()`,
+      [staffId, passwordHash],
+    );
+  },
+
+  async setPassword(staffId: string, password: string, manager?: EntityManager): Promise<void> {
+    await this.saveHash(staffId, await hashPassword(password), manager);
+  },
+
+  async checkPassword(staffId: string, password: string): Promise<PasswordCheck> {
+    const [row] = (await AppDataSource.query(
+      `SELECT password_hash AS "passwordHash", failed_attempts AS "failedAttempts", locked_until AS "lockedUntil"
+         FROM staff_credentials WHERE staff_id = $1`,
+      [staffId],
+    )) as CredentialRow[];
+    if (!row) {
+      await spendPasswordCheck(password);
+      return 'invalid';
     }
-    return data.user.id;
+    if (row.lockedUntil && row.lockedUntil.getTime() > Date.now()) return 'locked';
+    if (!(await verifyPassword(password, row.passwordHash))) {
+      await AppDataSource.query(
+        `UPDATE staff_credentials SET
+           failed_attempts = CASE WHEN failed_attempts + 1 >= $2 THEN 0 ELSE failed_attempts + 1 END,
+           locked_until = CASE WHEN failed_attempts + 1 >= $2 THEN now() + make_interval(mins => $3) ELSE locked_until END,
+           updated_at = now()
+         WHERE staff_id = $1`,
+        [staffId, MAX_FAILURES, LOCK_MINUTES],
+      );
+      return 'invalid';
+    }
+    if (row.failedAttempts > 0 || row.lockedUntil) {
+      await AppDataSource.query(
+        `UPDATE staff_credentials SET failed_attempts = 0, locked_until = NULL, updated_at = now() WHERE staff_id = $1`,
+        [staffId],
+      );
+    }
+    if (needsRehash(row.passwordHash)) {
+      const upgraded = await hashPassword(password);
+      await AppDataSource.query(
+        `UPDATE staff_credentials SET password_hash = $2, updated_at = now() WHERE staff_id = $1 AND password_hash = $3`,
+        [staffId, upgraded, row.passwordHash],
+      ).catch((err: unknown) => logger.warn({ err, staffId }, 'Could not upgrade the password hash'));
+    }
+    return 'ok';
   },
 
-  async remove(userId: string): Promise<void> {
-    await getSupabaseAdmin().auth.admin.deleteUser(userId);
-  },
-
-  async setPassword(userId: string, password: string): Promise<void> {
-    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, { password });
-    if (error) throw AppError.badGateway(`Could not update password: ${error.message}`);
-  },
-
-  async setEmail(userId: string, email: string): Promise<void> {
-    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
-      email,
-      email_confirm: true,
-    });
-    if (error) throw AppError.badGateway(`Could not update login email: ${error.message}`);
-  },
-
-  async setBlocked(userId: string, blocked: boolean): Promise<void> {
-    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
-      ban_duration: blocked ? PERMANENT_BAN : 'none',
-    });
-    if (error) throw AppError.badGateway(`Could not update login status: ${error.message}`);
+  async endSessions(staffId: string, reason: RevokeReason, manager?: EntityManager, keepSessionId?: string) {
+    await staffSessions.revokeAll(staffId, reason, manager, keepSessionId);
   },
 };
