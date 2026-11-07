@@ -27,6 +27,7 @@ import './modules/clinical-records/clinical-records.schemas';
 import './modules/prescriptions/prescriptions.schemas';
 import './modules/sales/sales.docs';
 import './modules/discount-requests/discount-requests.schemas';
+import './modules/stock-holds/stock-holds.schemas';
 import './modules/stock-requests/stock-requests.schemas';
 import './modules/badges/badges.routes';
 import './modules/trace/trace.routes';

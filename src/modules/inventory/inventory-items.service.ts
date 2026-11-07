@@ -133,7 +133,7 @@ const STATUS_TEXT: Record<ItemStatus, string> = {
   in_stock: 'is in stock',
   sold: 'is already sold',
   returned: 'is waiting for return inspection',
-  quarantined: 'is in quarantine',
+  quarantined: 'is under observation',
   damaged: 'was written off as damaged',
   expired: 'was written off as expired',
   supplier_returned: 'was sent back to the supplier',
@@ -458,9 +458,11 @@ export const inventoryItemsService = {
     const [row] = (await manager.query(
       `SELECT (COALESCE((SELECT SUM(qty) FROM stock_movements
                           WHERE branch_id = $1 AND product_id = $2 AND batch_id IS NOT DISTINCT FROM $3), 0)
-             - (SELECT COUNT(*) FROM inventory_items
-                 WHERE branch_id = $1 AND product_id = $2 AND batch_id IS NOT DISTINCT FROM $3
-                   AND status = 'in_stock' AND deleted_at IS NULL))::text AS n`,
+             - (SELECT COUNT(*) FROM inventory_items i
+                 WHERE i.branch_id = $1 AND i.product_id = $2 AND i.batch_id IS NOT DISTINCT FROM $3
+                   AND i.deleted_at IS NULL
+                   AND (i.status = 'in_stock' OR EXISTS (
+                         SELECT 1 FROM stock_holds h WHERE h.item_id = i.id AND h.status = 'open'))))::text AS n`,
       [branchId, productId, batchId],
     )) as [{ n: string }];
     return new Decimal(row.n);

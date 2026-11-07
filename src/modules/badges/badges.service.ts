@@ -16,12 +16,15 @@ export interface BadgeCounts {
   stockRequests: number;
   incomingStock: number;
   writeOffs: number;
+  observations: number;
   discountRequests: number;
   returns: number;
   stockReceipts: number;
   patientRequests: number;
   patientMessages: number;
 }
+
+const OPEN_HOLDS = `SELECT COUNT(*)::int AS n FROM stock_holds WHERE status = 'open' AND ($1::uuid IS NULL OR branch_id = $1)`;
 
 const one = async (sql: string, params: unknown[]) => {
   const [row] = (await AppDataSource.query(sql, params)) as { n: number }[];
@@ -60,6 +63,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
       stockRequests,
       incomingStock,
       writeOffs,
+      observations: await one(OPEN_HOLDS, [null]),
       discountRequests,
       returns,
       stockReceipts: (await pendingReceipts(null)) + (await pendingGrnEdits()),
@@ -89,6 +93,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
       stockRequests: toSend,
       incomingStock: onTheWay,
       writeOffs: 0,
+      observations: viewer.role === 'warehouse_keeper' ? await one(OPEN_HOLDS, [null]) : 0,
       discountRequests: 0,
       returns: 0,
       stockReceipts: await pendingReceipts(branchId),
@@ -134,6 +139,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
     stockRequests,
     incomingStock,
     writeOffs,
+    observations: branch?.kind === 'dispatch' ? await one(OPEN_HOLDS, [branchId]) : 0,
     discountRequests,
     returns,
     stockReceipts: 0,

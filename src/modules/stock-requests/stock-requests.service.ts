@@ -72,7 +72,14 @@ const SELECT = `
                              WHERE x.id = (array_agg(o.received_by) FILTER (WHERE o.received_by IS NOT NULL))[1]) AS "receivedBy"
                       FROM stock_outs o
                      WHERE o.stock_request_id = r.id AND o.deleted_at IS NULL AND o.transfer_no IS NOT NULL
-                     GROUP BY o.transfer_no) t), '[]') AS transfers
+                     GROUP BY o.transfer_no) t), '[]') AS transfers,
+         COALESCE((SELECT json_agg(json_build_object(
+                    'id', h.id, 'holdNo', h.hold_no, 'serial', hi.serial, 'productName', hp.name,
+                    'reason', h.reason, 'note', h.note, 'status', h.status, 'decisionNote', h.decision_note,
+                    'createdAt', h.created_at) ORDER BY h.created_at)
+                    FROM stock_holds h JOIN inventory_items hi ON hi.id = h.item_id
+                    JOIN products hp ON hp.id = h.product_id
+                   WHERE h.stock_request_id = r.id), '[]') AS holds
     FROM stock_requests r
     JOIN branches b ON b.id = r.branch_id
     LEFT JOIN staff_profiles rq ON rq.id = r.created_by

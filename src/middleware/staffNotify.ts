@@ -15,6 +15,7 @@ const WATCHED = [
   /^\/admin\/write-offs/,
   /^\/branch\/inventory\/batches\/[^/]+\/write-off/,
   /^\/branch\/discount-requests/,
+  /^\/branch\/stock-holds/,
   /^\/admin\/discount-requests/,
   /^\/branch\/returns/,
   /^\/admin\/returns/,

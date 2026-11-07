@@ -17,6 +17,7 @@ const countsSchema = registry.register(
     stockRequests: z.number().int(),
     incomingStock: z.number().int(),
     writeOffs: z.number().int(),
+    observations: z.number().int(),
     discountRequests: z.number().int(),
     returns: z.number().int(),
     stockReceipts: z.number().int(),

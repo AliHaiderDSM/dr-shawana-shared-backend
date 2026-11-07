@@ -19,6 +19,11 @@ const BADGES: Record<BadgeKey, { label: string; path: string; anyOf: Permission[
     anyOf: ['stock.view', 'inventoryReport.view'],
   },
   writeOffs: { label: 'Write-offs', path: '/write-offs', anyOf: ['stock.view', 'inventoryReport.view'] },
+  observations: {
+    label: 'Under observation',
+    path: '/under-observation',
+    anyOf: ['stock.view', 'inventoryReport.view', 'sales.update'],
+  },
   discountRequests: { label: 'Discount requests', path: '/discount-requests', anyOf: ['sales.view'] },
   returns: { label: 'Returns', path: '/returns', anyOf: ['returns.view'] },
   stockReceipts: { label: 'Store receipts', path: '/store-receipts', anyOf: ['stock.view'] },

@@ -379,6 +379,57 @@ export const productBatchesService = {
   },
 };
 
+export async function writeOffHeldPieces(
+  em: EntityManager,
+  actor: Actor,
+  input: {
+    branchId: string;
+    productId: string;
+    batchId: string | null;
+    serials: string[];
+    reason: WriteOffInput['reason'];
+    note: string | null;
+  },
+) {
+  const [branch] = (await em.query('SELECT code FROM branches WHERE id = $1', [input.branchId])) as {
+    code: string;
+  }[];
+  const seq = await nextSequence(em, input.branchId, 'write_off');
+  const writeOffs = repo(StockWriteOff, em);
+  const record = await writeOffs.save(
+    writeOffs.create({
+      id: randomUUID(),
+      branchId: input.branchId,
+      writeOffNo: `${branch?.code ?? 'WO'}-WO-${String(seq).padStart(6, '0')}`,
+      productId: input.productId,
+      batchId: input.batchId,
+      qty: new Decimal(input.serials.length),
+      reason: input.reason,
+      note: input.note,
+      date: today(),
+      status: 'approved',
+      serials: normalizeSerials(input.serials),
+      decidedBy: actor.userId,
+      decidedAt: new Date(),
+      createdBy: actor.userId,
+      updatedBy: actor.userId,
+    }),
+  );
+  await applyWriteOff(em, actor, record);
+  await auditService.record(
+    {
+      actor,
+      branchId: input.branchId,
+      action: 'write_off',
+      entity: 'stock_write_off',
+      entityId: record.id,
+      after: { writeOffNo: record.writeOffNo, qty: record.qty.toString(), reason: record.reason },
+    },
+    em,
+  );
+  return record;
+}
+
 const finalStatus = (reason: WriteOffInput['reason']) =>
   reason === 'expired' ? 'expired' : reason === 'damaged' ? 'damaged' : 'written_off';
 

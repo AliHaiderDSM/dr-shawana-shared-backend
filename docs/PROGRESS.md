@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Under observation: labelled pieces held back while sending (2026-11-07)
+
+- New stock_holds table (migration StockHolds1795000000000, run it before deploying) and /branch/stock-holds. The Warehouse Keeper (while sending a stock request) and the Dispatch Department branch admin, store keeper or dispatcher (while dispatching an online order) scan a label with a reason (damaged, expired, label issue, other) and a note. The label becomes quarantined, so it cannot be sold, sent or dispatched; stock on hand does not change. Each hold gets a number like HFLC-UO-000001.
+- Only the Warehouse Keeper (any hold) and the Dispatch Department branch admin (its own holds) decide, with a required note: release (label back in stock), write off (an approved write-off record, stock out, label damaged/expired/written off) or send to the supplier (stock out, label supplier returned). The Super Admin only sees them.
+- The Super Admin and the Warehouse Keeper see every hold, the Dispatch Department sees its own, other branches see the holds on their own stock requests. Stock requests now return holds. Sidebar badge observations; push and realtime pings include it. Unlabelled counts no longer treat held labels as free stock. The label status text reads "is under observation". Tests in stock-holds.test.ts.
+
 ## Appointment payments report: visits of the period (2026-11-07)
 
 - /admin/reports/appointment-payments also returns visits: appointments whose visit date is in the period but that have no entry in it (booked earlier, nothing paid in the period). Each is a row of kind visit, amount 0, with the payment state at the end of the period; sr numbers continue after rows. rows and the summary are unchanged. Test in appointment-refunds.test.ts.

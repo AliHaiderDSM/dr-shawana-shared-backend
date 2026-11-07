@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { STOCK_HOLD_REASONS, STOCK_HOLD_STATUSES } from '../stock-holds/stock-holds.schemas';
 import { branchQuerySchema, dataEnvelope, errorResponses, idParamsSchema, jsonContent } from '../../lib/http';
 import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
@@ -88,6 +89,19 @@ export const stockRequestSchema = registry.register(
         receivedAt: z.string().nullable(),
         sentBy: z.string().nullable(),
         receivedBy: z.string().nullable(),
+      }),
+    ),
+    holds: z.array(
+      z.object({
+        id: z.uuid(),
+        holdNo: z.string(),
+        serial: z.string(),
+        productName: z.string(),
+        reason: z.enum(STOCK_HOLD_REASONS),
+        note: z.string().nullable(),
+        status: z.enum(STOCK_HOLD_STATUSES),
+        decisionNote: z.string().nullable(),
+        createdAt: z.string(),
       }),
     ),
     items: z.array(
