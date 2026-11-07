@@ -4,7 +4,7 @@ import { verifyAccessToken } from '../lib/jwt';
 import { perUserLimit } from '../lib/rate-limit';
 import { authService } from '../modules/auth/auth.service';
 
-function bearerToken(header: string | undefined): string | null {
+export function bearerToken(header: string | undefined): string | null {
   if (!header) return null;
   const [scheme, token, extra] = header.split(' ');
   return scheme?.toLowerCase() === 'bearer' && token && extra === undefined ? token : null;

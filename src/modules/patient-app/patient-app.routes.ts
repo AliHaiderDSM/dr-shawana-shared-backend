@@ -109,7 +109,8 @@ patientAppRouter.post(
   passwordLimiter,
   validate({ body: patientSetPasswordSchema }),
   async (req, res) => {
-    await patientAuth.setPassword(patientId(req), validBody(req, patientSetPasswordSchema));
+    const { patientId: id, sessionId } = patientOf(req);
+    await patientAuth.setPassword(id, sessionId, validBody(req, patientSetPasswordSchema));
     sendNoContent(res);
   },
 );

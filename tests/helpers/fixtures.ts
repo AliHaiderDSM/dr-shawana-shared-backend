@@ -61,12 +61,20 @@ export async function createStaff(
   );
   passwordHash ??= hashPassword(TEST_PASSWORD);
   await staffAccounts.saveHash(id, await passwordHash);
+  await openTestSession(id);
   return profile;
 }
 
-const testSession = randomUUID();
+export async function openTestSession(staffId: string) {
+  await AppDataSource.query(
+    `INSERT INTO staff_sessions (id, staff_id, refresh_hash, expires_at, absolute_expires_at)
+     VALUES ($1, $1, encode(gen_random_bytes(32), 'hex'), now() + interval '1 day', now() + interval '1 day')
+     ON CONFLICT (id) DO NOTHING`,
+    [staffId],
+  );
+}
 
-export const tokenFor = (staff: { id: string }, sessionId = testSession) =>
+export const tokenFor = (staff: { id: string }, sessionId = staff.id) =>
   signAccessToken(staff.id, sessionId).token;
 
 export const bearer = (staff: { id: string }) => ({ Authorization: `Bearer ${tokenFor(staff)}` });

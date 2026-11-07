@@ -53,6 +53,12 @@ export const authController = {
     sendNoContent(res);
   },
 
+  async logoutEverywhere(req: Request, res: Response) {
+    await authService.logoutEverywhere(actorFrom(req));
+    if (usesCookie(req)) clearRefreshCookie(res);
+    sendNoContent(res);
+  },
+
   async me(req: Request, res: Response) {
     sendOk(res, await authService.me(actorFrom(req).userId));
   },

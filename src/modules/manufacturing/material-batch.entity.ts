@@ -96,6 +96,9 @@ export class MaterialBatchItem {
   @Column(quantityColumn())
   qty: Decimal;
 
+  @Column({ type: 'integer', default: 0 })
+  position: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

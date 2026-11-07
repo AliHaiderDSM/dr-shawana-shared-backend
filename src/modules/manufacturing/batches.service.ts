@@ -42,7 +42,7 @@ const detailed = (branchId: string, manager?: EntityManager) =>
 
 function toBatchDto(batch: MaterialBatch) {
   const { items, product, labBatch: _labBatch, ...rest } = withoutInternals(batch);
-  const rows = (items ?? []).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const rows = (items ?? []).sort((a, b) => a.position - b.position);
   return {
     ...rest,
     product: product ? { id: product.id, name: product.name } : null,
@@ -80,7 +80,9 @@ async function insertBatch(
   const batch = await batchesRepository.create(branchId, actor.userId, data, manager);
   const itemsRepo = repo(MaterialBatchItem, manager);
   await itemsRepo.save(
-    items.map((i) => itemsRepo.create({ batchId: batch.id, materialId: i.materialId, qty: i.qty as never })),
+    items.map((i, position) =>
+      itemsRepo.create({ batchId: batch.id, materialId: i.materialId, qty: i.qty as never, position }),
+    ),
   );
   return batch;
 }

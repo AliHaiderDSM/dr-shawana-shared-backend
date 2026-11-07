@@ -36,6 +36,7 @@ const passwordLimiter = limiter('staff-password', {
 authRouter.post('/auth/login', ...loginLimiter, validate({ body: loginSchema }), authController.login);
 authRouter.post('/auth/refresh', refreshLimiter, validate({ body: refreshSchema }), authController.refresh);
 authRouter.post('/auth/logout', logoutLimiter, validate({ body: logoutSchema }), authController.logout);
+authRouter.post('/auth/logout-all', authenticate, logoutLimiter, authController.logoutEverywhere);
 authRouter.get('/auth/me', authenticate, authController.me);
 authRouter.patch(
   '/auth/me',

@@ -1,8 +1,10 @@
+import { randomBytes, scryptSync } from 'node:crypto';
 import request from 'supertest';
 import { today } from '../../lib/validation';
 import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { AppDataSource } from '../../database/data-source';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -390,5 +392,52 @@ describe('patient app', () => {
     const wrong = code === '000000' ? '111111' : '000000';
     for (let i = 0; i < 5; i += 1) expect((await loginWith('03001112233', wrong)).status).toBe(401);
     expect((await loginWith('03001112233', code)).status).toBe(401);
+  });
+
+  it('revokes the session when an old refresh token is replayed after the grace period', async () => {
+    const first = (await loginWith('03001112233', (await issueCode(patientId)).code)).body.data;
+    const refresh = (token: string) =>
+      request(app).post('/api/v1/patient/auth/refresh').send({ refreshToken: token });
+    const second = await refresh(first.refreshToken);
+    expect(second.status).toBe(200);
+    expect((await refresh(first.refreshToken)).status).toBe(401);
+    expect((await asPatient('get', '/patient/me', second.body.data.accessToken)).status).toBe(200);
+
+    await AppDataSource.query(
+      `UPDATE patient_sessions SET rotated_at = now() - interval '5 minutes' WHERE refresh_hash IS NOT NULL`,
+    );
+    expect((await refresh(first.refreshToken)).status).toBe(401);
+    expect((await refresh(second.body.data.refreshToken)).status).toBe(401);
+    expect((await asPatient('get', '/patient/me', second.body.data.accessToken)).status).toBe(401);
+  });
+
+  it('logs the other phones out when the patient changes the password, and keeps old hashes working', async () => {
+    const salt = randomBytes(16);
+    const key = scryptSync('ShortForm123', salt, 64);
+    await AppDataSource.query(`UPDATE patient_accounts SET password_hash = $2 WHERE patient_id = $1`, [
+      patientId,
+      `scrypt$${salt.toString('base64')}$${key.toString('base64')}`,
+    ]);
+    const passwordLogin = () =>
+      request(app)
+        .post('/api/v1/patient/auth/password-login')
+        .send({ phone: '03001112233', password: 'ShortForm123' });
+    expect((await passwordLogin()).status).toBe(200);
+    const [stored] = (await AppDataSource.query(
+      `SELECT password_hash AS "upgraded" FROM patient_accounts WHERE patient_id = $1`,
+      [patientId],
+    )) as { upgraded: string }[];
+    expect(stored?.upgraded.split('$')).toHaveLength(6);
+    const phoneA = (await passwordLogin()).body.data;
+    const phoneB = (await passwordLogin()).body.data;
+    expect(phoneB.accessToken).toEqual(expect.any(String));
+
+    const changed = await asPatient('post', '/patient/me/password', phoneA.accessToken).send({
+      currentPassword: 'ShortForm123',
+      password: 'NewSecret789',
+    });
+    expect(changed.status).toBe(204);
+    expect((await asPatient('get', '/patient/me', phoneB.accessToken)).status).toBe(401);
+    expect((await asPatient('get', '/patient/me', phoneA.accessToken)).status).toBe(200);
   });
 });

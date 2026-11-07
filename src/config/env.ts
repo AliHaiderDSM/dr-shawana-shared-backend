@@ -88,6 +88,13 @@ const envSchema = z
         message: 'TEST_DATABASE_URL must NOT equal DATABASE_URL (tests truncate tables)',
       });
     }
+    if (env.JWT_SECRET && env.JWT_SECRET === env.PATIENT_LINK_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PATIENT_LINK_SECRET'],
+        message: 'PATIENT_LINK_SECRET must be different from JWT_SECRET',
+      });
+    }
   });
 
 const parsed = envSchema.safeParse(cleanEnv(process.env));

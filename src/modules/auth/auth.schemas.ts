@@ -14,15 +14,10 @@ export const loginSchema = registry.register(
   }),
 );
 
-const refreshTokenField = z
-  .string()
-  .min(10)
-  .max(200)
-  .optional()
-  .openapi({
-    description:
-      'Mobile apps send the refresh token here. The dashboard leaves it out and sends the HttpOnly cookie with X-Auth-Transport: cookie.',
-  });
+const refreshTokenField = z.string().min(10).max(200).optional().openapi({
+  description:
+    'Mobile apps send the refresh token here. The dashboard leaves it out and sends the HttpOnly cookie with X-Auth-Transport: cookie.',
+});
 
 export const refreshSchema = registry.register(
   'RefreshSession',
@@ -85,12 +80,9 @@ export const sessionSchema = registry.register(
   'Session',
   z.object({
     accessToken: z.string().openapi({ description: 'Short-lived JWT, send as Authorization: Bearer' }),
-    refreshToken: z
-      .string()
-      .nullable()
-      .openapi({
-        description: 'Null when X-Auth-Transport: cookie is sent; the token is then in an HttpOnly cookie',
-      }),
+    refreshToken: z.string().nullable().openapi({
+      description: 'Null when X-Auth-Transport: cookie is sent; the token is then in an HttpOnly cookie',
+    }),
     tokenType: z.literal('bearer'),
     expiresIn: z.number().int(),
     expiresAt: z.number().int().nullable(),
@@ -136,6 +128,14 @@ registry.registerPath({
   summary: 'End the session of this refresh token (body or cookie) and clear the cookie',
   request: { body: jsonContent(logoutSchema) },
   responses: { 204: { description: 'Logged out' }, ...errorResponses },
+});
+
+registry.registerPath({
+  ...securedRoute,
+  method: 'post',
+  path: '/auth/logout-all',
+  summary: 'End every session of the signed-in staff member (all devices) and clear the cookie',
+  responses: { 204: { description: 'Logged out everywhere' }, ...errorResponses },
 });
 
 registry.registerPath({

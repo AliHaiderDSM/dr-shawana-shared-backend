@@ -119,6 +119,15 @@ export const staffSessions = {
     );
   },
 
+  async isLive(sessionId: string, staffId: string): Promise<boolean> {
+    const rows = (await AppDataSource.query(
+      `SELECT 1 FROM staff_sessions
+        WHERE id = $1 AND staff_id = $2 AND revoked_at IS NULL AND expires_at > now() AND absolute_expires_at > now()`,
+      [sessionId, staffId],
+    )) as unknown[];
+    return rows.length > 0;
+  },
+
   async revokeAll(staffId: string, reason: RevokeReason, manager?: EntityManager, keepSessionId?: string) {
     await db(manager).query(
       `UPDATE staff_sessions SET revoked_at = now(), revoked_reason = $2

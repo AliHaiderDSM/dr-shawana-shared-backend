@@ -1,11 +1,13 @@
-import { createHash, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
-import { perUserLimit } from '../../lib/rate-limit';
-import { promisify } from 'node:util';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { type RequestHandler } from 'express';
 import { AppDataSource } from '../../database/data-source';
 import { withTransaction } from '../../database/transaction';
 import { AppError } from '../../lib/errors';
+import { logger } from '../../lib/logger';
+import { hashPassword, needsRehash, spendPasswordCheck, verifyPassword } from '../../lib/password';
+import { perUserLimit } from '../../lib/rate-limit';
 import { createSignedToken, readSignedToken } from '../../lib/signed-token';
+import { bearerToken } from '../../middleware/auth';
 import { last9Of } from '../patients/phone';
 
 const ACCESS_TTL_SECONDS = 15 * 60;
@@ -14,6 +16,7 @@ const CODE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CODE_ATTEMPTS = 5;
 const MAX_PASSWORD_FAILURES = 10;
 const PASSWORD_LOCK_MS = 15 * 60 * 1000;
+const REUSE_GRACE_MS = 30_000;
 
 const INVALID_CODE = 'This phone number and code do not match. Ask the clinic for a new code.';
 const SESSION_ENDED = 'Your session has ended. Ask the clinic for a new code to log in.';
@@ -23,21 +26,6 @@ const LOCKED = 'Too many wrong passwords. Try again in 15 minutes or use Forgot 
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 const codeHash = (patientId: string, code: string) => sha256(`patient-activation:${patientId}:${code}`);
-const scryptAsync = promisify(scrypt) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16);
-  const key = await scryptAsync(password, salt, 64);
-  return `scrypt$${salt.toString('base64')}$${key.toString('base64')}`;
-}
-
-async function passwordMatches(password: string, stored: string) {
-  const [scheme, salt, key] = stored.split('$');
-  if (scheme !== 'scrypt' || !salt || !key) return false;
-  const expected = Buffer.from(key, 'base64');
-  const given = await scryptAsync(password, Buffer.from(salt, 'base64'), expected.length);
-  return given.length === expected.length && timingSafeEqual(given, expected);
-}
 
 interface AccountRow {
   activatedAt: Date | null;
@@ -211,11 +199,13 @@ export const patientAuth = {
   async loginWithPassword(input: { phone: string; password: string; device?: string | null }) {
     const patientId = await patientByPhone(input.phone);
     const account = patientId ? await accountOf(patientId) : null;
-    if (!patientId || !account?.passwordHash || !account.activatedAt || account.disabledAt)
+    if (!patientId || !account?.passwordHash || !account.activatedAt || account.disabledAt) {
+      await spendPasswordCheck(input.password);
       throw AppError.unauthorized(INVALID_PASSWORD);
+    }
     if (account.passwordLockedUntil && account.passwordLockedUntil > new Date())
       throw new AppError(429, 'RATE_LIMITED', LOCKED);
-    if (!(await passwordMatches(input.password, account.passwordHash))) {
+    if (!(await verifyPassword(input.password, account.passwordHash))) {
       const failures = account.passwordFailures + 1;
       const locked = failures >= MAX_PASSWORD_FAILURES;
       await AppDataSource.query(
@@ -229,6 +219,13 @@ export const patientAuth = {
          updated_at = now() WHERE patient_id = $1`,
       [patientId],
     );
+    if (needsRehash(account.passwordHash)) {
+      const upgraded = await hashPassword(input.password);
+      await AppDataSource.query(
+        `UPDATE patient_accounts SET password_hash = $2 WHERE patient_id = $1 AND password_hash = $3`,
+        [patientId, upgraded, account.passwordHash],
+      ).catch((err: unknown) => logger.warn({ err, patientId }, 'Could not upgrade the password hash'));
+    }
     return openSession(patientId, input.device ?? null);
   },
 
@@ -238,18 +235,34 @@ export const patientAuth = {
     return openSession(patientId, input.device ?? null);
   },
 
-  async setPassword(patientId: string, input: { currentPassword?: string | null; password: string }) {
+  async setPassword(
+    patientId: string,
+    keepSessionId: string,
+    input: { currentPassword?: string | null; password: string },
+  ) {
     const account = await accountOf(patientId);
     if (!account) throw AppError.unauthorized();
     if (account.passwordHash) {
-      if (!input.currentPassword || !(await passwordMatches(input.currentPassword, account.passwordHash)))
+      if (!input.currentPassword || !(await verifyPassword(input.currentPassword, account.passwordHash)))
         throw AppError.badRequest('Your current password is not right');
     }
-    await AppDataSource.query(
-      `UPDATE patient_accounts SET password_hash = $2, password_set_at = now(), failed_attempts = 0,
-         locked_until = NULL, updated_at = now() WHERE patient_id = $1`,
-      [patientId, await hashPassword(input.password)],
-    );
+    const passwordHash = await hashPassword(input.password);
+    await withTransaction(async (em) => {
+      await em.query(
+        `UPDATE patient_accounts SET password_hash = $2, password_set_at = now(), failed_attempts = 0,
+           locked_until = NULL, updated_at = now() WHERE patient_id = $1`,
+        [patientId, passwordHash],
+      );
+      await em.query(
+        `UPDATE patient_sessions SET revoked_at = now(), revoked_reason = 'password_changed'
+          WHERE patient_id = $1 AND id <> $2 AND revoked_at IS NULL`,
+        [patientId, keepSessionId],
+      );
+      await em.query(
+        `DELETE FROM patient_push_tokens WHERE patient_id = $1 AND session_id IS DISTINCT FROM $2`,
+        [patientId, keepSessionId],
+      );
+    });
   },
 
   async hasPassword(patientId: string) {
@@ -257,34 +270,53 @@ export const patientAuth = {
   },
 
   async refresh(refreshToken: string) {
-    const [session] = (await AppDataSource.query(
-      `SELECT s.id, s.patient_id AS "patientId" FROM patient_sessions s
-         JOIN patient_accounts a ON a.patient_id = s.patient_id
-        WHERE s.refresh_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
-          AND a.disabled_at IS NULL AND a.activated_at IS NOT NULL`,
-      [sha256(refreshToken)],
-    )) as { id: string; patientId: string }[];
-    if (!session) throw AppError.unauthorized(SESSION_ENDED);
-    const next = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
-    await AppDataSource.query(
-      `UPDATE patient_sessions SET refresh_hash = $2, expires_at = $3, last_used_at = now() WHERE id = $1`,
-      [session.id, sha256(next), expiresAt],
-    );
-    return tokensFor(session.patientId, session.id, next, expiresAt);
+    const presented = sha256(refreshToken);
+    const issued = await withTransaction(async (em) => {
+      const [session] = (await em.query(
+        `SELECT s.id, s.patient_id AS "patientId" FROM patient_sessions s
+           JOIN patient_accounts a ON a.patient_id = s.patient_id
+          WHERE s.refresh_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now()
+            AND a.disabled_at IS NULL AND a.activated_at IS NOT NULL
+          FOR UPDATE OF s`,
+        [presented],
+      )) as { id: string; patientId: string }[];
+      if (session) {
+        const next = randomBytes(32).toString('base64url');
+        const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
+        await em.query(
+          `UPDATE patient_sessions SET previous_hash = refresh_hash, refresh_hash = $2, rotated_at = now(),
+             expires_at = $3, last_used_at = now() WHERE id = $1`,
+          [session.id, sha256(next), expiresAt],
+        );
+        return tokensFor(session.patientId, session.id, next, expiresAt);
+      }
+      const [replayed] = (await em.query(
+        `SELECT id, patient_id AS "patientId", rotated_at AS "rotatedAt" FROM patient_sessions
+          WHERE previous_hash = $1 AND revoked_at IS NULL FOR UPDATE`,
+        [presented],
+      )) as { id: string; patientId: string; rotatedAt: Date | null }[];
+      if (replayed && !(replayed.rotatedAt && Date.now() - replayed.rotatedAt.getTime() < REUSE_GRACE_MS)) {
+        await em.query(
+          `UPDATE patient_sessions SET revoked_at = now(), revoked_reason = 'reuse' WHERE id = $1`,
+          [replayed.id],
+        );
+        await em.query(`DELETE FROM patient_push_tokens WHERE session_id = $1`, [replayed.id]);
+        logger.warn({ sessionId: replayed.id }, 'Patient refresh token reuse detected, session revoked');
+      }
+      return null;
+    });
+    if (!issued) throw AppError.unauthorized(SESSION_ENDED);
+    return issued;
   },
 
   async logout(sessionId: string) {
-    await AppDataSource.query(`UPDATE patient_sessions SET revoked_at = now() WHERE id = $1`, [sessionId]);
+    await AppDataSource.query(
+      `UPDATE patient_sessions SET revoked_at = now(), revoked_reason = 'logout' WHERE id = $1 AND revoked_at IS NULL`,
+      [sessionId],
+    );
     await AppDataSource.query(`DELETE FROM patient_push_tokens WHERE session_id = $1`, [sessionId]);
   },
 };
-
-function bearerToken(header: string | undefined) {
-  if (!header) return null;
-  const [scheme, token] = header.split(' ');
-  return scheme?.toLowerCase() === 'bearer' && token ? token : null;
-}
 
 export const authenticatePatient: RequestHandler = async (req, res, next) => {
   if (req.patient) return next();

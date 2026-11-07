@@ -22,6 +22,17 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Auth hardening after the security audit (2026-11-07)
+
+- Staff access tokens now die with their session: authenticate checks staff_sessions (same user, not revoked, not expired) next to the profile, so logout, logout-all, password change, reset, deactivate and reuse detection take effect at once instead of up to 15 minutes later.
+- New POST /auth/logout-all ends every session of the signed-in staff member.
+- Patient refresh tokens: rotation runs in a transaction with FOR UPDATE; replaying the previous token after 30 s revokes the session (reuse). Migration PatientSessionRotation1794800000000 adds previous_hash, rotated_at, revoked_reason to patient_sessions. Run it before deploying.
+- Patient password change ends the patient's other sessions (and their push tokens); the current phone stays signed in.
+- One password module (src/lib/password.ts) for staff and patients: it also reads the old patient form scrypt$salt$key and upgrades it on login. An unknown patient phone spends the same hashing time.
+- One bearer parser (exported from middleware/auth.ts).
+- env: PATIENT_LINK_SECRET must differ from JWT_SECRET.
+- Tests: access token after logout / logout-all / password change, session of another user, patient reuse, patient password change, old patient hash. Full suite: 331 of 332; the one failure is manufacturing "stores recipes as rows" (recipe items share one created_at, so their order is random; not auth related).
+
 ## PATIENT_LINK_SECRET is its own secret (2026-11-07)
 
 - Patient history links, patient app access tokens and chat channel names are signed only with PATIENT_LINK_SECRET (required in production). The fallback to SUPABASE_SERVICE_ROLE_KEY is gone, so dropping Supabase later breaks none of them. Links signed before this change stop working (the data was still dummy).

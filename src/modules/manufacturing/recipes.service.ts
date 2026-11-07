@@ -31,7 +31,7 @@ function toRecipeDto(recipe: ProductRecipe) {
     ...rest,
     product: product ? { id: product.id, name: product.name } : null,
     items: (items ?? [])
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .sort((a, b) => a.position - b.position)
       .map((i) => ({ materialId: i.materialId, materialName: i.material?.name ?? null, qty: i.qty })),
   };
 }
@@ -61,7 +61,9 @@ async function replaceItems(
   const itemsRepo = repo(RecipeItem, manager);
   await itemsRepo.delete({ recipeId });
   await itemsRepo.save(
-    items.map((i) => itemsRepo.create({ recipeId, materialId: i.materialId, qty: (i.qty ?? null) as never })),
+    items.map((i, position) =>
+      itemsRepo.create({ recipeId, materialId: i.materialId, qty: (i.qty ?? null) as never, position }),
+    ),
   );
 }
 

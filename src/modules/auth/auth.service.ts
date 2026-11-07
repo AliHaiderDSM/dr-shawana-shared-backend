@@ -15,6 +15,7 @@ import { staffSessions, type IssuedRefresh, type SessionMeta } from './staff-ses
 
 const INVALID_CREDENTIALS = 'Invalid username/email or password';
 const LOCKED = 'Too many failed attempts. Try again in 15 minutes.';
+const SESSION_ENDED = 'Session expired, please log in again';
 
 function assertCanSignIn(profile: StaffProfile | null): asserts profile is StaffProfile {
   if (!profile) throw AppError.unauthorized('No staff account is linked to this login');
@@ -73,8 +74,9 @@ export type StaffSession = Awaited<ReturnType<typeof toSession>>;
 const noMeta: SessionMeta = { device: null, ip: null };
 
 export const authService = {
-  async resolveContext(userId: string, sessionId: string | null = null): Promise<Express.AuthContext> {
-    const profile = await loadProfile(userId);
+  async resolveContext(userId: string, sessionId: string): Promise<Express.AuthContext> {
+    const [profile, live] = await Promise.all([loadProfile(userId), staffSessions.isLive(sessionId, userId)]);
+    if (!live) throw AppError.unauthorized(SESSION_ENDED);
     return {
       userId: profile.id,
       role: profile.role,
@@ -106,6 +108,10 @@ export const authService = {
 
   async logout(refreshToken: string) {
     await staffSessions.revokeByToken(refreshToken);
+  },
+
+  async logoutEverywhere(actor: Actor) {
+    await staffSessions.revokeAll(actor.userId, 'logout');
   },
 
   async me(userId: string) {

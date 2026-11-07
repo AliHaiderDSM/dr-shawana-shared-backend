@@ -1,5 +1,11 @@
 import request from 'supertest';
-import { bearer, createBranch, createStaff, TEST_PASSWORD } from '../../../tests/helpers/fixtures';
+import {
+  bearer,
+  createBranch,
+  createStaff,
+  openTestSession,
+  TEST_PASSWORD,
+} from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 import { normalizePhone } from './phone';
@@ -179,6 +185,7 @@ describe('patients and doctors', () => {
       });
       doctorId = res.body.data.id;
       doctorLogin = { id: res.body.data.staffId };
+      await openTestSession(doctorLogin.id);
 
       const me = await request(app).get('/api/v1/auth/me').set(bearer(doctorLogin));
       expect(me.body.data.role).toBe('doctor');

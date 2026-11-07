@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
-import { bearer, createBranch, createStaff, TEST_PASSWORD } from '../../../tests/helpers/fixtures';
+import { bearer, createBranch, createStaff, TEST_PASSWORD, tokenFor } from '../../../tests/helpers/fixtures';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 import { AppDataSource } from '../../database/data-source';
@@ -181,7 +181,7 @@ describe('auth', () => {
       expect((await refresh(second2)).status).toBe(401);
       const [session] = (await AppDataSource.query(
         `SELECT revoked_reason AS "reason" FROM staff_sessions
-          WHERE staff_id = (SELECT id FROM staff_profiles WHERE username = 'rotate.one')`,
+          WHERE staff_id = (SELECT id FROM staff_profiles WHERE username = 'rotate.one') AND id <> staff_id`,
       )) as { reason: string | null }[];
       expect(session?.reason).toBe('reuse');
     });
@@ -266,6 +266,53 @@ describe('auth', () => {
       const fresh = await login('store.one', 'NewPassw0rd!');
       expect(fresh.status).toBe(200);
       expect(fresh.body.data.me.profile.mustChangePassword).toBe(false);
+    });
+  });
+
+  describe('access tokens follow their session', () => {
+    const me = (token: string) => request(app).get('/api/v1/auth/me').set('Authorization', `Bearer ${token}`);
+
+    it('stops an access token as soon as its session is logged out', async () => {
+      await createStaff(fake, { role: 'front_desk', branchId, username: 'live.one' });
+      const session = (await login('live.one')).body.data;
+      expect((await me(session.accessToken)).status).toBe(200);
+      await request(app).post('/api/v1/auth/logout').send({ refreshToken: session.refreshToken });
+      expect((await me(session.accessToken)).status).toBe(401);
+    });
+
+    it('logs out every device with /auth/logout-all', async () => {
+      await createStaff(fake, { role: 'front_desk', branchId, username: 'all.one' });
+      const phone = (await login('all.one')).body.data;
+      const laptop = (await login('all.one')).body.data;
+      const out = await request(app)
+        .post('/api/v1/auth/logout-all')
+        .set('Authorization', `Bearer ${laptop.accessToken}`);
+      expect(out.status).toBe(204);
+      expect((await me(phone.accessToken)).status).toBe(401);
+      expect((await me(laptop.accessToken)).status).toBe(401);
+      expect((await refresh(phone.refreshToken)).status).toBe(401);
+      expect((await request(app).post('/api/v1/auth/logout-all')).status).toBe(401);
+    });
+
+    it('refuses a token whose session belongs to someone else', async () => {
+      const victim = await createStaff(fake, { role: 'branch_admin', branchId, username: 'victim.one' });
+      await createStaff(fake, { role: 'front_desk', branchId, username: 'attacker.one' });
+      const own = (await login('attacker.one')).body.data.accessToken as string;
+      const claims = verifyAccessToken(own)!;
+      expect((await me(tokenFor(victim, claims.sessionId))).status).toBe(401);
+    });
+
+    it('ends the other sessions right away when the password changes', async () => {
+      await createStaff(fake, { role: 'front_desk', branchId, username: 'pw.live' });
+      const other = (await login('pw.live')).body.data.accessToken as string;
+      const current = (await login('pw.live')).body.data.accessToken as string;
+      const changed = await request(app)
+        .post('/api/v1/auth/change-password')
+        .set('Authorization', `Bearer ${current}`)
+        .send({ currentPassword: TEST_PASSWORD, newPassword: 'Changed1Pass' });
+      expect(changed.status).toBe(204);
+      expect((await me(other)).status).toBe(401);
+      expect((await me(current)).status).toBe(200);
     });
   });
 });
