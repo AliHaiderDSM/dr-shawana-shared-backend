@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Appointment payments report: visits of the period (2026-11-07)
+
+- /admin/reports/appointment-payments also returns visits: appointments whose visit date is in the period but that have no entry in it (booked earlier, nothing paid in the period). Each is a row of kind visit, amount 0, with the payment state at the end of the period; sr numbers continue after rows. rows and the summary are unchanged. Test in appointment-refunds.test.ts.
+
 ## P&L: list price with the discount apart, product sales breakdown (2026-11-07)
 
 - /admin/reports/profit-loss products: avgSalePrice is now the price the item was sold at before any discount (qty x unit price / qty); new gross and discount (line discounts plus the item's share of the overall sale discount). Revenue and profit stay net of the discount.

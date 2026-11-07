@@ -199,4 +199,31 @@ describe('appointment advances, balances, refunds and the payment report', () =>
       (await ownerApi('get', '/admin/reports/appointment-payments?from=2026-10-05&to=2026-10-01')).status,
     ).toBe(400);
   });
+
+  it('lists the visits of the period that have no entry in it, apart from the entries', async () => {
+    const later = shift(day0, 5);
+    const booked = await book('15:00', '15:30', '3000', later);
+    expect(booked.status).toBe(201);
+    const id = booked.body.data.id as string;
+
+    const onVisitDay = (await ledger(later)).body.data;
+    expect(onVisitDay.rows.some((r: { appointment: { id: string } }) => r.appointment.id === id)).toBe(false);
+    expect(onVisitDay.visits).toEqual([
+      expect.objectContaining({
+        kind: 'visit',
+        date: later,
+        amount: '0.00',
+        stateAfter: 'unpaid',
+        remainingAfter: '3000.00',
+        appointment: expect.objectContaining({ id, visitDate: later }),
+      }),
+    ]);
+    const srs = [...onVisitDay.rows, ...onVisitDay.visits].map((r: { sr: number }) => r.sr);
+    expect(new Set(srs).size).toBe(srs.length);
+
+    const bookingDay = (await ledger(day0)).body.data;
+    expect(bookingDay.visits.some((r: { appointment: { id: string } }) => r.appointment.id === id)).toBe(
+      false,
+    );
+  });
 });

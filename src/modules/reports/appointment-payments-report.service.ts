@@ -8,7 +8,7 @@ const many = (sql: string, params: unknown[]) => AppDataSource.query(sql, params
 const money = (value: Decimal) => toMoney(value).toFixed(2);
 const BOOKED_ON = `(a.created_at AT TIME ZONE '${CLINIC_TIME_ZONE}')::date`;
 
-type EntryKind = 'booked' | 'advance' | 'balance' | 'refund';
+type EntryKind = 'booked' | 'advance' | 'balance' | 'refund' | 'visit';
 type State = 'unpaid' | 'advance' | 'paid' | 'held' | 'refunded' | 'cancelled';
 
 interface Movement {
@@ -72,6 +72,7 @@ export const appointmentPaymentsReportService = {
          LEFT JOIN doctors d ON d.id = a.doctor_id
         WHERE a.deleted_at IS NULL AND ($3::uuid IS NULL OR a.branch_id = $3::uuid)
           AND (${BOOKED_ON} BETWEEN $1::date AND $2::date
+            OR a.date BETWEEN $1::date AND $2::date
             OR EXISTS (SELECT 1 FROM appointment_payments y WHERE y.appointment_id = a.id AND y.deleted_at IS NULL
                         AND y.date BETWEEN $1::date AND $2::date)
             OR EXISTS (SELECT 1 FROM appointment_refunds r WHERE r.appointment_id = a.id AND r.deleted_at IS NULL
@@ -84,6 +85,7 @@ export const appointmentPaymentsReportService = {
       movementsOf('appointment_refunds', ids),
     ]);
 
+    const visits: typeof entries = [];
     const entries: {
       kind: EntryKind;
       id: string;
@@ -143,6 +145,27 @@ export const appointmentPaymentsReportService = {
           appointment: a,
         });
       }
+      const visitDate = a.visitDate as string;
+      const hasEntry =
+        paid.some((p) => inRange(p.date)) ||
+        back.some((r) => inRange(r.date)) ||
+        (inRange(bookedOn) && !paid.some((p) => p.date === bookedOn));
+      if (inRange(visitDate) && !hasEntry) {
+        const upTo = (list: Movement[]) =>
+          list.filter((m) => m.date <= to).reduce((sum, m) => sum.plus(m.amount), new Decimal(0));
+        visits.push({
+          kind: 'visit',
+          id: `visit-${id}`,
+          date: visitDate,
+          at: new Date(a.createdAt as string).toISOString(),
+          amount: new Decimal(0),
+          method: null,
+          account: null,
+          paidAfter: upTo(paid),
+          refundedAfter: upTo(back),
+          appointment: a,
+        });
+      }
       if (inRange(bookedOn) && !paid.some((p) => p.date === bookedOn)) {
         entries.push({
           kind: 'booked',
@@ -161,7 +184,7 @@ export const appointmentPaymentsReportService = {
 
     entries.sort((x, y) => x.date.localeCompare(y.date) || x.at.localeCompare(y.at));
 
-    const rows = entries.map((e, index) => {
+    const toRow = (e: (typeof entries)[number], index: number) => {
       const a = e.appointment;
       const fee = new Decimal((a.fee as string | null) ?? 0);
       const status = a.status as string;
@@ -193,9 +216,14 @@ export const appointmentPaymentsReportService = {
           status === 'cancelled' ? new Decimal(0) : Decimal.max(fee.minus(e.paidAfter), 0),
         ),
         stateAfter: after,
-        fullyPaidHere: e.kind !== 'refund' && e.kind !== 'booked' && after === 'paid' && !wasPaid,
+        fullyPaidHere:
+          e.kind !== 'refund' && e.kind !== 'booked' && e.kind !== 'visit' && after === 'paid' && !wasPaid,
       };
-    });
+    };
+    const rows = entries.map(toRow);
+    const visitRows = visits
+      .sort((x, y) => x.date.localeCompare(y.date) || x.at.localeCompare(y.at))
+      .map((e, index) => toRow(e, rows.length + index));
 
     const total = (kind: EntryKind) =>
       rows.filter((r) => r.kind === kind).reduce((sum, r) => sum.plus(r.amount), new Decimal(0));
@@ -219,6 +247,7 @@ export const appointmentPaymentsReportService = {
         fullyPaid: rows.filter((r) => r.fullyPaidHere).length,
       },
       rows,
+      visits: visitRows,
     };
   },
 };
