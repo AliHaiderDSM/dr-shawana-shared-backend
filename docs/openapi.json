@@ -18023,6 +18023,248 @@
           "rows"
         ]
       },
+      "ProfitLossProductSales": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "type": "string"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "month": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "period": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "to"
+            ]
+          },
+          "branchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "sales": {
+                "type": "integer"
+              },
+              "returns": {
+                "type": "integer"
+              },
+              "qty": {
+                "type": "string"
+              },
+              "gross": {
+                "type": "string"
+              },
+              "discount": {
+                "type": "string"
+              },
+              "invoiced": {
+                "type": "string"
+              },
+              "revenue": {
+                "type": "string"
+              },
+              "cost": {
+                "type": "string"
+              },
+              "profit": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "sales",
+              "returns",
+              "qty",
+              "gross",
+              "discount",
+              "invoiced",
+              "revenue",
+              "cost",
+              "profit"
+            ]
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "revenue": {
+                  "type": "string"
+                },
+                "profit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "code",
+                "name",
+                "qty",
+                "revenue",
+                "profit"
+              ]
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "sale",
+                    "return"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "invoiceNo": {
+                  "type": "string"
+                },
+                "saleType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "date": {
+                  "type": "string"
+                },
+                "branch": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "name"
+                  ]
+                },
+                "patient": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "qty": {
+                  "type": "string"
+                },
+                "unitPrice": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "gross": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "discount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "invoiced": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "revenue": {
+                  "type": "string"
+                },
+                "notReceived": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cost": {
+                  "type": "string"
+                },
+                "costEstimated": {
+                  "type": "boolean"
+                },
+                "profit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "reference",
+                "invoiceNo",
+                "saleType",
+                "date",
+                "branch",
+                "patient",
+                "qty",
+                "unitPrice",
+                "gross",
+                "discount",
+                "invoiced",
+                "revenue",
+                "notReceived",
+                "cost",
+                "costEstimated",
+                "profit"
+              ]
+            }
+          }
+        },
+        "required": [
+          "product",
+          "year",
+          "month",
+          "period",
+          "branchId",
+          "summary",
+          "branches",
+          "rows"
+        ]
+      },
       "ErrorResponse": {
         "type": "object",
         "properties": {
@@ -60633,6 +60875,136 @@
                     "data": {
                       "type": "object",
                       "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/profit-loss/product-sales": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin: every sale and return of one product in the period, with list price, discount, revenue received, cost and profit per invoice. The totals match the product row of the profit and loss report.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "required": true,
+            "name": "year",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "description": "1-12; the whole year when left out"
+            },
+            "required": false,
+            "description": "1-12; the whole year when left out",
+            "name": "month",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "One branch; every branch when left out"
+            },
+            "required": false,
+            "description": "One branch; every branch when left out",
+            "name": "branchId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Product name as shown in the report"
+            },
+            "required": true,
+            "description": "Product name as shown in the report",
+            "name": "product",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product sales",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ProfitLossProductSales"
                     }
                   },
                   "required": [

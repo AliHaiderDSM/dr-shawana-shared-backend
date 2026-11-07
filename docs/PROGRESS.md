@@ -22,6 +22,16 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## P&L: list price with the discount apart, product sales breakdown (2026-11-07)
+
+- /admin/reports/profit-loss products: avgSalePrice is now the price the item was sold at before any discount (qty x unit price / qty); new gross and discount (line discounts plus the item's share of the overall sale discount). Revenue and profit stay net of the discount.
+- New GET /admin/reports/profit-loss/product-sales?year&month&branchId&product (Super Admin): every sale and return of one product in the period with invoice, patient, branch, qty, price, discount, revenue received, not received, cost and profit, plus per-branch totals. Its totals equal the product row of the report. Test in profit-loss.test.ts.
+
+## Recipe and batch items keep their order (2026-11-07)
+
+- recipe_items and material_batch_items get a position column (migration ItemPositions1794900000000; existing rows numbered by created_at, then id). Items are saved in the order they were sent and listed by position. Before, all items of one save shared created_at, so their order was random (the flaky manufacturing test).
+- Full suite: 332 passed.
+
 ## Auth hardening after the security audit (2026-11-07)
 
 - Staff access tokens now die with their session: authenticate checks staff_sessions (same user, not revoked, not expired) next to the profile, so logout, logout-all, password change, reset, deactivate and reuse detection take effect at once instead of up to 15 minutes later.

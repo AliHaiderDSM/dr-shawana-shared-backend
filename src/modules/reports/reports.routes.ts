@@ -26,6 +26,7 @@ import {
   saleProductsQuerySchema,
   stockReportQuerySchema,
   appointmentPaymentsQuerySchema,
+  productSalesQuerySchema,
   profitLossQuerySchema,
   topProductsQuerySchema,
 } from './reports.schemas';
@@ -134,6 +135,17 @@ reportsRouter.get(
   async (req, res) => {
     const { year, month, branchId, product } = validQuery(req, profitLossQuerySchema);
     sendOk(res, await profitLossService.report(year, month ?? null, branchId ?? null, product ?? null));
+  },
+);
+
+reportsRouter.get(
+  '/admin/reports/profit-loss/product-sales',
+  authenticate,
+  requireRole('super_admin'),
+  validate({ query: productSalesQuerySchema }),
+  async (req, res) => {
+    const { year, month, branchId, product } = validQuery(req, productSalesQuerySchema);
+    sendOk(res, await profitLossService.productSales(year, month ?? null, branchId ?? null, product));
   },
 );
 

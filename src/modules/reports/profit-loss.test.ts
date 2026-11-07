@@ -158,6 +158,86 @@ describe('Profit and loss', () => {
     expect(Number(all.summary.revenue)).toBeCloseTo(Number(serumOnly.summary.revenue) + 300, 2);
   });
 
+  it('shows the list price with the discount apart, and breaks one product down by invoice', async () => {
+    const asked = await api('post', '/branch/discount-requests', admin).send({
+      saleAmount: '3000',
+      discountPercent: '10',
+    });
+    await api('post', `/admin/discount-requests/${asked.body.data.id}/approve`, owner).send({});
+    const sale = await api('post', '/branch/sales', admin).send({
+      patient: { name: 'Sana', phone: '923007778800', city: 'Lahore' },
+      date: '2026-10-05',
+      saleType: 'office',
+      autoDiscount: true,
+      discountRequestId: asked.body.data.id,
+      items: [{ productId: serum, qty: '3' }],
+      payments: [{ method: 'cash', amount: '2700', accountSheetId: cashSheet, date: '2026-10-05' }],
+    });
+    expect(sale.status).toBe(201);
+    expect(sale.body.data.total).toBe('2700.00');
+
+    const october = (await report('year=2026&month=10')).body.data;
+    expect(october.products[0]).toMatchObject({
+      product: 'Profit Serum',
+      qtySold: '3.000',
+      avgSalePrice: '1000.00',
+      gross: '3000.00',
+      discount: '300.00',
+      revenue: '2700.00',
+    });
+
+    const detail = await api(
+      'get',
+      '/admin/reports/profit-loss/product-sales?year=2026&month=10&product=Profit%20Serum',
+      owner,
+    );
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.summary).toMatchObject({
+      sales: 1,
+      returns: 0,
+      qty: '3.000',
+      gross: '3000.00',
+      discount: '300.00',
+      revenue: october.products[0].revenue,
+      cost: october.products[0].cost,
+      profit: october.products[0].profit,
+    });
+    expect(detail.body.data.rows).toEqual([
+      expect.objectContaining({
+        kind: 'sale',
+        invoiceNo: sale.body.data.invoiceNo,
+        date: '2026-10-05',
+        patient: 'Sana',
+        unitPrice: '1000.00',
+        discount: '300.00',
+        revenue: '2700.00',
+        branch: { code: 'PLR', name: expect.any(String) },
+      }),
+    ]);
+    expect(detail.body.data.branches).toEqual([expect.objectContaining({ code: 'PLR', revenue: '2700.00' })]);
+
+    const september = (await report('year=2026&month=9')).body.data.products.find(
+      (p: { product: string }) => p.product === 'Profit Serum',
+    );
+    const septemberDetail = (
+      await api(
+        'get',
+        '/admin/reports/profit-loss/product-sales?year=2026&month=9&product=Profit%20Serum',
+        owner,
+      )
+    ).body.data;
+    expect(septemberDetail.summary).toMatchObject({
+      revenue: september.revenue,
+      cost: september.cost,
+      profit: september.profit,
+    });
+    expect(septemberDetail.rows.some((r: { kind: string }) => r.kind === 'return')).toBe(true);
+    expect(
+      (await api('get', '/admin/reports/profit-loss/product-sales?year=2026&product=x', admin)).status,
+    ).toBe(403);
+    expect((await api('get', '/admin/reports/profit-loss/product-sales?year=2026', owner)).status).toBe(400);
+  });
+
   it('is for the Super Admin only', async () => {
     expect((await api('get', '/admin/reports/profit-loss?year=2026', admin)).status).toBe(403);
     expect((await report('year=2026&month=13')).status).toBe(400);

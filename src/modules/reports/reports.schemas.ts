@@ -161,6 +161,10 @@ export const profitLossQuerySchema = z.object({
     .openapi({ description: 'Only this product (by name); every product when left out' }),
 });
 
+export const productSalesQuerySchema = profitLossQuerySchema.extend({
+  product: z.string().trim().min(1).max(200).openapi({ description: 'Product name as shown in the report' }),
+});
+
 export const topProductsQuerySchema = z.object({
   range: z
     .enum(['today', 'month', 'year'])
@@ -266,6 +270,67 @@ registry.registerPath({
   request: { query: profitLossQuerySchema },
   responses: {
     200: { description: 'Profit and loss', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
+    ...errorResponses,
+  },
+});
+
+const money = z.string();
+const productSaleRowSchema = z.object({
+  kind: z.enum(['sale', 'return']),
+  id: z.uuid(),
+  reference: z.string(),
+  invoiceNo: z.string(),
+  saleType: z.string().nullable(),
+  date: z.string(),
+  branch: z.object({ code: z.string(), name: z.string() }),
+  patient: z.string().nullable(),
+  qty: z.string(),
+  unitPrice: money.nullable(),
+  gross: money.nullable(),
+  discount: money.nullable(),
+  invoiced: money.nullable(),
+  revenue: money,
+  notReceived: money.nullable(),
+  cost: money,
+  costEstimated: z.boolean(),
+  profit: money,
+});
+
+export const productSalesSchema = registry.register(
+  'ProfitLossProductSales',
+  z.object({
+    product: z.string(),
+    year: z.number().int(),
+    month: z.number().int().nullable(),
+    period: z.object({ from: z.string(), to: z.string() }),
+    branchId: z.uuid().nullable(),
+    summary: z.object({
+      sales: z.number().int(),
+      returns: z.number().int(),
+      qty: z.string(),
+      gross: money,
+      discount: money,
+      invoiced: money,
+      revenue: money,
+      cost: money,
+      profit: money,
+    }),
+    branches: z.array(
+      z.object({ code: z.string(), name: z.string(), qty: z.string(), revenue: money, profit: money }),
+    ),
+    rows: z.array(productSaleRowSchema),
+  }),
+);
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/admin/reports/profit-loss/product-sales',
+  summary:
+    'Super Admin: every sale and return of one product in the period, with list price, discount, revenue received, cost and profit per invoice. The totals match the product row of the profit and loss report.',
+  request: { query: productSalesQuerySchema },
+  responses: {
+    200: { description: 'Product sales', ...jsonContent(dataEnvelope(productSalesSchema)) },
     ...errorResponses,
   },
 });
