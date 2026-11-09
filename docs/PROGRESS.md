@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Appointment payments report: payment history per appointment (2026-11-09)
+
+- Each entry's appointment now carries history: every payment and refund of that appointment (date, amount, method, account), whatever the period, so the dashboard can break a fully paid due down.
+
 ## Under observation: labelled pieces held back while sending (2026-11-07)
 
 - New stock_holds table (migration StockHolds1795000000000, run it before deploying) and /branch/stock-holds. The Warehouse Keeper (while sending a stock request) and the Dispatch Department branch admin, store keeper or dispatcher (while dispatching an online order) scan a label with a reason (damaged, expired, label issue, other) and a note. The label becomes quarantined, so it cannot be sold, sent or dispatched; stock on hand does not change. Each hold gets a number like HFLC-UO-000001.

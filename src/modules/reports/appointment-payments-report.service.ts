@@ -85,6 +85,17 @@ export const appointmentPaymentsReportService = {
       movementsOf('appointment_refunds', ids),
     ]);
 
+    const historyOf = new Map<
+      string,
+      {
+        kind: 'payment' | 'refund';
+        id: string;
+        date: string;
+        amount: string;
+        method: string | null;
+        account: string | null;
+      }[]
+    >();
     const visits: typeof entries = [];
     const entries: {
       kind: EntryKind;
@@ -104,6 +115,22 @@ export const appointmentPaymentsReportService = {
       const paid = payments.get(id) ?? [];
       const back = refunds.get(id) ?? [];
       const bookedOn = a.bookedOn as string;
+      historyOf.set(
+        id,
+        [
+          ...paid.map((m) => ({ kind: 'payment' as const, m })),
+          ...back.map((m) => ({ kind: 'refund' as const, m })),
+        ]
+          .sort((x, y) => x.m.date.localeCompare(y.m.date) || x.m.createdAt.localeCompare(y.m.createdAt))
+          .map(({ kind, m }) => ({
+            kind,
+            id: m.id,
+            date: m.date,
+            amount: money(m.amount),
+            method: m.method,
+            account: m.account,
+          })),
+      );
       const inRange = (date: string) => date >= from && date <= to;
       let paidAfter = new Decimal(0);
       for (const p of paid) {
@@ -206,6 +233,7 @@ export const appointmentPaymentsReportService = {
           bookedOn: a.bookedOn as string,
           status,
           fee: money(fee),
+          history: historyOf.get(a.id as string) ?? [],
         },
         patient: { name: a.patientName as string | null, phone: a.patientPhone as string | null },
         doctor: a.doctorName as string | null,
