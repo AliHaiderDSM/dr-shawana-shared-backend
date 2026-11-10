@@ -240,7 +240,11 @@ export const appointmentsService = {
       { sortMap: { date: 'a.date', createdAt: 'a.createdAt', appointmentNo: 'a.appointmentNo' } },
     );
     if (query.sort.endsWith('appointmentNo'))
-      qb.addOrderBy('a.repeatNo', query.sort.startsWith('-') ? 'DESC' : 'ASC', 'NULLS FIRST');
+      qb.addOrderBy(
+        'a.repeatNo',
+        query.sort.startsWith('-') ? 'DESC' : 'ASC',
+        query.sort.startsWith('-') ? 'NULLS LAST' : 'NULLS FIRST',
+      );
     if (query.sort.endsWith('date')) qb.addOrderBy('a.timeFrom', query.sort.startsWith('-') ? 'DESC' : 'ASC');
     const [items, total] = await qb.getManyAndCount();
     const meta = pageMeta(query, total);
@@ -290,6 +294,24 @@ export const appointmentsService = {
 
   async summary(viewer: Viewer, query: AppointmentSummaryQuery) {
     const doctorId = viewer.doctorId ?? query.doctorId ?? null;
+    const params: unknown[] = [query.from, query.to, viewer.branchId, doctorId];
+    const where: string[] = [];
+    const add = (sql: string, value: unknown) => {
+      params.push(value);
+      where.push(sql.replaceAll('?', () => `$${params.length}`));
+    };
+    if (query.status) add('a.status = ?', query.status);
+    else where.push(`a.status <> 'cancelled'`);
+    if (query.mode) add('a.mode = ?', query.mode);
+    if (query.visitType) add('a.visit_type = ?', query.visitType);
+    if (query.bhrtStatus) add('p.bhrt_status = ?', query.bhrtStatus);
+    if (query.repeat === 'true') where.push('a.repeat_no IS NOT NULL');
+    if (query.repeat === 'false') where.push('a.repeat_no IS NULL');
+    if (query.search)
+      add(
+        `(p.name ILIKE ? OR p.phone ILIKE ? OR CONCAT('APP#', a.appointment_no, CASE WHEN a.repeat_no IS NULL THEN '' ELSE CONCAT('.', a.repeat_no) END) ILIKE ?)`,
+        `%${escapeLike(query.search)}%`,
+      );
     const [row] = (await AppDataSource.query(
       `SELECT COUNT(*) FILTER (WHERE a.repeat_no IS NULL)::int AS appointments,
               COUNT(*) FILTER (WHERE a.repeat_no IS NOT NULL)::int AS repeats,
@@ -300,10 +322,12 @@ export const appointmentsService = {
                      AND e.date < $1::date)
               )::int AS "newPatients"
          FROM appointments a
-        WHERE a.deleted_at IS NULL AND a.status <> 'cancelled' AND a.branch_id = $3
+         JOIN patients p ON p.id = a.patient_id
+        WHERE a.deleted_at IS NULL AND a.branch_id = $3
           AND a.date BETWEEN $1::date AND $2::date
-          AND ($4::uuid IS NULL OR a.doctor_id = $4::uuid)`,
-      [query.from, query.to, viewer.branchId, doctorId],
+          AND ($4::uuid IS NULL OR a.doctor_id = $4::uuid)
+          ${where.map((w) => `AND ${w}`).join(' ')}`,
+      params,
     )) as { appointments: number; repeats: number; newPatients: number }[];
     return row ?? { appointments: 0, repeats: 0, newPatients: 0 };
   },

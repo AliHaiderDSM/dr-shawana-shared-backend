@@ -184,6 +184,15 @@ export const appointmentSummaryQuerySchema = z
     to: dateInput,
     doctorId: z.uuid().optional(),
     branchId: z.uuid().optional(),
+    status: z
+      .enum(APPOINTMENT_STATUSES)
+      .optional()
+      .openapi({ description: 'Cancelled are left out unless asked' }),
+    mode: z.enum(APPOINTMENT_MODES).optional(),
+    visitType: z.enum(VISIT_TYPES).optional(),
+    bhrtStatus: z.enum(BHRT_STATUSES).optional(),
+    repeat: z.enum(['true', 'false']).optional(),
+    search: z.string().trim().max(100).optional(),
   })
   .refine((v) => v.to >= v.from, { message: '"to" must not be before "from"', path: ['to'] });
 

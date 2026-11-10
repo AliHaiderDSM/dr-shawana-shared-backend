@@ -35782,6 +35782,80 @@
             "required": false,
             "name": "branchId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "booked",
+                "completed",
+                "cancelled"
+              ],
+              "description": "Cancelled are left out unless asked"
+            },
+            "required": false,
+            "description": "Cancelled are left out unless asked",
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "online",
+                "physical"
+              ]
+            },
+            "required": false,
+            "name": "mode",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "new",
+                "followup"
+              ]
+            },
+            "required": false,
+            "name": "visitType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "on",
+                "off",
+                "recommended"
+              ]
+            },
+            "required": false,
+            "name": "bhrtStatus",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            },
+            "required": false,
+            "name": "repeat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
           }
         ],
         "responses": {

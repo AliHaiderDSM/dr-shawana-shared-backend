@@ -161,6 +161,27 @@ describe('repeat visits', () => {
     const later = await api('get', '/branch/appointments/summary?from=2026-10-25&to=2026-11-30', frontDesk);
     expect(later.body.data).toEqual({ appointments: 1, repeats: 2, newPatients: 0 });
 
+    const onlyRepeats = await api(
+      'get',
+      '/branch/appointments/summary?from=2026-10-01&to=2026-11-30&repeat=true&status=booked',
+      frontDesk,
+    );
+    expect(onlyRepeats.body.data).toEqual({ appointments: 0, repeats: 1, newPatients: 0 });
+
+    const searched = await api(
+      'get',
+      '/branch/appointments/summary?from=2026-10-01&to=2026-11-30&search=Other%20Patient',
+      frontDesk,
+    );
+    expect(searched.body.data).toEqual({ appointments: 2, repeats: 0, newPatients: 1 });
+
+    const sorted = await api(
+      'get',
+      '/branch/appointments?sort=-appointmentNo&patientId=' + patientId,
+      frontDesk,
+    );
+    expect(sorted.body.data.map((a: { repeatNo: number | null }) => a.repeatNo)).toEqual([2, 1, null]);
+
     const money = await api(
       'get',
       `/admin/reports/appointment-payments?from=2026-10-01&to=2026-11-30&branchId=${branchId}`,
