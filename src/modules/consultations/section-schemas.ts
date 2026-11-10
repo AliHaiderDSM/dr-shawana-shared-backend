@@ -179,6 +179,7 @@ export const SURGERIES = [
   'breast_surgery',
   'bariatric_surgery',
   'other',
+  'no_surgery',
 ] as const;
 
 export const FAMILY_RELATIVES = ['mother', 'father', 'sister', 'close_family'] as const;
@@ -227,7 +228,11 @@ export const medicalHistorySchema = z
       )
       .max(SURGERIES.length)
       .default([])
-      .refine((v) => new Set(v.map((s) => s.type)).size === v.length, 'Each surgery can be listed once'),
+      .refine((v) => new Set(v.map((s) => s.type)).size === v.length, 'Each surgery can be listed once')
+      .refine(
+        (v) => !v.some((s) => s.type === 'no_surgery') || v.length === 1,
+        'None cannot be ticked together with a surgery',
+      ),
     otherSurgery: text(500),
     familyRelatives: flags(FAMILY_RELATIVES),
     familyConditions: flags(FAMILY_CONDITIONS),

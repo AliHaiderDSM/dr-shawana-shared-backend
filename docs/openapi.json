@@ -10517,7 +10517,8 @@
                     "endometriosis_surgery",
                     "breast_surgery",
                     "bariatric_surgery",
-                    "other"
+                    "other",
+                    "no_surgery"
                   ]
                 },
                 "date": {
@@ -10543,7 +10544,7 @@
                 "type"
               ]
             },
-            "maxItems": 9,
+            "maxItems": 10,
             "default": []
           },
           "otherSurgery": {
@@ -12177,6 +12178,7 @@
               "enum": [
                 "vasomotor",
                 "gsm",
+                "musculoskeletal_disorder",
                 "hsdd",
                 "mood",
                 "sleep_disorder",
@@ -12187,7 +12189,7 @@
                 "other"
               ]
             },
-            "maxItems": 10,
+            "maxItems": 11,
             "default": []
           },
           "clinicalStatus": {

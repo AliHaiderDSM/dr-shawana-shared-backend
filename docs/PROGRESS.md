@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Surgical history: None (2026-11-10)
+
+- medical_history surgeries accept no_surgery, which cannot be sent together with a surgery. Test in consultations.test.ts.
+
 ## Clinical remarks: Musculoskeletal disorder complaint (2026-11-10)
 
 - clinical_assessment complaints now accept musculoskeletal_disorder, which the dashboard offered but the API refused with a 400. Every other dashboard option was checked against the section schemas and matches. Test in consultations.test.ts.

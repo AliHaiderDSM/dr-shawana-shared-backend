@@ -141,6 +141,17 @@ describe('consultations and clinical records', () => {
     it('applies the medical history rules and shares the topics with the follow up form', async () => {
       const noDate = await section('medical_history', { havingPeriods: 'yes' });
       expect(noDate.status).toBe(400);
+      const noneAndSurgery = await section('medical_history', {
+        havingPeriods: 'no',
+        surgeries: [{ type: 'no_surgery' }, { type: 'c_section' }],
+      });
+      expect(noneAndSurgery.status).toBe(400);
+      const none = await section('medical_history', {
+        havingPeriods: 'no',
+        surgeries: [{ type: 'no_surgery' }],
+      });
+      expect(none.status).toBe(200);
+      expect(none.body.data.section.data.surgeries).toEqual([{ type: 'no_surgery', date: null, year: null }]);
       const res = await section('medical_history', {
         majorComplaint: 'Hot flushes',
         havingPeriods: 'no',
