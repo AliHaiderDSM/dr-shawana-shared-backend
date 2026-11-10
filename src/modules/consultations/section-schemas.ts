@@ -484,6 +484,7 @@ export const clinicalAssessmentSchema = z.object({
   complaints: flags([
     'vasomotor',
     'gsm',
+    'musculoskeletal_disorder',
     'hsdd',
     'mood',
     'sleep_disorder',

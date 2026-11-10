@@ -278,9 +278,12 @@ describe('consultations and clinical records', () => {
       expect((await section('referral', referral)).status).toBe(422);
       const assessment = await section('clinical_assessment', {
         menopauseStage: ['perimenopause'],
+        complaints: ['vasomotor', 'musculoskeletal_disorder'],
         treatmentPlan: ['start_bhrt', 'referred_to_specialist'],
         plan: 'Start estradiol',
       });
+      expect(assessment.status).toBe(200);
+      expect(assessment.body.data.section.data.complaints).toEqual(['vasomotor', 'musculoskeletal_disorder']);
       expect(assessment.body.data.section.data.plan).toBe('Start estradiol');
       expect(assessment.body.data.availableSections).toContain('referral');
       expect((await section('referral', { ...referral, reason: '' })).status).toBe(400);
