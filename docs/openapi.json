@@ -2261,6 +2261,36 @@
               "null"
             ]
           },
+          "firstBatch": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "batchNo": {
+                "type": "string"
+              },
+              "expiryDate": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date"
+              },
+              "serials": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "batchNo",
+              "expiryDate",
+              "serials"
+            ],
+            "description": "An in-stock piece only: the earlier batch (sooner expiry, then older) that must go out first, with the in-stock labels of every earlier batch"
+          },
           "history": {
             "type": "array",
             "items": {
@@ -2364,6 +2394,7 @@
           "salePrice",
           "patientId",
           "patientName",
+          "firstBatch",
           "history"
         ]
       },

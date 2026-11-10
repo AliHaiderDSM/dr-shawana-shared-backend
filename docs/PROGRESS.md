@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Earliest batch goes out first (2026-11-10)
+
+- A scanned label is refused on a sale, an online dispatch or a stock out (stock request sending) while the same branch still has in-stock labels of an earlier batch of that product: sooner expiry first, then the batch added first. Batches too close to expiry to go out and pieces under observation do not count. No override. The error names the batch to use and its labels.
+- GET /branch/inventory/items/serial/{serial} returns firstBatch for an in-stock piece (the earlier batch and the in-stock labels of every earlier batch) so scanners can warn at once. Test in serials.test.ts.
+
 ## Repeat visits: APP#4.1 (2026-11-09)
 
 - Migration AppointmentRepeats1795100000000 (run it before deploying): appointments get repeat_of_id and repeat_no. The number is unique for main appointments and (number, repeat) for repeats; appointment_no now takes its default from the sequence, so a repeat reuses the first appointment's number and the next new booking does not skip one.

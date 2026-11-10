@@ -421,6 +421,7 @@ async function takeForSale(
     date,
     sellableOnly: true,
     productIds: tracked,
+    earliestBatchFirst: true,
   });
 }
 

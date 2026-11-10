@@ -132,6 +132,17 @@ export const inventoryItemDetailSchema = registry.register(
     salePrice: z.string(),
     patientId: z.uuid().nullable(),
     patientName: z.string().nullable(),
+    firstBatch: z
+      .object({
+        batchNo: z.string(),
+        expiryDate: z.iso.date().nullable(),
+        serials: z.array(z.string()),
+      })
+      .nullable()
+      .openapi({
+        description:
+          'An in-stock piece only: the earlier batch (sooner expiry, then older) that must go out first, with the in-stock labels of every earlier batch',
+      }),
     history: z.array(
       z.object({
         id: z.uuid(),

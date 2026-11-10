@@ -15,7 +15,7 @@ import {
   type LabelBatchListQuery,
   type RegisterLabelsInput,
 } from './inventory-items.schemas';
-import { MIN_SHELF_DAYS, tooShortToUse } from './shelf-life';
+import { MIN_SHELF_DAYS, shelfCutoff, tooShortToUse } from './shelf-life';
 import { type StockMovementInput } from './stock-ledger';
 import { type StockMovementType } from './stock-movement.entity';
 
@@ -272,6 +272,36 @@ export const inventoryItemsService = {
     return rows;
   },
 
+  async earlierBatches(manager: EntityManager, itemIds: string[], date: string, skipIds: string[] = itemIds) {
+    if (itemIds.length === 0) return [];
+    return (await manager.query(
+      `SELECT i.id AS "itemId", i.serial, b.batch_no AS "batchNo", ob.id AS "firstBatchId",
+              ob.batch_no AS "firstBatchNo", to_char(ob.expiry_date, 'YYYY-MM-DD') AS "firstExpiryDate",
+              array_agg(o.serial ORDER BY o.serial) AS serials
+         FROM inventory_items i
+         LEFT JOIN product_batches b ON b.id = i.batch_id
+         JOIN inventory_items o ON o.product_id = i.product_id AND o.branch_id = i.branch_id
+              AND o.status = 'in_stock' AND o.deleted_at IS NULL AND NOT (o.id = ANY($2::uuid[]))
+         JOIN product_batches ob ON ob.id = o.batch_id
+        WHERE i.id = ANY($1::uuid[])
+          AND (ob.expiry_date IS NULL OR ob.expiry_date >= $3::date)
+          AND (i.batch_id IS NULL OR (ob.id <> b.id
+               AND (COALESCE(ob.expiry_date, 'infinity'::date), ob.created_at)
+                 < (COALESCE(b.expiry_date, 'infinity'::date), b.created_at)))
+        GROUP BY i.id, i.serial, b.batch_no, ob.id, ob.batch_no, ob.expiry_date, ob.created_at
+        ORDER BY i.serial, ob.expiry_date NULLS LAST, ob.created_at`,
+      [itemIds, skipIds, shelfCutoff(date)],
+    )) as {
+      itemId: string;
+      serial: string;
+      batchNo: string | null;
+      firstBatchId: string;
+      firstBatchNo: string;
+      firstExpiryDate: string | null;
+      serials: string[];
+    }[];
+  },
+
   async take(
     manager: EntityManager,
     actor: Actor,
@@ -288,6 +318,7 @@ export const inventoryItemsService = {
       productIds?: Set<string>;
       batchId?: string;
       note?: string | null;
+      earliestBatchFirst?: boolean;
     },
   ): Promise<TakenItem[]> {
     const serials = normalizeSerials(input.serials);
@@ -315,6 +346,22 @@ export const inventoryItemsService = {
     }
     failOn(problems);
     const ids = items.map((i) => i.id);
+    if (input.earliestBatchFirst) {
+      const blocked = new Set<string>();
+      for (const row of await inventoryItemsService.earlierBatches(manager, ids, input.date)) {
+        if (blocked.has(row.serial)) continue;
+        blocked.add(row.serial);
+        problems.push({
+          serial: row.serial,
+          problem: `is batch ${row.batchNo ?? 'without a batch'}, but batch ${row.firstBatchNo}${
+            row.firstExpiryDate ? ` (expires ${row.firstExpiryDate})` : ''
+          } goes first: ${row.serials.length} still in stock (${row.serials.slice(0, 5).join(', ')}${
+            row.serials.length > 5 ? ', …' : ''
+          })`,
+        });
+      }
+      failOn(problems);
+    }
     const sets: string[] = ['status = $2', 'updated_by = $3', 'updated_at = now()'];
     const params: unknown[] = [ids, input.to, actor.userId];
     if (input.to === 'sold') {
@@ -653,6 +700,17 @@ export const inventoryItemsService = {
       [branchId, ref.id ?? ref.serial?.trim().toUpperCase()],
     )) as Record<string, unknown>[];
     if (!item) throw AppError.notFound('Label');
+    const earlier =
+      item.status === 'in_stock'
+        ? await inventoryItemsService.earlierBatches(AppDataSource.manager, [item.id as string], today())
+        : [];
+    const firstBatch = earlier[0]
+      ? {
+          batchNo: earlier[0].firstBatchNo,
+          expiryDate: earlier[0].firstExpiryDate,
+          serials: earlier.flatMap((e) => e.serials).slice(0, 500),
+        }
+      : null;
     const history = await AppDataSource.query(
       `SELECT e.id, e.type, e.reference_type AS "referenceType", e.reference_id AS "referenceId",
               e.reference_label AS "referenceLabel", e.note, e.created_at AS "createdAt",
@@ -664,7 +722,7 @@ export const inventoryItemsService = {
         ORDER BY e.created_at ASC`,
       [item.id],
     );
-    return { ...item, history };
+    return { ...item, firstBatch, history };
   },
 
   async registerExisting(actor: Actor, branchId: string, input: RegisterLabelsInput) {

@@ -120,7 +120,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
         productId: serum,
         qty: '20',
         batch: 'B-002',
-        expiryDate: '2027-01-01',
+        expiryDate: '2029-01-01',
         labels: 'existing',
         firstSerial: 'DSM-000500',
       },
@@ -197,6 +197,20 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
 
     const elsewhere = await api('get', `/branch/inventory/items/serial/${serials[30]}`, islamabadAdmin);
     expect(elsewhere.status).toBe(404);
+  });
+
+  it('sells the batch that expires first before a later one', async () => {
+    const later = await sell({ items: [{ productId: serum, qty: '1' }], serials: ['DSM-000500'] });
+    expect(later.status).toBe(422);
+    expect(later.body.error.details.serials[0].problem).toContain(
+      'batch B-001 (expires 2028-09-01) goes first',
+    );
+
+    const lookup = await api('get', '/branch/inventory/items/serial/DSM-000500');
+    expect(lookup.body.data.firstBatch).toMatchObject({ batchNo: 'B-001', expiryDate: '2028-09-01' });
+    expect(lookup.body.data.firstBatch.serials).toContain(serials[30]);
+    const first = await api('get', `/branch/inventory/items/serial/${serials[30]}`);
+    expect(first.body.data.firstBatch).toBeNull();
   });
 
   it('refuses to sell a piece of a batch with less than 45 days left', async () => {
@@ -384,7 +398,7 @@ describe('labelled pieces: DSM serials from stock in to sale and return', () => 
     const b001 = res.body.data.find((g: { batchNo: string }) => g.batchNo === 'B-001');
     expect(b001).toMatchObject({ total: 100, firstSerial: 'DSM-000001', lastSerial: 'DSM-000100' });
     expect(b001.inStock + b001.sold + b001.other).toBe(100);
-    expect(res.body.data.map((g: { batchNo: string }) => g.batchNo)).toEqual(['OLD', 'B-002', 'B-001']);
+    expect(res.body.data.map((g: { batchNo: string }) => g.batchNo)).toEqual(['OLD', 'B-001', 'B-002']);
 
     const one = await api('get', `/branch/inventory/items?batchId=${b001.batchId}&pageSize=100`);
     expect(one.body.meta.total).toBe(100);

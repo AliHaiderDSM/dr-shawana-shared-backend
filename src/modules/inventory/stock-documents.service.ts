@@ -331,6 +331,7 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
       date: record.date,
       sellableOnly: true,
       productIds: new Set([record.productId]),
+      earliestBatchFirst: true,
     });
     await stockLedger.apply(
       manager,
