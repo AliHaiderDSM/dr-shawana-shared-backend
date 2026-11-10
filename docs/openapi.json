@@ -35749,9 +35749,11 @@
             "schema": {
               "type": "string",
               "format": "date",
-              "example": "2026-09-30"
+              "example": "2026-09-30",
+              "description": "Left out with to: every date"
             },
-            "required": true,
+            "required": false,
+            "description": "Left out with to: every date",
             "name": "from",
             "in": "query"
           },
@@ -35761,7 +35763,7 @@
               "format": "date",
               "example": "2026-09-30"
             },
-            "required": true,
+            "required": false,
             "name": "to",
             "in": "query"
           },

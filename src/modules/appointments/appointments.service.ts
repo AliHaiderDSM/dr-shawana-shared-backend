@@ -294,7 +294,7 @@ export const appointmentsService = {
 
   async summary(viewer: Viewer, query: AppointmentSummaryQuery) {
     const doctorId = viewer.doctorId ?? query.doctorId ?? null;
-    const params: unknown[] = [query.from, query.to, viewer.branchId, doctorId];
+    const params: unknown[] = [query.from ?? null, query.to ?? null, viewer.branchId, doctorId];
     const where: string[] = [];
     const add = (sql: string, value: unknown) => {
       params.push(value);
@@ -319,12 +319,13 @@ export const appointmentsService = {
                 WHERE a.repeat_no IS NULL AND NOT EXISTS (
                   SELECT 1 FROM appointments e
                    WHERE e.patient_id = a.patient_id AND e.deleted_at IS NULL AND e.status <> 'cancelled'
-                     AND e.date < $1::date)
+                     AND $1::date IS NOT NULL AND e.date < $1::date)
               )::int AS "newPatients"
          FROM appointments a
          JOIN patients p ON p.id = a.patient_id
         WHERE a.deleted_at IS NULL AND a.branch_id = $3
-          AND a.date BETWEEN $1::date AND $2::date
+          AND ($1::date IS NULL OR a.date >= $1::date)
+          AND ($2::date IS NULL OR a.date <= $2::date)
           AND ($4::uuid IS NULL OR a.doctor_id = $4::uuid)
           ${where.map((w) => `AND ${w}`).join(' ')}`,
       params,

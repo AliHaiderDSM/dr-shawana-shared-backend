@@ -158,6 +158,9 @@ describe('repeat visits', () => {
     expect(summary.status).toBe(200);
     expect(summary.body.data).toEqual({ appointments: 3, repeats: 2, newPatients: 2 });
 
+    const ever = await api('get', '/branch/appointments/summary', frontDesk);
+    expect(ever.body.data).toEqual({ appointments: 3, repeats: 2, newPatients: 2 });
+
     const later = await api('get', '/branch/appointments/summary?from=2026-10-25&to=2026-11-30', frontDesk);
     expect(later.body.data).toEqual({ appointments: 1, repeats: 2, newPatients: 0 });
 

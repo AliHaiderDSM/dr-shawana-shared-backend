@@ -180,8 +180,8 @@ export const appointmentListQuerySchema = listQuerySchema(
 
 export const appointmentSummaryQuerySchema = z
   .object({
-    from: dateInput,
-    to: dateInput,
+    from: dateInput.optional().openapi({ description: 'Left out with to: every date' }),
+    to: dateInput.optional(),
     doctorId: z.uuid().optional(),
     branchId: z.uuid().optional(),
     status: z
@@ -194,7 +194,10 @@ export const appointmentSummaryQuerySchema = z
     repeat: z.enum(['true', 'false']).optional(),
     search: z.string().trim().max(100).optional(),
   })
-  .refine((v) => v.to >= v.from, { message: '"to" must not be before "from"', path: ['to'] });
+  .refine((v) => !v.from || !v.to || v.to >= v.from, {
+    message: '"to" must not be before "from"',
+    path: ['to'],
+  });
 
 export const appointmentSummarySchema = registry.register(
   'AppointmentSummary',
