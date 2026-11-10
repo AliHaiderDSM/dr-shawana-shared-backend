@@ -16,6 +16,7 @@ import { patientRequestsService } from './patient-requests.service';
 interface AppointmentRow {
   id: string;
   appointmentNo: number;
+  repeatNo: number | null;
   date: string;
   timeFrom: string;
   timeTo: string;
@@ -32,7 +33,7 @@ interface AppointmentRow {
 }
 
 const APPOINTMENT_SELECT = `
-  SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
+  SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", a.date::text AS date, a.time_from::text AS "timeFrom",
          a.time_to::text AS "timeTo", a.mode, a.visit_type AS "visitType", a.status,
          d.display_name AS "doctorName", d.details AS "doctorDetails",
          b.name AS "branchName", b.city AS "branchCity", b.address AS "branchAddress", b.phone AS "branchPhone",
@@ -51,6 +52,7 @@ function toAppointment(row: AppointmentRow) {
   return {
     id: row.id,
     appointmentNo: row.appointmentNo,
+    repeatNo: row.repeatNo,
     date: row.date,
     timeFrom: row.timeFrom.slice(0, 5),
     timeTo: row.timeTo.slice(0, 5),

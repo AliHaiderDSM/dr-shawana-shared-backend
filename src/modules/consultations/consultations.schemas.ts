@@ -61,6 +61,7 @@ const consultationSummarySchema = z.object({
     .object({
       id: z.uuid(),
       appointmentNo: z.number().int(),
+      repeatNo: z.number().int().nullable(),
       date: z.iso.date(),
       timeFrom: z.string(),
       visitType: z.string(),
@@ -305,6 +306,7 @@ export const consultationHistorySchema = registry.register(
       z.object({
         id: z.uuid(),
         appointmentNo: z.number().int(),
+        repeatNo: z.number().int().nullable(),
         date: z.iso.date(),
         visitType: z.string(),
         status: z.string(),
@@ -330,6 +332,7 @@ export const consultationHistorySchema = registry.register(
     previousSymptoms: z
       .object({
         appointmentNo: z.number().int(),
+        repeatNo: z.number().int().nullable(),
         date: z.iso.date(),
         symptoms: z.array(z.string()),
         severity: z.record(z.string(), z.number()),
@@ -341,6 +344,7 @@ export const consultationHistorySchema = registry.register(
 const previousEntrySchema = z.object({
   consultationId: z.uuid(),
   appointmentNo: z.number().int(),
+  repeatNo: z.number().int().nullable(),
   date: z.string(),
   data: z.record(z.string(), z.unknown()),
 });

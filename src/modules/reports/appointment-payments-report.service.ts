@@ -70,7 +70,7 @@ export const appointmentPaymentsReportService = {
          JOIN branches b ON b.id = a.branch_id
          LEFT JOIN patients p ON p.id = a.patient_id
          LEFT JOIN doctors d ON d.id = a.doctor_id
-        WHERE a.deleted_at IS NULL AND ($3::uuid IS NULL OR a.branch_id = $3::uuid)
+        WHERE a.deleted_at IS NULL AND a.repeat_no IS NULL AND ($3::uuid IS NULL OR a.branch_id = $3::uuid)
           AND (${BOOKED_ON} BETWEEN $1::date AND $2::date
             OR a.date BETWEEN $1::date AND $2::date
             OR EXISTS (SELECT 1 FROM appointment_payments y WHERE y.appointment_id = a.id AND y.deleted_at IS NULL

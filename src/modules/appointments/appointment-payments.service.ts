@@ -184,7 +184,7 @@ function applyReportFilters(
   if (query.city) qb.andWhere('a.patientCity ILIKE :city', { city: escapeLike(query.city) });
   if (query.search) {
     qb.andWhere(
-      `(p.name ILIKE :term OR p.phone ILIKE :term OR CONCAT('APP#', a.appointment_no) ILIKE :term)`,
+      `(p.name ILIKE :term OR p.phone ILIKE :term OR CONCAT('APP#', a.appointment_no, CASE WHEN a.repeat_no IS NULL THEN '' ELSE CONCAT('.', a.repeat_no) END) ILIKE :term)`,
       {
         term: `%${escapeLike(query.search)}%`,
       },
@@ -208,6 +208,7 @@ function reportBase(viewer: Viewer, query: PaymentReportQuery) {
 interface ReportRow {
   appointmentId: string;
   appointmentNo: number;
+  repeatNo: number | null;
   date: string;
   timeFrom: string;
   timeTo: string;
@@ -240,7 +241,9 @@ export const appointmentPaymentsService = {
   ) {
     if (proof && input.method !== 'online')
       throw AppError.badRequest('Only online payments take a screenshot');
-    await getAppointmentRecord(viewer, appointmentId);
+    const target = await getAppointmentRecord(viewer, appointmentId);
+    if (target.repeatNo !== null)
+      throw AppError.badRequest('A repeat visit has no fee, so it takes no payments');
     const uploaded = proof ? await uploadProofs(viewer.branchId, [proof]) : [];
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
@@ -379,6 +382,7 @@ export const appointmentPaymentsService = {
     const rows = await reportBase(viewer, query)
       .select('a.id', 'appointmentId')
       .addSelect('a.appointment_no', 'appointmentNo')
+      .addSelect('a.repeat_no', 'repeatNo')
       .addSelect(`to_char(a.date, 'YYYY-MM-DD')`, 'date')
       .addSelect('a.time_from', 'timeFrom')
       .addSelect('a.time_to', 'timeTo')
@@ -412,6 +416,7 @@ export const appointmentPaymentsService = {
       items: rows.map((r) => ({
         appointmentId: r.appointmentId,
         appointmentNo: Number(r.appointmentNo),
+        repeatNo: r.repeatNo === null ? null : Number(r.repeatNo),
         date: r.date,
         timeFrom: r.timeFrom,
         timeTo: r.timeTo,

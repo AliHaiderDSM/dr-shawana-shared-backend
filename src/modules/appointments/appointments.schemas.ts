@@ -89,12 +89,24 @@ export const createAppointmentSchema = registry.register(
         .optional()
         .openapi({ description: 'Optional medical record; its files go in "medicalRecordFiles"' }),
       payments: z.array(paymentInputSchema).max(10).default([]),
+      repeatOfId: z.uuid().optional().openapi({
+        description:
+          'Book a repeat visit of an earlier completed appointment of the same patient. It is numbered APP#<number>.<repeat>, its fee is 0 and it takes no payments.',
+      }),
     })
     .refine((v) => (v.patientId ? 1 : 0) + (v.patient ? 1 : 0) === 1, {
       message: 'Provide either patientId or patient',
       path: ['patientId'],
     })
-    .refine(timeRangeValid, timeRangeIssue),
+    .refine(timeRangeValid, timeRangeIssue)
+    .refine((v) => !v.repeatOfId || v.patientId, {
+      message: 'A repeat visit is for an existing patient',
+      path: ['patientId'],
+    })
+    .refine((v) => !v.repeatOfId || v.payments.length === 0, {
+      message: 'A repeat visit has no fee, so it takes no payments',
+      path: ['payments'],
+    }),
 );
 
 export const updateAppointmentSchema = registry.register(
@@ -160,7 +172,29 @@ export const appointmentListQuerySchema = listQuerySchema(
   createdOn: dateInput
     .optional()
     .openapi({ description: 'Booking date (posSoft "appointment date" filter)' }),
+  repeat: z
+    .enum(['true', 'false'])
+    .optional()
+    .openapi({ description: 'true: only repeat visits, false: only main appointments' }),
 });
+
+export const appointmentSummaryQuerySchema = z
+  .object({
+    from: dateInput,
+    to: dateInput,
+    doctorId: z.uuid().optional(),
+    branchId: z.uuid().optional(),
+  })
+  .refine((v) => v.to >= v.from, { message: '"to" must not be before "from"', path: ['to'] });
+
+export const appointmentSummarySchema = registry.register(
+  'AppointmentSummary',
+  z.object({
+    appointments: z.number().int().openapi({ description: 'Main appointments, repeats left out' }),
+    repeats: z.number().int().openapi({ description: 'Repeat visits like APP#4.1' }),
+    newPatients: z.number().int().openapi({ description: 'Patients whose first visit falls in the period' }),
+  }),
+);
 
 export const calendarQuerySchema = z
   .object({
@@ -237,6 +271,12 @@ export const paymentSchema = registry.register(
 const appointmentBase = {
   id: z.uuid(),
   appointmentNo: z.number().int().openapi({ description: 'Shown as APP#<number>' }),
+  repeatNo: z
+    .number()
+    .int()
+    .nullable()
+    .openapi({ description: 'Set on a repeat visit, shown as APP#<appointmentNo>.<repeatNo>' }),
+  repeatOfId: z.uuid().nullable().openapi({ description: 'The appointment this visit repeats' }),
   branchId: z.uuid(),
   patientId: z.uuid(),
   patient: z
@@ -313,6 +353,7 @@ export const calendarEntrySchema = registry.register(
   z.object({
     id: z.uuid(),
     appointmentNo: z.number().int(),
+    repeatNo: z.number().int().nullable(),
     date: z.iso.date(),
     timeFrom: z.string(),
     timeTo: z.string(),
@@ -329,6 +370,7 @@ export const paymentReportRowSchema = registry.register(
   z.object({
     appointmentId: z.uuid(),
     appointmentNo: z.number().int(),
+    repeatNo: z.number().int().nullable(),
     date: z.iso.date(),
     timeFrom: z.string(),
     timeTo: z.string(),
@@ -348,6 +390,7 @@ export type UpdateAppointmentInput = z.output<typeof updateAppointmentSchema>;
 export type AppointmentStatusInput = z.output<typeof appointmentStatusSchema>;
 export type AppointmentListQuery = z.output<typeof appointmentListQuerySchema>;
 export type CalendarQuery = z.output<typeof calendarQuerySchema>;
+export type AppointmentSummaryQuery = z.output<typeof appointmentSummaryQuerySchema>;
 export type PaymentInput = z.output<typeof paymentInputSchema>;
 export type UpdatePaymentInput = z.output<typeof updatePaymentSchema>;
 export type RefundInput = z.output<typeof refundInputSchema>;
@@ -408,6 +451,18 @@ registry.registerPath({
   request: { query: appointmentListQuerySchema },
   responses: {
     200: { description: 'Page', ...jsonContent(pageEnvelope(appointmentSchema)) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...appointmentDocs,
+  method: 'get',
+  path: '/branch/appointments/summary',
+  summary: 'Counts for a period: main appointments, repeat visits and new patients (cancelled left out)',
+  request: { query: appointmentSummaryQuerySchema },
+  responses: {
+    200: { description: 'Counts', ...jsonContent(dataEnvelope(appointmentSummarySchema)) },
     ...errorResponses,
   },
 });

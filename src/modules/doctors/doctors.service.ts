@@ -220,6 +220,7 @@ export const doctorsService = {
     return rows.map((a) => ({
       appointmentId: a.id,
       appointmentNo: a.appointmentNo,
+      repeatNo: a.repeatNo,
       timeFrom: a.timeFrom,
       timeTo: a.timeTo,
       status: a.status,

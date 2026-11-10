@@ -26,6 +26,7 @@ import { appointmentRefundsService } from './appointment-refunds.service';
 import {
   appointmentListQuerySchema,
   appointmentStatusSchema,
+  appointmentSummaryQuerySchema,
   attachmentParamsSchema,
   calendarQuerySchema,
   createAppointmentSchema,
@@ -77,6 +78,18 @@ appointmentsRouter.get(
       validQuery(req, appointmentListQuerySchema),
     );
     sendOk(res, items, meta);
+  },
+);
+
+appointmentsRouter.get(
+  `${path}/summary`,
+  can('view'),
+  validate({ query: appointmentSummaryQuerySchema }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await appointmentsService.summary(await viewerOf(req), validQuery(req, appointmentSummaryQuerySchema)),
+    );
   },
 );
 

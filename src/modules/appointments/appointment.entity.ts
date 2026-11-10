@@ -1,4 +1,4 @@
-import { Check, Column, Entity, Generated, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Check, Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { type Decimal } from 'decimal.js';
 import { BranchScopedEntity } from '../../database/branch-scoped.entity';
 import { moneyColumn } from '../../database/transformers';
@@ -20,12 +20,33 @@ export type AppointmentSource = (typeof APPOINTMENT_SOURCES)[number];
 
 @Entity('appointments')
 @Index(['branchId', 'doctorId', 'date'])
-@Index('UQ_appointments_number', ['appointmentNo'], { unique: true })
+@Index('UQ_appointments_number', ['appointmentNo'], { unique: true, where: '"repeat_no" IS NULL' })
+@Index('UQ_appointments_repeat_number', ['appointmentNo', 'repeatNo'], {
+  unique: true,
+  where: '"repeat_no" IS NOT NULL',
+})
+@Check(
+  'CHK_appointments_repeat',
+  '("repeat_of_id" IS NULL) = ("repeat_no" IS NULL) AND ("repeat_no" IS NULL OR "repeat_no" > 0)',
+)
 @Check('CHK_appointments_time_range', `"time_to" > "time_from"`)
 export class Appointment extends BranchScopedEntity {
-  @Column({ name: 'appointment_no', type: 'integer' })
-  @Generated('increment')
+  @Column({
+    name: 'appointment_no',
+    type: 'integer',
+    default: () => "nextval('appointments_appointment_no_seq')",
+  })
   appointmentNo: number;
+
+  @Column({ name: 'repeat_of_id', type: 'uuid', nullable: true })
+  repeatOfId: string | null;
+
+  @ManyToOne(() => Appointment, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'repeat_of_id' })
+  repeatOf?: Appointment | null;
+
+  @Column({ name: 'repeat_no', type: 'smallint', nullable: true })
+  repeatNo: number | null;
 
   @Index()
   @Column({ name: 'patient_id', type: 'uuid' })

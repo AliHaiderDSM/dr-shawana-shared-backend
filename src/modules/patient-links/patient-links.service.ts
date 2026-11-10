@@ -123,6 +123,7 @@ async function publicForm(appointmentId: string | null) {
   return {
     form: {
       appointmentNo: appointment.appointmentNo,
+      repeatNo: appointment.repeatNo,
       date: appointment.date,
       defaults: {
         name: appointment.patient?.name ?? null,
@@ -172,6 +173,7 @@ export const patientLinksService = {
       expiresAt,
       appointments: visits.map((a) => ({
         appointmentNo: a.appointmentNo,
+        repeatNo: a.repeatNo,
         date: a.date,
         timeFrom: a.timeFrom,
         timeTo: a.timeTo,

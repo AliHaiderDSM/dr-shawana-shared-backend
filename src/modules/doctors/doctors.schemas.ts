@@ -85,6 +85,7 @@ const doctorOptionSchema = z.object({
 const slotSchema = z.object({
   appointmentId: z.uuid(),
   appointmentNo: z.number().int(),
+  repeatNo: z.number().int().nullable(),
   timeFrom: z.string().openapi({ example: '10:00:00' }),
   timeTo: z.string().openapi({ example: '10:30:00' }),
   status: z.enum(APPOINTMENT_STATUSES),

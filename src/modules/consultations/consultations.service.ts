@@ -106,6 +106,7 @@ function toSummary(c: Consultation) {
       ? {
           id: c.appointment.id,
           appointmentNo: c.appointment.appointmentNo,
+          repeatNo: c.appointment.repeatNo,
           date: c.appointment.date,
           timeFrom: c.appointment.timeFrom,
           visitType: c.appointment.visitType,
@@ -272,7 +273,7 @@ export const consultationsService = {
     const date = consultation.appointment?.date ?? null;
     const [visits, prescriptions, previous] = await Promise.all([
       AppDataSource.query(
-        `SELECT a.id, a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
+        `SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", to_char(a.date, 'YYYY-MM-DD') AS date,
                 a.visit_type AS "visitType", a.status, a.issues, a.remark, d.display_name AS doctor,
                 NULLIF(TRIM(cs.data->>'plan'), '') AS plan, (a.id = $2) AS "thisVisit"
            FROM appointments a
@@ -297,7 +298,7 @@ export const consultationsService = {
         { id: string; prescriptionNo: number; date: string; doctor: string | null; thisVisit: boolean }[]
       >,
       AppDataSource.query(
-        `SELECT cs.data, a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date
+        `SELECT cs.data, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", to_char(a.date, 'YYYY-MM-DD') AS date
            FROM consultation_sections cs
            JOIN consultations c ON c.id = cs.consultation_id AND c.deleted_at IS NULL
            JOIN appointments a ON a.id = c.appointment_id
@@ -306,7 +307,9 @@ export const consultationsService = {
           ORDER BY a.date DESC, a.time_from DESC
           LIMIT 1`,
         [consultation.patientId, id, date],
-      ) as Promise<{ data: Record<string, unknown>; appointmentNo: number; date: string }[]>,
+      ) as Promise<
+        { data: Record<string, unknown>; appointmentNo: number; repeatNo: number | null; date: string }[]
+      >,
     ]);
     return {
       visits,
@@ -318,6 +321,7 @@ export const consultationsService = {
       previousSymptoms: previous[0]
         ? {
             appointmentNo: previous[0].appointmentNo,
+            repeatNo: previous[0].repeatNo,
             date: previous[0].date,
             symptoms: (previous[0].data.symptoms as string[] | undefined) ?? [],
             severity: (previous[0].data.severity as Record<string, number> | undefined) ?? {},
@@ -330,7 +334,7 @@ export const consultationsService = {
     const consultation = await getConsultation(viewer, id);
     const date = consultation.appointment?.date ?? null;
     const rows = (await AppDataSource.query(
-      `SELECT cs.section_key AS key, cs.data, c.id AS "consultationId", a.appointment_no AS "appointmentNo",
+      `SELECT cs.section_key AS key, cs.data, c.id AS "consultationId", a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo",
               to_char(a.date, 'YYYY-MM-DD') AS date, c.discuss_topics AS "discussTopics",
               c.major_complaint AS "majorComplaint", c.current_medications AS "currentMedications"
          FROM consultation_sections cs
@@ -346,6 +350,7 @@ export const consultationsService = {
       data: Record<string, unknown>;
       consultationId: string;
       appointmentNo: number;
+      repeatNo: number | null;
       date: string;
       discussTopics: string | null;
       majorComplaint: string | null;
@@ -366,6 +371,7 @@ export const consultationsService = {
       list.push({
         consultationId: row.consultationId,
         appointmentNo: row.appointmentNo,
+        repeatNo: row.repeatNo,
         date: row.date,
         data: { ...row.data, ...shared },
       });

@@ -123,6 +123,7 @@ const phoneCheckSchema = z.object({
 const summaryAppointmentSchema = z.object({
   id: z.uuid(),
   appointmentNo: z.number().int(),
+  repeatNo: z.number().int().nullable(),
   date: z.iso.date(),
   timeFrom: z.string(),
   timeTo: z.string(),

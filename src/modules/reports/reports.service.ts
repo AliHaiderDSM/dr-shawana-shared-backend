@@ -411,7 +411,7 @@ export const reportsService = {
       );
     const methodParam = f.params.length + 1;
     const rows = await query(
-      `SELECT b.code AS branch, 'APP#' || a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
+      `SELECT b.code AS branch, 'APP#' || a.appointment_no || COALESCE('.' || a.repeat_no, '') AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
               to_char(a.time_from, 'HH24:MI') AS "timeFrom", to_char(a.time_to, 'HH24:MI') AS "timeTo",
               p.name AS patient, p.phone, d.display_name AS doctor, a.mode, a.visit_type AS "visitType", a.status,
               a.patient_city AS city, p.bhrt_status AS "bhrtStatus", a.issues,
@@ -467,7 +467,7 @@ export const reportsService = {
       .when(q.method, 'y.method = ?', q.method)
       .when(q.accountSheetId, 'y.account_sheet_id = ?', q.accountSheetId);
     const rows = await query(
-      `SELECT b.code AS branch, 'APP#' || a.appointment_no AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
+      `SELECT b.code AS branch, 'APP#' || a.appointment_no || COALESCE('.' || a.repeat_no, '') AS "appointmentNo", to_char(a.date, 'YYYY-MM-DD') AS date,
               p.name AS patient, p.phone, d.display_name AS doctor, a.mode, a.status, a.patient_city AS city,
               string_agg(DISTINCT y.method::text, ', ') AS methods,
               to_char(MAX(y.date), 'YYYY-MM-DD') AS "lastPaymentDate", SUM(y.amount)::numeric(12,2)::text AS amount

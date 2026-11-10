@@ -57,6 +57,7 @@ function summaryAppointment(a: Appointment, received: Map<string, string>) {
   return {
     id: a.id,
     appointmentNo: a.appointmentNo,
+    repeatNo: a.repeatNo,
     date: a.date,
     timeFrom: a.timeFrom,
     timeTo: a.timeTo,

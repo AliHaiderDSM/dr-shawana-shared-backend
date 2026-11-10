@@ -37,6 +37,7 @@ import { type AppointmentPayment } from './appointment-payment.entity';
 import {
   type AppointmentListQuery,
   type AppointmentStatusInput,
+  type AppointmentSummaryQuery,
   type CalendarQuery,
   type CreateAppointmentInput,
   type UpdateAppointmentInput,
@@ -155,6 +156,34 @@ async function assertNoOverlap(
   }
 }
 
+async function repeatTarget(manager: EntityManager, branchId: string, repeatOfId: string, patientId: string) {
+  const picked = await appointments
+    .query(branchId, manager)
+    .andWhere('a.id = :id', { id: repeatOfId })
+    .getOne();
+  if (!picked) throw AppError.notFound('Appointment to repeat');
+  const rootId = picked.repeatOfId ?? picked.id;
+  const [root] = (await manager.query(
+    `SELECT id, appointment_no AS "appointmentNo", patient_id AS "patientId", status::text AS status
+       FROM appointments WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+    [rootId],
+  )) as { id: string; appointmentNo: number; patientId: string; status: string }[];
+  if (!root) throw AppError.notFound('Appointment to repeat');
+  if (root.patientId !== patientId)
+    throw AppError.badRequest('A repeat visit must be for the same patient as the first appointment');
+  if (root.status !== 'completed')
+    throw AppError.badRequest('Only a completed appointment can get a repeat visit');
+  const [counter] = (await manager.query(
+    `SELECT COALESCE(MAX(repeat_no), 0) + 1 AS next FROM appointments WHERE repeat_of_id = $1`,
+    [root.id],
+  )) as { next: number }[];
+  return {
+    repeatOfId: root.id,
+    appointmentNo: Number(root.appointmentNo),
+    repeatNo: Number(counter?.next ?? 1),
+  };
+}
+
 function assertOwnDoctor(viewer: Viewer, doctorId: string) {
   if (viewer.doctorId && viewer.doctorId !== doctorId) {
     throw AppError.forbidden('Doctors can only book their own appointments');
@@ -197,9 +226,11 @@ export const appointmentsService = {
     if (query.from) qb.andWhere('a.date >= :from', { from: query.from });
     if (query.to) qb.andWhere('a.date <= :to', { to: query.to });
     if (query.createdOn) qb.andWhere('a.createdAt::date = :createdOn', { createdOn: query.createdOn });
+    if (query.repeat === 'true') qb.andWhere('a.repeatNo IS NOT NULL');
+    if (query.repeat === 'false') qb.andWhere('a.repeatNo IS NULL');
     if (query.search) {
       qb.andWhere(
-        `(patient.name ILIKE :term OR patient.phone ILIKE :term OR CONCAT('APP#', a.appointmentNo) ILIKE :term)`,
+        `(patient.name ILIKE :term OR patient.phone ILIKE :term OR CONCAT('APP#', a.appointmentNo, CASE WHEN a.repeatNo IS NULL THEN '' ELSE CONCAT('.', a.repeatNo) END) ILIKE :term)`,
         { term: `%${escapeLike(query.search)}%` },
       );
     }
@@ -208,6 +239,8 @@ export const appointmentsService = {
       { ...query, search: undefined },
       { sortMap: { date: 'a.date', createdAt: 'a.createdAt', appointmentNo: 'a.appointmentNo' } },
     );
+    if (query.sort.endsWith('appointmentNo'))
+      qb.addOrderBy('a.repeatNo', query.sort.startsWith('-') ? 'DESC' : 'ASC', 'NULLS FIRST');
     if (query.sort.endsWith('date')) qb.addOrderBy('a.timeFrom', query.sort.startsWith('-') ? 'DESC' : 'ASC');
     const [items, total] = await qb.getManyAndCount();
     const meta = pageMeta(query, total);
@@ -243,6 +276,7 @@ export const appointmentsService = {
     return rows.map((a) => ({
       id: a.id,
       appointmentNo: a.appointmentNo,
+      repeatNo: a.repeatNo,
       date: a.date,
       timeFrom: a.timeFrom,
       timeTo: a.timeTo,
@@ -252,6 +286,26 @@ export const appointmentsService = {
       patient: { id: a.patientId, name: a.patient?.name ?? '' },
       doctor: { id: a.doctorId, name: a.doctor?.displayName ?? '' },
     }));
+  },
+
+  async summary(viewer: Viewer, query: AppointmentSummaryQuery) {
+    const doctorId = viewer.doctorId ?? query.doctorId ?? null;
+    const [row] = (await AppDataSource.query(
+      `SELECT COUNT(*) FILTER (WHERE a.repeat_no IS NULL)::int AS appointments,
+              COUNT(*) FILTER (WHERE a.repeat_no IS NOT NULL)::int AS repeats,
+              COUNT(DISTINCT a.patient_id) FILTER (
+                WHERE a.repeat_no IS NULL AND NOT EXISTS (
+                  SELECT 1 FROM appointments e
+                   WHERE e.patient_id = a.patient_id AND e.deleted_at IS NULL AND e.status <> 'cancelled'
+                     AND e.date < $1::date)
+              )::int AS "newPatients"
+         FROM appointments a
+        WHERE a.deleted_at IS NULL AND a.status <> 'cancelled' AND a.branch_id = $3
+          AND a.date BETWEEN $1::date AND $2::date
+          AND ($4::uuid IS NULL OR a.doctor_id = $4::uuid)`,
+      [query.from, query.to, viewer.branchId, doctorId],
+    )) as { appointments: number; repeats: number; newPatients: number }[];
+    return row ?? { appointments: 0, repeats: 0, newPatients: 0 };
   },
 
   get: (viewer: Viewer, id: string) => loadDetail(viewer, id),
@@ -280,6 +334,9 @@ export const appointmentsService = {
           timeTo: input.timeTo,
         };
         await assertNoOverlap(em, branchId, slot);
+        const repeat = input.repeatOfId
+          ? await repeatTarget(em, branchId, input.repeatOfId, patient.id)
+          : null;
 
         const appointment = await appointments.create(
           branchId,
@@ -289,9 +346,10 @@ export const appointmentsService = {
             patientId: patient.id,
             patientCity: patient.city,
             mode: input.mode,
-            visitType: input.visitType,
+            visitType: repeat ? 'followup' : input.visitType,
             issues: input.issues ?? null,
-            fee: (input.fee ?? doctor.consultationFee) as never,
+            fee: (repeat ? '0' : (input.fee ?? doctor.consultationFee)) as never,
+            ...(repeat ?? {}),
             status: 'booked',
             source: 'dashboard',
           },
@@ -343,6 +401,12 @@ export const appointmentsService = {
       if (slot.timeTo <= slot.timeFrom) throw AppError.badRequest('Time to must be after time from');
       await assertNoOverlap(em, viewer.branchId, slot, id);
 
+      if (current.repeatNo !== null) {
+        if (input.patientId && input.patientId !== current.patientId)
+          throw AppError.badRequest('A repeat visit stays with the patient of the first appointment');
+        if (input.fee !== undefined && Number(input.fee) !== 0)
+          throw AppError.badRequest('A repeat visit has no fee');
+      }
       if (input.patientId && input.patientId !== current.patientId) {
         const patient = await patientsService.require(input.patientId, em);
         current.patientCity = patient.city;
@@ -414,6 +478,12 @@ export const appointmentsService = {
     await withTransaction(async (em) => {
       const before = await loadDetail(viewer, id, em);
       const record = await getAppointmentRecord(viewer, id, em);
+      const [repeats] = (await em.query(
+        `SELECT COUNT(*)::int AS count FROM appointments WHERE repeat_of_id = $1 AND deleted_at IS NULL`,
+        [id],
+      )) as { count: number }[];
+      if (repeats && repeats.count > 0)
+        throw AppError.conflict('Delete the repeat visits of this appointment first');
       await appointmentRefundsService.removeAllFor(actor, viewer.branchId, id, em);
       await appointmentPaymentsService.removeAllFor(actor, viewer.branchId, id, em);
       await appointments.softDelete(record, actor.userId, em);

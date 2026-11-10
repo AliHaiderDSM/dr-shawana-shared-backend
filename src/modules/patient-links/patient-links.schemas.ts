@@ -29,6 +29,7 @@ export const publicPatientHistorySchema = registry.register(
     form: z
       .object({
         appointmentNo: z.number().int(),
+        repeatNo: z.number().int().nullable(),
         date: z.iso.date(),
         defaults: z
           .record(z.string(), z.unknown())
@@ -46,6 +47,7 @@ export const publicPatientHistorySchema = registry.register(
     appointments: z.array(
       z.object({
         appointmentNo: z.number().int(),
+        repeatNo: z.number().int().nullable(),
         date: z.iso.date(),
         timeFrom: z.string(),
         timeTo: z.string(),

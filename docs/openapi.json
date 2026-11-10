@@ -4918,6 +4918,12 @@
                   "appointmentNo": {
                     "type": "integer"
                   },
+                  "repeatNo": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
                   "date": {
                     "type": "string",
                     "format": "date"
@@ -4964,6 +4970,7 @@
                 "required": [
                   "id",
                   "appointmentNo",
+                  "repeatNo",
                   "date",
                   "timeFrom",
                   "timeTo",
@@ -4985,6 +4992,12 @@
                     },
                     "appointmentNo": {
                       "type": "integer"
+                    },
+                    "repeatNo": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
                     },
                     "date": {
                       "type": "string",
@@ -5032,6 +5045,7 @@
                   "required": [
                     "id",
                     "appointmentNo",
+                    "repeatNo",
                     "date",
                     "timeFrom",
                     "timeTo",
@@ -5584,6 +5598,11 @@
             },
             "maxItems": 10,
             "default": []
+          },
+          "repeatOfId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Book a repeat visit of an earlier completed appointment of the same patient. It is numbered APP#<number>.<repeat>, its fee is 0 and it takes no payments."
           }
         },
         "required": [
@@ -5716,6 +5735,28 @@
             "maxLength": 100
           }
         }
+      },
+      "AppointmentSummary": {
+        "type": "object",
+        "properties": {
+          "appointments": {
+            "type": "integer",
+            "description": "Main appointments, repeats left out"
+          },
+          "repeats": {
+            "type": "integer",
+            "description": "Repeat visits like APP#4.1"
+          },
+          "newPatients": {
+            "type": "integer",
+            "description": "Patients whose first visit falls in the period"
+          }
+        },
+        "required": [
+          "appointments",
+          "repeats",
+          "newPatients"
+        ]
       },
       "AppointmentRefundInput": {
         "type": "object",
@@ -5880,6 +5921,21 @@
           "appointmentNo": {
             "type": "integer",
             "description": "Shown as APP#<number>"
+          },
+          "repeatNo": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Set on a repeat visit, shown as APP#<appointmentNo>.<repeatNo>"
+          },
+          "repeatOfId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The appointment this visit repeats"
           },
           "branchId": {
             "type": "string",
@@ -6060,6 +6116,8 @@
         "required": [
           "id",
           "appointmentNo",
+          "repeatNo",
+          "repeatOfId",
           "branchId",
           "patientId",
           "patient",
@@ -6179,6 +6237,21 @@
           "appointmentNo": {
             "type": "integer",
             "description": "Shown as APP#<number>"
+          },
+          "repeatNo": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Set on a repeat visit, shown as APP#<appointmentNo>.<repeatNo>"
+          },
+          "repeatOfId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The appointment this visit repeats"
           },
           "branchId": {
             "type": "string",
@@ -6460,6 +6533,8 @@
         "required": [
           "id",
           "appointmentNo",
+          "repeatNo",
+          "repeatOfId",
           "branchId",
           "patientId",
           "patient",
@@ -6499,6 +6574,12 @@
           },
           "appointmentNo": {
             "type": "integer"
+          },
+          "repeatNo": {
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "date": {
             "type": "string",
@@ -6568,6 +6649,7 @@
         "required": [
           "id",
           "appointmentNo",
+          "repeatNo",
           "date",
           "timeFrom",
           "timeTo",
@@ -6587,6 +6669,12 @@
           },
           "appointmentNo": {
             "type": "integer"
+          },
+          "repeatNo": {
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "date": {
             "type": "string",
@@ -6681,6 +6769,7 @@
         "required": [
           "appointmentId",
           "appointmentNo",
+          "repeatNo",
           "date",
           "timeFrom",
           "timeTo",
@@ -6768,6 +6857,12 @@
               "appointmentNo": {
                 "type": "integer"
               },
+              "repeatNo": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "date": {
                 "type": "string",
                 "format": "date"
@@ -6790,6 +6885,7 @@
             },
             "required": [
               "appointmentNo",
+              "repeatNo",
               "date",
               "defaults",
               "sections"
@@ -6814,6 +6910,12 @@
               "properties": {
                 "appointmentNo": {
                   "type": "integer"
+                },
+                "repeatNo": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
                 },
                 "date": {
                   "type": "string",
@@ -6840,6 +6942,7 @@
               },
               "required": [
                 "appointmentNo",
+                "repeatNo",
                 "date",
                 "timeFrom",
                 "timeTo",
@@ -9047,6 +9150,12 @@
               "appointmentNo": {
                 "type": "integer"
               },
+              "repeatNo": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "date": {
                 "type": "string",
                 "format": "date"
@@ -9067,6 +9176,7 @@
             "required": [
               "id",
               "appointmentNo",
+              "repeatNo",
               "date",
               "timeFrom",
               "visitType",
@@ -12251,6 +12361,12 @@
               "appointmentNo": {
                 "type": "integer"
               },
+              "repeatNo": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "date": {
                 "type": "string",
                 "format": "date"
@@ -12271,6 +12387,7 @@
             "required": [
               "id",
               "appointmentNo",
+              "repeatNo",
               "date",
               "timeFrom",
               "visitType",
@@ -12565,6 +12682,12 @@
                 "appointmentNo": {
                   "type": "integer"
                 },
+                "repeatNo": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
                 "date": {
                   "type": "string",
                   "format": "date"
@@ -12608,6 +12731,7 @@
               "required": [
                 "id",
                 "appointmentNo",
+                "repeatNo",
                 "date",
                 "visitType",
                 "status",
@@ -12667,6 +12791,12 @@
               "appointmentNo": {
                 "type": "integer"
               },
+              "repeatNo": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "date": {
                 "type": "string",
                 "format": "date"
@@ -12686,6 +12816,7 @@
             },
             "required": [
               "appointmentNo",
+              "repeatNo",
               "date",
               "symptoms",
               "severity"
@@ -34662,6 +34793,12 @@
                           "appointmentNo": {
                             "type": "integer"
                           },
+                          "repeatNo": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
                           "timeFrom": {
                             "type": "string",
                             "example": "10:00:00"
@@ -34682,6 +34819,7 @@
                         "required": [
                           "appointmentId",
                           "appointmentNo",
+                          "repeatNo",
                           "timeFrom",
                           "timeTo",
                           "status"
@@ -35371,6 +35509,20 @@
             "description": "Booking date (posSoft \"appointment date\" filter)",
             "name": "createdOn",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "true: only repeat visits, false: only main appointments"
+            },
+            "required": false,
+            "description": "true: only repeat visits, false: only main appointments",
+            "name": "repeat",
+            "in": "query"
           }
         ],
         "responses": {
@@ -35519,6 +35671,129 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/AppointmentDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/appointments/summary": {
+      "get": {
+        "tags": [
+          "Appointments"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Counts for a period: main appointments, repeat visits and new patients (cancelled left out)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": true,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "example": "2026-09-30"
+            },
+            "required": true,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "doctorId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AppointmentSummary"
                     }
                   },
                   "required": [
@@ -46191,6 +46466,12 @@
                               "appointmentNo": {
                                 "type": "integer"
                               },
+                              "repeatNo": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
                               "date": {
                                 "type": "string",
                                 "format": "date"
@@ -46211,6 +46492,7 @@
                             "required": [
                               "id",
                               "appointmentNo",
+                              "repeatNo",
                               "date",
                               "timeFrom",
                               "visitType",
@@ -47358,6 +47640,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47369,6 +47657,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47386,6 +47675,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47397,6 +47692,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47414,6 +47710,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47425,6 +47727,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47442,6 +47745,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47453,6 +47762,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47470,6 +47780,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47481,6 +47797,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47498,6 +47815,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47509,6 +47832,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47526,6 +47850,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47537,6 +47867,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47554,6 +47885,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47565,6 +47902,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]
@@ -47582,6 +47920,12 @@
                                   "appointmentNo": {
                                     "type": "integer"
                                   },
+                                  "repeatNo": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
                                   "date": {
                                     "type": "string"
                                   },
@@ -47593,6 +47937,7 @@
                                 "required": [
                                   "consultationId",
                                   "appointmentNo",
+                                  "repeatNo",
                                   "date",
                                   "data"
                                 ]

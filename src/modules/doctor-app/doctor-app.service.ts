@@ -94,7 +94,7 @@ export const doctorAppService = {
       unread: number;
     }[];
     const schedule = (await AppDataSource.query(
-      `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
+      `SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", a.date::text AS date, a.time_from::text AS "timeFrom",
               a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode,
               p.id AS "patientId", p.name AS "patientName", p.phone AS "patientPhone", b.name AS "branchName"
          FROM appointments a
@@ -107,6 +107,7 @@ export const doctorAppService = {
     )) as {
       id: string;
       appointmentNo: number;
+      repeatNo: number | null;
       date: string;
       timeFrom: string;
       timeTo: string;
@@ -140,6 +141,7 @@ export const doctorAppService = {
       schedule: schedule.map((a) => ({
         id: a.id,
         appointmentNo: a.appointmentNo,
+        repeatNo: a.repeatNo,
         date: a.date,
         timeFrom: a.timeFrom.slice(0, 5),
         timeTo: a.timeTo.slice(0, 5),
@@ -170,7 +172,7 @@ export const doctorAppService = {
         : 'a.date < $2::date';
     const order = month || upcoming ? 'ASC' : 'DESC';
     const rows = (await AppDataSource.query(
-      `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
+      `SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", a.date::text AS date, a.time_from::text AS "timeFrom",
               a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode, a.issues,
               p.id AS "patientId", p.name AS "patientName", p.phone AS "patientPhone", b.name AS "branchName"
          FROM appointments a
@@ -184,6 +186,7 @@ export const doctorAppService = {
     )) as {
       id: string;
       appointmentNo: number;
+      repeatNo: number | null;
       date: string;
       timeFrom: string;
       timeTo: string;
@@ -200,6 +203,7 @@ export const doctorAppService = {
       items: rows.slice(0, size).map((a) => ({
         id: a.id,
         appointmentNo: a.appointmentNo,
+        repeatNo: a.repeatNo,
         date: a.date,
         timeFrom: a.timeFrom.slice(0, 5),
         timeTo: a.timeTo.slice(0, 5),
@@ -279,7 +283,7 @@ export const doctorAppService = {
     )) as Record<string, unknown>[];
     const [appointments, prescriptions, items, remarks, records, conversation, blood] = await Promise.all([
       AppDataSource.query(
-        `SELECT a.id, a.appointment_no AS "appointmentNo", a.date::text AS date, a.time_from::text AS "timeFrom",
+        `SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", a.date::text AS date, a.time_from::text AS "timeFrom",
                 a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode, a.issues, a.remark,
                 d.display_name AS doctor, b.name AS branch, (a.doctor_id = $2) AS mine
            FROM appointments a
@@ -308,7 +312,7 @@ export const doctorAppService = {
         [patientId],
       ) as Promise<{ prescriptionId: string } & Record<string, unknown>[]>,
       AppDataSource.query(
-        `SELECT c.id AS "consultationId", a.date::text AS date, a.appointment_no AS "appointmentNo",
+        `SELECT c.id AS "consultationId", a.date::text AS date, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo",
                 d.display_name AS doctor, b.name AS branch, NULLIF(TRIM(cs.data->>'plan'), '') AS remarks,
                 cs.updated_at AS "updatedAt", (c.doctor_id = $2) AS editable
            FROM consultations c
