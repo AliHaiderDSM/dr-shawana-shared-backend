@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Prescription date follows the visit (2026-11-10)
+
+- A prescription written for a consultation without a date takes the date of that appointment, not today. Test in prescriptions.test.ts.
+
 ## Earliest batch goes out first (2026-11-10)
 
 - A scanned label is refused on a sale, an online dispatch or a stock out (stock request sending) while the same branch still has in-stock labels of an earlier batch of that product: sooner expiry first, then the batch added first. Batches too close to expiry to go out and pieces under observation do not count. No override. The error names the batch to use and its labels.

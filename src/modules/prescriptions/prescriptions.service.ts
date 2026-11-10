@@ -155,6 +155,7 @@ async function insertItems(
 async function resolveParties(viewer: Viewer, input: CreatePrescriptionInput, manager: EntityManager) {
   let patientId = input.patientId;
   let doctorId = input.doctorId ?? viewer.doctorId ?? undefined;
+  let visitDate: string | null = null;
   if (input.consultationId) {
     const consultation = await repo(Consultation, manager).findOne({
       where: { id: input.consultationId, branchId: viewer.branchId },
@@ -165,6 +166,11 @@ async function resolveParties(viewer: Viewer, input: CreatePrescriptionInput, ma
     }
     patientId = consultation.patientId;
     doctorId = input.doctorId ?? consultation.doctorId;
+    const [visit] = (await manager.query(
+      `SELECT to_char(date, 'YYYY-MM-DD') AS date FROM appointments WHERE id = $1`,
+      [consultation.appointmentId],
+    )) as { date: string }[];
+    visitDate = visit?.date ?? null;
   }
   if (!doctorId) throw AppError.badRequest('Select the doctor');
   if (viewer.doctorId && doctorId !== viewer.doctorId) {
@@ -173,7 +179,7 @@ async function resolveParties(viewer: Viewer, input: CreatePrescriptionInput, ma
   const doctor = await repo(Doctor, manager).findOne({ where: { id: doctorId, branchId: viewer.branchId } });
   if (!doctor) throw AppError.badRequest('The doctor was not found in this branch');
   await patientsService.require(patientId as string, manager);
-  return { patientId: patientId as string, doctorId };
+  return { patientId: patientId as string, doctorId, visitDate };
 }
 
 export const catalogService = {
@@ -256,7 +262,7 @@ export const prescriptionsService = {
 
   async create(actor: Actor, viewer: Viewer, input: CreatePrescriptionInput) {
     return withTransaction(async (em) => {
-      const { patientId, doctorId } = await resolveParties(viewer, input, em);
+      const { patientId, doctorId, visitDate } = await resolveParties(viewer, input, em);
       const rx = await prescriptions.create(
         viewer.branchId,
         actor.userId,
@@ -264,7 +270,7 @@ export const prescriptionsService = {
           patientId,
           doctorId,
           consultationId: input.consultationId ?? null,
-          date: input.date ?? today(),
+          date: input.date ?? visitDate ?? today(),
           diagnosis: input.diagnosis,
           notes: input.notes,
           planTreatment: input.planTreatment ?? null,

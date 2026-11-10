@@ -162,6 +162,16 @@ describe('prescriptions', () => {
       expect(res.body.data.items[3]).toMatchObject({ catalogItemId: null, groupName: 'Other' });
     });
 
+    it('dates a prescription of a consultation on the visit day when no date is sent', async () => {
+      const res = await api('post', '/branch/prescriptions', doctorUser).send({
+        consultationId,
+        diagnosis: 'Visit day',
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.date).toBe('2026-09-01');
+      await api('delete', `/branch/prescriptions/${res.body.data.id}`, admin);
+    });
+
     it('rejects inactive or foreign items and bad input', async () => {
       const base = { consultationId, diagnosis: 'x' };
       expect(
