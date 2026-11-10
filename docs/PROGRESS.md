@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Family history: Hypertension (2026-11-10)
+
+- medical_history familyHistory conditions accept hypertension.
+
 ## Surgical history: None (2026-11-10)
 
 - medical_history surgeries accept no_surgery, which cannot be sent together with a surgery. Test in consultations.test.ts.

@@ -10580,13 +10580,14 @@
                 "osteoporosis",
                 "hip_fracture",
                 "heart_disease",
+                "hypertension",
                 "diabetes",
                 "early_menopause",
                 "dementia",
                 "other"
               ]
             },
-            "maxItems": 10,
+            "maxItems": 11,
             "default": []
           },
           "familyOther": {
@@ -10630,13 +10631,14 @@
                       "osteoporosis",
                       "hip_fracture",
                       "heart_disease",
+                      "hypertension",
                       "diabetes",
                       "early_menopause",
                       "dementia",
                       "other"
                     ]
                   },
-                  "maxItems": 10,
+                  "maxItems": 11,
                   "default": []
                 },
                 "other": {

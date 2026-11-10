@@ -190,6 +190,7 @@ export const FAMILY_CONDITIONS = [
   'osteoporosis',
   'hip_fracture',
   'heart_disease',
+  'hypertension',
   'diabetes',
   'early_menopause',
   'dementia',
