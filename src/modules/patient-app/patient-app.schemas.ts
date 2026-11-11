@@ -4,6 +4,9 @@ import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
 import { normalizePhone } from '../patients/phone';
 import { PATIENT_REQUEST_CATEGORIES, PATIENT_REQUEST_STATUSES } from './patient-requests.service';
+import { PUBLIC_SECTIONS } from '../patient-links/patient-links.service';
+
+export const intakeParamsSchema = z.object({ key: z.enum(PUBLIC_SECTIONS) });
 
 const phoneInput = z
   .string()
@@ -255,6 +258,37 @@ registry.registerPath({
   summary:
     'Upload up to 5 reports (multipart "files": PDF, JPG, PNG or WebP, 10 MB each) with an optional "title" and "type" (medical_record for lab reports, imaging for scans). They are added to the medical records as uploaded by the patient.',
   responses: { 201: { description: 'Saved', ...jsonContent(dataEnvelope(z.unknown())) }, ...errorResponses },
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'get',
+  path: '/patient/intake',
+  summary:
+    'The medical history form of the patient: basic information, this visit, past diagnoses and symptoms, for the next booked visit (else the latest booked one, else the latest completed one, read-only). editable is false once the doctor completes the visit.',
+  responses: { 200: { description: 'Form', ...jsonContent(dataEnvelope(z.unknown())) }, ...errorResponses },
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'put',
+  path: '/patient/intake/{key}',
+  summary:
+    'Save one part of the medical history form (basic_info, medical_history or additional_symptoms) into the consultation of that visit, where the doctor sees and edits it. Only the patient fields are taken; 409 once the doctor completed the visit.',
+  request: {
+    params: intakeParamsSchema,
+    body: { content: { 'application/json': { schema: z.record(z.string(), z.unknown()) } } },
+  },
+  responses: { 200: { description: 'Form', ...jsonContent(dataEnvelope(z.unknown())) }, ...errorResponses },
+});
+registry.registerPath({
+  ...patientDocs,
+  method: 'get',
+  path: '/patient/medicines',
+  summary:
+    'Medicines and supplements of every prescription, newest first (medicine, supplement, BHRT, GLP, skin and hair care; tests are left out).',
+  responses: {
+    200: { description: 'Medicines', ...jsonContent(dataEnvelope(z.unknown())) },
+    ...errorResponses,
+  },
 });
 registry.registerPath({
   ...patientDocs,

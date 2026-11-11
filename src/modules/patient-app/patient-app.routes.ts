@@ -21,10 +21,12 @@ import {
   updatePatientProfileSchema,
   updatePatientRequestSchema,
   uploadDocumentFieldsSchema,
+  intakeParamsSchema,
 } from './patient-app.schemas';
 import { patientAppService } from './patient-app.service';
 import { patientRequestsService } from './patient-requests.service';
 import { recordScanService } from '../clinical-records/record-scan.service';
+import { patientIntakeService } from './patient-intake.service';
 import { limiter, loginGuard } from '../../lib/rate-limit';
 
 export const patientAppRouter = Router();
@@ -138,6 +140,24 @@ patientAppRouter.get('/patient/prescriptions', async (req, res) => {
 
 patientAppRouter.get('/patient/prescriptions/:id', byId, async (req, res) => {
   sendOk(res, await patientAppService.prescription(patientId(req), idOf(req)));
+});
+
+patientAppRouter.get('/patient/intake', async (req, res) => {
+  sendOk(res, await patientIntakeService.get(patientId(req)));
+});
+
+patientAppRouter.put(
+  '/patient/intake/:key',
+  requestLimiter,
+  validate({ params: intakeParamsSchema }),
+  async (req, res) => {
+    const { key } = validParams(req, intakeParamsSchema);
+    sendOk(res, await patientIntakeService.save(patientId(req), key, req.body));
+  },
+);
+
+patientAppRouter.get('/patient/medicines', async (req, res) => {
+  sendOk(res, await patientIntakeService.medicines(patientId(req)));
 });
 
 patientAppRouter.get('/patient/documents', async (req, res) => {

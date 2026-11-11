@@ -379,14 +379,14 @@ export const consultationsService = {
     return { sections };
   },
 
-  async open(actor: Actor, viewer: Viewer, appointmentId: string) {
+  async open(actor: Actor | null, viewer: Viewer, appointmentId: string) {
     return withTransaction(async (em) => {
       const appointment = await getAppointmentRecord(viewer, appointmentId, em);
       const existing = await consultations.findOneBy(viewer.branchId, { appointmentId }, em);
       if (existing) return { created: false, consultation: await toDetail(viewer, existing.id, em) };
       const created = await consultations.create(
         viewer.branchId,
-        actor.userId,
+        actor?.userId ?? null,
         {
           appointmentId,
           patientId: appointment.patientId,
@@ -410,7 +410,7 @@ export const consultationsService = {
     return toDetail(viewer, existing.id);
   },
 
-  async saveSection(actor: Actor, viewer: Viewer, id: string, key: SectionKey, body: unknown) {
+  async saveSection(actor: Actor | null, viewer: Viewer, id: string, key: SectionKey, body: unknown) {
     const parsed = SECTION_SCHEMAS[key].safeParse(body);
     if (!parsed.success) {
       throw AppError.validation(
@@ -436,7 +436,7 @@ export const consultationsService = {
         await patientsService.update(actor, viewer.branchId, consultation.patientId, patient as never, em);
       }
       if (Object.keys(shared).length > 0) {
-        Object.assign(consultation, shared, { updatedBy: actor.userId });
+        Object.assign(consultation, shared, { updatedBy: actor?.userId ?? null });
         delete consultation.patient;
         delete consultation.doctor;
         delete consultation.appointment;
@@ -447,12 +447,12 @@ export const consultationsService = {
       const before = existing?.data ?? null;
       if (existing) {
         existing.data = data;
-        existing.updatedBy = actor.userId;
+        existing.updatedBy = actor?.userId ?? null;
         await sections.save(existing, em);
       } else {
         await sections.create(
           viewer.branchId,
-          actor.userId,
+          actor?.userId ?? null,
           { consultationId: id, sectionKey: key, data },
           em,
         );

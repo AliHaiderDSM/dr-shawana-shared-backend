@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Patient app: medical history form and medicines (2026-11-11)
+
+- GET /patient/intake and PUT /patient/intake/{basic_info|medical_history|additional_symptoms}: the patient fills the same form as the patient link (basic information, this visit, past diagnoses, symptoms) for the next booked visit (else the latest booked one). It is saved into that visit's consultation, where the doctor sees and edits it. Only the patient fields are taken and merged, so doctor-only answers (surgeries, family history, the STD condition) stay. Once the doctor completes the consultation the form is read-only for the patient (409). Consultation open/save and patient update accept a missing actor for these app writes.
+- GET /patient/medicines: medicines and supplements (medicine, supplement, BHRT, GLP, skin and hair care) of every prescription, newest first; tests are left out.
+- Test in patient-app.test.ts.
+
 ## Public privacy policy and account deletion pages (2026-11-11)
 
 - GET /privacy (also /privacy-policy) and GET /account-deletion (also /delete-account) serve public HTML pages for the mobile app and the Play Store listing, outside /api/v1 and without login. The clinic name, phone, email and address come from company_info and are HTML-escaped. The privacy page states what the app collects, the AI reading of lab reports (Google Gemini or OpenAI), the service providers and the permissions; the deletion page explains the in-app request and what is closed versus kept as medical records. Test in legal.test.ts.

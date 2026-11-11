@@ -20,6 +20,7 @@ describe('patient app', () => {
   let patientId: string;
   let otherPatientId: string;
   let pastAppointmentId: string;
+  let upcomingAppointmentId: string;
   let prescriptionId: string;
   let otherPrescriptionId: string;
   let session: { accessToken: string; refreshToken: string };
@@ -27,7 +28,7 @@ describe('patient app', () => {
   const staff = (method: 'get' | 'post' | 'patch', path: string, who: { id: string }) =>
     request(app)[method](`/api/v1${path}`).set(bearer(who));
   const asPatient = (
-    method: 'get' | 'post' | 'patch' | 'delete',
+    method: 'get' | 'post' | 'put' | 'patch' | 'delete',
     path: string,
     token = session.accessToken,
   ) =>
@@ -73,7 +74,7 @@ describe('patient app', () => {
         })
       ).body.data.id;
     pastAppointmentId = await book(patientId, '2026-09-01');
-    await book(patientId, isoIn(20));
+    upcomingAppointmentId = await book(patientId, isoIn(20));
     const otherAppointment = await book(otherPatientId, '2026-09-02');
     const prescribe = async (appointmentId: string) => {
       const consultationId = (
@@ -417,6 +418,101 @@ describe('patient app', () => {
     const left = (await asPatient('get', '/patient/documents')).body.data as { id: string }[];
     expect(left.map((d) => d.id)).not.toContain(scan.body.data.id);
     expect(left.map((d) => d.id)).toContain(byClinic.body.data.id);
+  });
+
+  it('lets the patient fill the medical history form until the doctor completes the visit', async () => {
+    const empty = await asPatient('get', '/patient/intake');
+    expect(empty.status).toBe(200);
+    expect(empty.body.data).toMatchObject({
+      editable: true,
+      appointment: { id: upcomingAppointmentId },
+      defaults: { name: 'Ayesha', city: 'Lahore' },
+      sections: { basic_info: null, medical_history: null, additional_symptoms: null },
+    });
+
+    const basic = await asPatient('put', '/patient/intake/basic_info').send({
+      name: 'Ayesha',
+      age: 48,
+      city: 'Lahore',
+      country: 'Pakistan',
+      weightKg: 70,
+      heightFeet: 5.4,
+      maritalStatus: 'married',
+      marriedYears: '20',
+      hasKids: 'yes',
+      kidsDetails: '2',
+    });
+    expect(basic.status).toBe(200);
+    expect(basic.body.data.sections.basic_info).toMatchObject({
+      weightKg: 70,
+      heightFeet: 5.4,
+      hasKids: 'yes',
+    });
+
+    const consultation = await staff(
+      'get',
+      `/branch/appointments/${upcomingAppointmentId}/consultation`,
+      doctorUser,
+    );
+    const consultationId = consultation.body.data.id as string;
+    const doctorSave = await request(app)
+      .put(`/api/v1/branch/consultations/${consultationId}/sections/medical_history`)
+      .set(bearer(doctorUser))
+      .send({
+        conditions: ['std'],
+        surgeries: [{ type: 'c_section', year: 2015 }],
+        majorComplaint: 'Flushes',
+      });
+    expect(doctorSave.status).toBe(200);
+
+    const history = await asPatient('put', '/patient/intake/medical_history').send({
+      majorComplaint: 'Hot flushes and poor sleep',
+      currentMedications: 'None',
+      menopauseDiagnosed: 'no',
+      conditions: ['hypothyroidism', 'no_cancer', 'std'],
+      surgeries: [],
+      clinicalNote: 'ignored',
+    });
+    expect(history.status).toBe(200);
+    const saved = history.body.data.sections.medical_history;
+    expect(saved.majorComplaint).toBe('Hot flushes and poor sleep');
+    expect([...saved.conditions].sort()).toEqual(['hypothyroidism', 'no_cancer', 'std']);
+    expect(saved.surgeries).toEqual([{ type: 'c_section', date: null, year: 2015 }]);
+    expect(saved).not.toHaveProperty('clinicalNote');
+
+    const symptoms = await asPatient('put', '/patient/intake/additional_symptoms').send({
+      symptoms: ['hair_loss', 'headaches'],
+    });
+    expect(symptoms.body.data.sections.additional_symptoms.symptoms).toEqual(['hair_loss', 'headaches']);
+
+    const seen = await staff('get', `/branch/consultations/${consultationId}`, doctorUser);
+    expect(seen.body.data.sections.medical_history.data.majorComplaint).toBe('Hot flushes and poor sleep');
+    expect((await asPatient('put', '/patient/intake/plans').send({})).status).toBe(400);
+
+    await staff('post', `/branch/consultations/${consultationId}/status`, doctorUser)
+      .send({ status: 'completed' })
+      .expect(200);
+    const after = await asPatient('get', '/patient/intake');
+    expect(after.body.data).toMatchObject({ editable: true, appointment: { id: pastAppointmentId } });
+    const pastConsultation = await staff(
+      'get',
+      `/branch/appointments/${pastAppointmentId}/consultation`,
+      doctorUser,
+    );
+    await staff('post', `/branch/consultations/${pastConsultation.body.data.id}/status`, doctorUser)
+      .send({ status: 'completed' })
+      .expect(200);
+    const done = await asPatient('get', '/patient/intake');
+    expect(done.body.data).toMatchObject({ editable: false, appointment: { id: upcomingAppointmentId } });
+    expect(done.body.data.sections.medical_history.majorComplaint).toBe('Hot flushes and poor sleep');
+    const locked = await asPatient('put', '/patient/intake/basic_info').send({ name: 'Changed' });
+    expect(locked.status).toBe(409);
+    expect((await asPatient('get', '/patient/medicines')).body.data).toEqual([
+      expect.objectContaining({
+        prescriptionId,
+        items: [expect.objectContaining({ name: 'Vitamin D', category: 'skin_care', dose: '1 daily' })],
+      }),
+    ]);
   });
 
   it('sends requests to management and shows their replies', async () => {

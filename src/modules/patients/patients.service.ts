@@ -146,7 +146,7 @@ export const patientsService = {
   },
 
   async update(
-    actor: Actor,
+    actor: Actor | null,
     branchId: string,
     id: string,
     input: UpdatePatientInput,
@@ -157,7 +157,7 @@ export const patientsService = {
       const before = toPatientDto(patient);
       const phone = input.phone ? phoneFields(input.phone) : null;
       if (phone) await assertPhoneAvailable(phone.phoneLast9, id, em);
-      Object.assign(patient, input, phone ?? {}, { updatedBy: actor.userId });
+      Object.assign(patient, input, phone ?? {}, { updatedBy: actor?.userId ?? null });
       const saved = await patientsRepository.save(patient, em);
       await auditService.record(
         {

@@ -43,7 +43,7 @@ const asObject = (value: unknown) =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 const asList = (value: unknown) => (Array.isArray(value) ? (value as string[]) : []);
 
-function mergeIntake(key: PublicSectionKey, saved: Record<string, unknown>, body: unknown) {
+export function mergeIntake(key: PublicSectionKey, saved: Record<string, unknown>, body: unknown) {
   const next = asObject(body);
   if (key !== 'additional_symptoms') return { ...saved, ...next };
   const publicKeys = PUBLIC_SYMPTOMS as readonly string[];
