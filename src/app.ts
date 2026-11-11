@@ -15,6 +15,7 @@ import { RESOURCES_PATH } from './modules/educational-resources/educational-reso
 import { requestId } from './middleware/requestId';
 import { apiRouter } from './routes';
 import { limiter } from './lib/rate-limit';
+import { legalRouter } from './modules/legal/legal.routes';
 
 export function createApp(): Express {
   const app = express();
@@ -81,6 +82,7 @@ export function createApp(): Express {
   );
 
   app.use('/api/v1', apiRouter);
+  app.use(legalRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Public privacy policy and account deletion pages (2026-11-11)
+
+- GET /privacy (also /privacy-policy) and GET /account-deletion (also /delete-account) serve public HTML pages for the mobile app and the Play Store listing, outside /api/v1 and without login. The clinic name, phone, email and address come from company_info and are HTML-escaped. The privacy page states what the app collects, the AI reading of lab reports (Google Gemini or OpenAI), the service providers and the permissions; the deletion page explains the in-app request and what is closed versus kept as medical records. Test in legal.test.ts.
+
 ## Lab records read by AI on upload, one phone per doctor (2026-11-11)
 
 - New POST /branch/patients/{id}/medical-records/{recordId}/scan (optional fileIds) and POST /patient/documents/{id}/scan (recordScanService): the PDFs and photos of a lab record (up to 5) are read by AI, the clinical summary is saved, and the blood work values go straight into the table on the report date, or the record date when the report shows none. Imaging is skipped. The clients call it right after an upload, so a slow AI answer never fails the upload. Blood work and summaries accept a missing actor for patient uploads.
