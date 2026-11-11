@@ -470,14 +470,28 @@ describe('patient app', () => {
       currentMedications: 'None',
       menopauseDiagnosed: 'no',
       conditions: ['hypothyroidism', 'no_cancer', 'std'],
-      surgeries: [],
+      havingPeriods: 'yes',
+      lastPeriodDate: '2026-10-05',
+      cycle: 'irregular',
+      dub: true,
+      surgeries: [{ type: 'hysterectomy', year: 2019 }],
+      familyHistory: [{ relative: 'mother', conditions: ['breast_cancer', 'hypertension'] }],
+      hasAllergies: 'yes',
+      allergies: 'Penicillin',
       clinicalNote: 'ignored',
     });
     expect(history.status).toBe(200);
     const saved = history.body.data.sections.medical_history;
     expect(saved.majorComplaint).toBe('Hot flushes and poor sleep');
     expect([...saved.conditions].sort()).toEqual(['hypothyroidism', 'no_cancer', 'std']);
-    expect(saved.surgeries).toEqual([{ type: 'c_section', date: null, year: 2015 }]);
+    expect(saved.surgeries).toEqual([{ type: 'hysterectomy', date: null, year: 2019 }]);
+    expect(saved).toMatchObject({
+      lastPeriodDate: '2026-10-05',
+      dub: true,
+      allergies: 'Penicillin',
+      familyRelatives: ['mother'],
+      familyConditions: ['breast_cancer', 'hypertension'],
+    });
     expect(saved).not.toHaveProperty('clinicalNote');
 
     const symptoms = await asPatient('put', '/patient/intake/additional_symptoms').send({
@@ -507,11 +521,25 @@ describe('patient app', () => {
     expect(done.body.data.sections.medical_history.majorComplaint).toBe('Hot flushes and poor sleep');
     const locked = await asPatient('put', '/patient/intake/basic_info').send({ name: 'Changed' });
     expect(locked.status).toBe(409);
-    expect((await asPatient('get', '/patient/medicines')).body.data).toEqual([
-      expect.objectContaining({
-        prescriptionId,
-        items: [expect.objectContaining({ name: 'Vitamin D', category: 'skin_care', dose: '1 daily' })],
-      }),
+    const rx = await staff('post', '/branch/prescriptions', doctorUser).send({
+      consultationId,
+      date: '2026-11-01',
+      diagnosis: 'Iron deficiency',
+      items: [
+        { name: 'Collagen', category: 'supplement', dose: '10 g daily' },
+        { name: 'Ferrous sulphate', category: 'medicine', dose: 'Once daily' },
+        { name: 'Night cream', category: 'skin_care' },
+      ],
+    });
+    expect(rx.status).toBe(201);
+    const medicines = (await asPatient('get', '/patient/medicines')).body.data as {
+      prescriptionId: string;
+      items: { name: string; category: string }[];
+    }[];
+    expect(medicines.map((m) => m.prescriptionId)).toEqual([rx.body.data.id]);
+    expect(medicines[0]!.items.map((i) => [i.category, i.name]).sort()).toEqual([
+      ['medicine', 'Ferrous sulphate'],
+      ['supplement', 'Collagen'],
     ]);
   });
 

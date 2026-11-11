@@ -24,8 +24,8 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ## Patient app: medical history form and medicines (2026-11-11)
 
-- GET /patient/intake and PUT /patient/intake/{basic_info|medical_history|additional_symptoms}: the patient fills the same form as the patient link (basic information, this visit, past diagnoses, symptoms) for the next booked visit (else the latest booked one). It is saved into that visit's consultation, where the doctor sees and edits it. Only the patient fields are taken and merged, so doctor-only answers (surgeries, family history, the STD condition) stay. Once the doctor completes the consultation the form is read-only for the patient (409). Consultation open/save and patient update accept a missing actor for these app writes.
-- GET /patient/medicines: medicines and supplements (medicine, supplement, BHRT, GLP, skin and hair care) of every prescription, newest first; tests are left out.
+- GET /patient/intake and PUT /patient/intake/{basic_info|medical_history|additional_symptoms}: the patient fills the same form as the patient link (basic information, this visit, past diagnoses, symptoms) for the next booked visit (else the latest booked one). It is saved into that visit's consultation, where the doctor sees and edits it. The app shows the whole Medical history section of the dashboard (hormones and periods, conditions, surgeries, family history, medications, allergies and lifestyle), so every field of that section can be sent; unknown keys are dropped and the saved data is merged. Once the doctor completes the consultation the form is read-only for the patient (409). Consultation open/save and patient update accept a missing actor for these app writes.
+- GET /patient/medicines: the medicine and supplement items of every prescription, newest first; other items stay on the prescription.
 - Test in patient-app.test.ts.
 
 ## Public privacy policy and account deletion pages (2026-11-11)

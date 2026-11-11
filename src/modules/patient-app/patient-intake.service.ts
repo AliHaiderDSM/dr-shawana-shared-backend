@@ -8,14 +8,7 @@ import { mergeIntake, PUBLIC_SECTIONS, type PublicSectionKey } from '../patient-
 import { Patient } from '../patients/patient.entity';
 import { Prescription } from '../prescriptions/prescription.entity';
 
-export const MEDICINE_CATEGORIES = [
-  'medicine',
-  'supplement',
-  'bhrt',
-  'glp',
-  'skin_care',
-  'hair_care',
-] as const;
+export const MEDICINE_CATEGORIES = ['medicine', 'supplement'] as const;
 
 const PATIENT_FIELDS: Record<PublicSectionKey, readonly string[]> = {
   basic_info: [
@@ -35,16 +28,36 @@ const PATIENT_FIELDS: Record<PublicSectionKey, readonly string[]> = {
   ],
   medical_history: [
     'majorComplaint',
-    'currentMedications',
+    'hormoneTherapy',
+    'hormonesUsed',
+    'contraception',
+    'havingPeriods',
+    'lastPeriodDate',
+    'cycle',
+    'flow',
+    'dub',
+    'oligomenorrhea',
+    'periodsNote',
     'menopauseDiagnosed',
     'menopauseDiagnosedAge',
     'conditions',
     'otherConditions',
+    'surgeries',
+    'otherSurgery',
+    'familyHistory',
+    'currentMedications',
+    'hasAllergies',
+    'allergies',
+    'alcohol',
+    'smoking',
+    'exercise',
+    'followsDiet',
+    'dietName',
+    'relationship',
+    'relationshipSituation',
   ],
   additional_symptoms: ['symptoms'],
 };
-
-const CLINIC_ONLY_CONDITIONS = ['std'];
 
 interface VisitRow {
   id: string;
@@ -87,17 +100,6 @@ const pick = (key: PublicSectionKey, body: unknown) => {
   return Object.fromEntries(PATIENT_FIELDS[key].filter((f) => f in source).map((f) => [f, source[f]]));
 };
 
-function withClinicConditions(saved: Record<string, unknown>, next: Record<string, unknown>) {
-  if (!Array.isArray(next.conditions)) return next;
-  const kept = (Array.isArray(saved.conditions) ? (saved.conditions as string[]) : []).filter((c) =>
-    CLINIC_ONLY_CONDITIONS.includes(c),
-  );
-  const chosen = (next.conditions as unknown[]).filter(
-    (c): c is string => typeof c === 'string' && !CLINIC_ONLY_CONDITIONS.includes(c),
-  );
-  return { ...next, conditions: [...new Set([...chosen, ...kept])] };
-}
-
 export const patientIntakeService = {
   async get(patientId: string) {
     const [visit, patient] = await Promise.all([
@@ -139,7 +141,7 @@ export const patientIntakeService = {
       throw AppError.conflict('Your doctor has completed this visit, so this form can no longer be changed.');
     }
     const saved = (opened.consultation.sections[key]?.data ?? {}) as Record<string, unknown>;
-    const next = key === 'medical_history' ? withClinicConditions(saved, pick(key, body)) : pick(key, body);
+    const next = pick(key, body);
     await consultationsService.saveSection(
       null,
       viewer,

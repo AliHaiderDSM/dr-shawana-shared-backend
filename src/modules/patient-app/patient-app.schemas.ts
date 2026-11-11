@@ -284,7 +284,7 @@ registry.registerPath({
   method: 'get',
   path: '/patient/medicines',
   summary:
-    'Medicines and supplements of every prescription, newest first (medicine, supplement, BHRT, GLP, skin and hair care; tests are left out).',
+    'Medicines and supplements of every prescription, newest first. Other items (tests, BHRT, GLP, skin and hair care) stay on the prescription.',
   responses: {
     200: { description: 'Medicines', ...jsonContent(dataEnvelope(z.unknown())) },
     ...errorResponses,
