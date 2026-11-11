@@ -39,14 +39,20 @@ async function toDtos(rows: LabReportSummary[]) {
 }
 
 export const labReportSummariesService = {
-  async save(actor: Actor, branchId: string, patientId: string, files: SummaryFile[], read: ReadReport) {
+  async save(
+    actor: Actor | null,
+    branchId: string,
+    patientId: string,
+    files: SummaryFile[],
+    read: ReadReport,
+  ) {
     if (!read.summary) return null;
     const fileName =
       files
         .map((f) => f.name)
         .filter(Boolean)
         .join(', ') || null;
-    const saved = await summaries.create(branchId, actor.userId, {
+    const saved = await summaries.create(branchId, actor?.userId ?? null, {
       patientId,
       testDate: read.testDate,
       fileName: fileName ? fileName.slice(0, 255) : null,

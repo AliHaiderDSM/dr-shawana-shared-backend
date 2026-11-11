@@ -148,7 +148,7 @@ export const bloodWorkService = {
     return { results: rows.map(toBloodDto), dates, tests };
   },
 
-  async add(actor: Actor, branchId: string, patientId: string, input: AddBloodWorkInput) {
+  async add(actor: Actor | null, branchId: string, patientId: string, input: AddBloodWorkInput) {
     return withTransaction(async (em) => {
       await patientsService.require(patientId, em);
       if (input.consultationId) await assertConsultation(branchId, patientId, input.consultationId, em);
@@ -165,7 +165,7 @@ export const bloodWorkService = {
           Object.assign(existing, {
             value: result.value as never,
             unit: result.unit ?? existing.unit,
-            updatedBy: actor.userId,
+            updatedBy: actor?.userId ?? null,
           });
           created.push(await bloodResults.save(existing, em));
           continue;
@@ -173,7 +173,7 @@ export const bloodWorkService = {
         created.push(
           await bloodResults.create(
             branchId,
-            actor.userId,
+            actor?.userId ?? null,
             {
               patientId,
               consultationId: input.consultationId ?? null,

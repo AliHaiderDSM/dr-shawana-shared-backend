@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## Lab records read by AI on upload, one phone per doctor (2026-11-11)
+
+- New POST /branch/patients/{id}/medical-records/{recordId}/scan (optional fileIds) and POST /patient/documents/{id}/scan (recordScanService): the PDFs and photos of a lab record (up to 5) are read by AI, the clinical summary is saved, and the blood work values go straight into the table on the report date, or the record date when the report shows none. Imaging is skipped. The clients call it right after an upload, so a slow AI answer never fails the upload. Blood work and summaries accept a missing actor for patient uploads.
+- A doctor's phone must not match another doctor's (last 9 digits): checked when staff is created or edited and when a doctor edits the own profile (409). The app login by phone now tries every doctor with that phone instead of the first one only. Production has no shared doctor phones today.
+- Tests in patient-app.test.ts and doctor-app.test.ts.
+
 ## Family history: Hypertension (2026-11-10)
 
 - medical_history familyHistory conditions accept hypertension.

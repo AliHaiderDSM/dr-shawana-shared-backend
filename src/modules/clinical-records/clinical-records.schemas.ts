@@ -84,6 +84,30 @@ export const medicalRecordListQuerySchema = z.object({
 
 export const resultParamsSchema = z.object({ id: z.uuid(), resultId: z.uuid() });
 export const recordParamsSchema = z.object({ id: z.uuid(), recordId: z.uuid() });
+
+export const scanRecordBodySchema = z.object({
+  fileIds: z
+    .array(z.uuid())
+    .max(10)
+    .optional()
+    .openapi({
+      description:
+        'Only these files of the record (for example the ones just added). All of them when left out.',
+    }),
+});
+
+export const recordScanSchema = registry.register(
+  'MedicalRecordScan',
+  z.object({
+    scanned: z
+      .boolean()
+      .openapi({ description: 'false when nothing was sent to AI (imaging, no PDF or photo)' }),
+    reason: z.string().nullable(),
+    saved: z.number().int().openapi({ description: 'Blood work values saved' }),
+    dates: z.array(z.iso.date()).openapi({ description: 'Test dates the values were saved on' }),
+    summaryId: z.uuid().nullable(),
+  }),
+);
 export const recordFileParamsSchema = z.object({ id: z.uuid(), recordId: z.uuid(), fileId: z.uuid() });
 
 export type AddBloodWorkInput = z.output<typeof addBloodWorkSchema>;
@@ -394,6 +418,23 @@ registry.registerPath({
   summary: 'Remove one AI report summary',
   request: { params: summaryParamsSchema, query: branchQuerySchema },
   responses: { 204: { description: 'Removed' }, ...errorResponses },
+});
+
+registry.registerPath({
+  ...securedDocs('Clinical records'),
+  method: 'post',
+  path: '/branch/patients/{id}/medical-records/{recordId}/scan',
+  summary:
+    'Read a lab record with AI right after it is uploaded: its PDFs and photos (up to 5) are read, the clinical summary is saved, and the blood work values go straight into the table (on the report date, or the record date when the report shows none). Imaging is skipped.',
+  request: {
+    params: recordParamsSchema,
+    query: branchQuerySchema,
+    body: { content: { 'application/json': { schema: scanRecordBodySchema } } },
+  },
+  responses: {
+    200: { description: 'Scan result', ...jsonContent(dataEnvelope(recordScanSchema)) },
+    ...errorResponses,
+  },
 });
 
 registry.registerPath({

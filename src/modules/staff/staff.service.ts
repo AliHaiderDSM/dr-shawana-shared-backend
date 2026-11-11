@@ -4,6 +4,7 @@ import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { canManageRole, DISPATCH_ROLES, WAREHOUSE_ROLES, type Role } from '../../lib/permissions';
+import { assertDoctorPhoneFree } from './doctor-phone';
 import { auditService } from '../audit/audit.service';
 import { branchesRepository } from '../branches/branches.repository';
 import { Doctor } from '../doctors/doctor.entity';
@@ -137,6 +138,7 @@ export const staffService = {
     afterInsert?: (manager: EntityManager, profile: StaffProfile) => Promise<void>,
   ) {
     await assertUnique(input.email, input.username);
+    if (input.role === 'doctor') await assertDoctorPhoneFree(input.phone);
     const userId = randomUUID();
     const passwordHash = await staffAccounts.hashPassword(input.password);
     return withTransaction(async (em) => {
@@ -210,6 +212,10 @@ export const staffService = {
       const email = input.email ?? profile.email;
       const username = input.username ?? profile.username;
       if (email !== profile.email || username !== profile.username) await assertUnique(email, username, id);
+      const role = input.role ?? profile.role;
+      const phone = input.phone !== undefined ? input.phone : profile.phone;
+      if (role === 'doctor' && (role !== profile.role || phone !== profile.phone))
+        await assertDoctorPhoneFree(phone, id, em);
 
       const before = toStaffDto(profile);
       Object.assign(profile, input, { updatedBy: actor.userId });

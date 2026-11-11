@@ -258,6 +258,31 @@ registry.registerPath({
 });
 registry.registerPath({
   ...patientDocs,
+  method: 'post',
+  path: '/patient/documents/{id}/scan',
+  summary:
+    'Read an uploaded lab report with AI right after the upload. The blood test values go to the doctor’s blood work table and a summary is saved for the doctor. Imaging is skipped.',
+  request: { params: idParamsSchema },
+  responses: {
+    200: {
+      description: 'Scan result',
+      ...jsonContent(
+        dataEnvelope(
+          z.object({
+            scanned: z.boolean(),
+            reason: z.string().nullable(),
+            saved: z.number().int(),
+            dates: z.array(z.iso.date()),
+            summaryId: z.uuid().nullable(),
+          }),
+        ),
+      ),
+    },
+    ...errorResponses,
+  },
+});
+registry.registerPath({
+  ...patientDocs,
   method: 'delete',
   path: '/patient/documents/{id}',
   summary: 'Delete a report the patient uploaded (reports from the clinic cannot be deleted here)',

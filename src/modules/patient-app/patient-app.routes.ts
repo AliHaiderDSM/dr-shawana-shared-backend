@@ -24,6 +24,7 @@ import {
 } from './patient-app.schemas';
 import { patientAppService } from './patient-app.service';
 import { patientRequestsService } from './patient-requests.service';
+import { recordScanService } from '../clinical-records/record-scan.service';
 import { limiter, loginGuard } from '../../lib/rate-limit';
 
 export const patientAppRouter = Router();
@@ -156,6 +157,10 @@ patientAppRouter.post(
     );
   },
 );
+
+patientAppRouter.post('/patient/documents/:id/scan', requestLimiter, byId, async (req, res) => {
+  sendOk(res, await recordScanService.scan(null, patientId(req), idOf(req)));
+});
 
 patientAppRouter.delete('/patient/documents/:id', byId, async (req, res) => {
   await patientAppService.removeDocument(patientId(req), idOf(req));

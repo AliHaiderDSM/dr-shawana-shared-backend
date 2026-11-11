@@ -5,6 +5,7 @@ import { bearer, createBranch, createStaff } from '../../../tests/helpers/fixtur
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
 import { AppDataSource } from '../../database/data-source';
+import { env } from '../../config/env';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -272,6 +273,110 @@ describe('patient app', () => {
     expect(
       (await asPatient('delete', `/patient/documents/${upload.body.data.id}`, other.accessToken)).status,
     ).toBe(404);
+  });
+
+  it('reads an uploaded lab report with AI into the blood work table right after the upload', async () => {
+    const saved = {
+      provider: env.AI_PROVIDER,
+      gemini: env.GEMINI_API_KEY,
+      fallback: env.GEMINI_FALLBACK_MODEL,
+    };
+    env.AI_PROVIDER = 'gemini';
+    env.GEMINI_API_KEY = 'test-key';
+    env.GEMINI_FALLBACK_MODEL = env.GEMINI_MODEL;
+    const answer = (testDate: string | null) =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      testDate,
+                      results: [
+                        { test: 'fsh', value: '38.4', unit: 'mIU/mL', document: 1 },
+                        { test: 'vit_d3', value: '14.2', unit: 'ng/mL', document: 1 },
+                      ],
+                      summary: {
+                        patient: [],
+                        abnormal: [
+                          { test: 'FSH', value: '38.4', unit: 'mIU/mL', range: '3.5 - 12.5', flag: 'high' },
+                        ],
+                        normal: [],
+                        overview: 'FSH is high.',
+                        reviewPoints: [],
+                        unreadable: [],
+                      },
+                      documents: [],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    const fetchMock = jest.spyOn(global, 'fetch').mockImplementation(async () => answer('2026-08-15'));
+    try {
+      const upload = await asPatient('post', '/patient/documents')
+        .field('title', 'Hormones')
+        .attach('files', Buffer.from('%PDF-1.4 fsh'), {
+          filename: 'hormones.pdf',
+          contentType: 'application/pdf',
+        });
+      expect(upload.status).toBe(201);
+      const scan = await asPatient('post', `/patient/documents/${upload.body.data.id}/scan`);
+      expect(scan.status).toBe(200);
+      expect(scan.body.data).toMatchObject({ scanned: true, saved: 2, dates: ['2026-08-15'] });
+      expect(scan.body.data.summaryId).toEqual(expect.any(String));
+
+      const blood = await staff('get', `/branch/patients/${patientId}/blood-work`, frontDesk);
+      expect(blood.body.data.dates).toContain('2026-08-15');
+      expect(
+        blood.body.data.results
+          .filter((r: { testDate: string }) => r.testDate === '2026-08-15')
+          .map((r: { test: string; value: string }) => [r.test, Number(r.value)]),
+      ).toEqual(
+        expect.arrayContaining([
+          ['fsh', 38.4],
+          ['vit_d3', 14.2],
+        ]),
+      );
+      const summaries = await staff('get', `/branch/patients/${patientId}/report-summaries`, frontDesk);
+      expect(summaries.body.data[0]).toMatchObject({ fileName: 'hormones.pdf', valuesFound: 2 });
+
+      const { code } = await issueCode(otherPatientId);
+      const other = (await loginWith('03004445566', code)).body.data;
+      expect(
+        (await asPatient('post', `/patient/documents/${upload.body.data.id}/scan`, other.accessToken)).status,
+      ).toBe(404);
+
+      const imaging = await asPatient('post', '/patient/documents')
+        .field('type', 'imaging')
+        .attach('files', Buffer.from('%PDF-1.4'), { filename: 'us.pdf', contentType: 'application/pdf' });
+      const skipped = await asPatient('post', `/patient/documents/${imaging.body.data.id}/scan`);
+      expect(skipped.body.data).toMatchObject({ scanned: false, saved: 0 });
+
+      fetchMock.mockImplementation(async () => answer(null));
+      const byClinic = await staff('post', `/branch/patients/${patientId}/medical-records`, frontDesk)
+        .field('data', JSON.stringify({ type: 'medical_record', date: '2026-07-01' }))
+        .attach('files', Buffer.from('%PDF-1.4'), { filename: 'old.pdf', contentType: 'application/pdf' });
+      const staffScan = await staff(
+        'post',
+        `/branch/patients/${patientId}/medical-records/${byClinic.body.data.id}/scan`,
+        frontDesk,
+      ).send({ fileIds: [byClinic.body.data.files[0].id] });
+      expect(staffScan.status).toBe(200);
+      expect(staffScan.body.data).toMatchObject({ scanned: true, saved: 2, dates: ['2026-07-01'] });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      env.AI_PROVIDER = saved.provider;
+      env.GEMINI_API_KEY = saved.gemini;
+      env.GEMINI_FALLBACK_MODEL = saved.fallback;
+      fetchMock.mockRestore();
+    }
   });
 
   it('keeps imaging apart and lets the patient delete only own uploads', async () => {

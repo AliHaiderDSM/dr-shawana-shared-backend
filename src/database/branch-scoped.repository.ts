@@ -47,7 +47,12 @@ export function branchScopedRepository<T extends BranchScopedEntity>(entity: Ent
         .where(`${alias}.branchId = :branchId`, { branchId });
     },
 
-    async create(branchId: string, actorId: string, data: Partial<T>, manager?: EntityManager): Promise<T> {
+    async create(
+      branchId: string,
+      actorId: string | null,
+      data: Partial<T>,
+      manager?: EntityManager,
+    ): Promise<T> {
       const repository = repo(entity, manager);
       const saved = await repository.save(repository.create({ ...data, branchId, createdBy: actorId } as T));
       return reload(saved, manager);

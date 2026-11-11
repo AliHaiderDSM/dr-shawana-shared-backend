@@ -31,18 +31,18 @@ type AppLoginInput = z.output<typeof appLoginSchema>;
 
 const looksLikePhone = (value: string) => /^[+\d\s()-]{7,}$/.test(value) && normalizePhone(value) !== null;
 
-async function doctorEmailByPhone(phone: string) {
+async function doctorEmailsByPhone(phone: string) {
   const last9 = normalizePhone(phone)?.last9;
-  if (!last9) return null;
-  const [row] = (await AppDataSource.query(
+  if (!last9) return [];
+  const rows = (await AppDataSource.query(
     `SELECT s.email FROM staff_profiles s
        JOIN doctors d ON d.staff_id = s.id AND d.deleted_at IS NULL
       WHERE s.deleted_at IS NULL AND s.status = 'active' AND s.role = 'doctor'
         AND RIGHT(regexp_replace(COALESCE(s.phone, ''), '\\D', '', 'g'), 9) = $1
-      LIMIT 1`,
+      ORDER BY s.created_at`,
     [last9],
   )) as { email: string }[];
-  return row?.email ?? null;
+  return rows.map((r) => r.email);
 }
 
 async function doctorSession(identifier: string, password: string) {
@@ -69,8 +69,7 @@ export async function appLogin(input: AppLoginInput) {
   } catch (error) {
     if (!isUnauthorized(error)) throw error;
   }
-  const email = await doctorEmailByPhone(input.identifier);
-  if (email) {
+  for (const email of await doctorEmailsByPhone(input.identifier)) {
     try {
       return await doctorSession(email, input.password);
     } catch (error) {

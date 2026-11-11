@@ -21,12 +21,14 @@ import {
   recordFileParamsSchema,
   recordParamsSchema,
   resultParamsSchema,
+  scanRecordBodySchema,
   summaryFileParamsSchema,
   summaryParamsSchema,
   updateBloodWorkSchema,
   updateMedicalRecordSchema,
 } from './clinical-records.schemas';
 import { bhrtService, bloodWorkService, medicalRecordsService } from './clinical-records.service';
+import { recordScanService } from './record-scan.service';
 
 export const clinicalRecordsRouter = Router();
 
@@ -225,6 +227,21 @@ clinicalRecordsRouter.delete(
     const { id, recordId } = validParams(req, recordParamsSchema);
     await medicalRecordsService.remove(actorFrom(req), branchIdOf(req), id, recordId);
     sendNoContent(res);
+  },
+);
+
+clinicalRecordsRouter.post(
+  `${base}/medical-records/:recordId/scan`,
+  ...scoped,
+  canCreate,
+  validate({ params: recordParamsSchema, body: scanRecordBodySchema }),
+  async (req, res) => {
+    const { id, recordId } = validParams(req, recordParamsSchema);
+    const { fileIds } = validBody(req, scanRecordBodySchema);
+    sendOk(
+      res,
+      await recordScanService.scan(actorFrom(req), id, recordId, { branchId: branchIdOf(req), fileIds }),
+    );
   },
 );
 

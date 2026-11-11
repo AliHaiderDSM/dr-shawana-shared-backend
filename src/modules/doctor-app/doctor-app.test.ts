@@ -208,6 +208,33 @@ describe('doctor app', () => {
     await staff('put', '/doctor/profile', doctorUser).send({ displayName: 'Dr. Shawana' }).expect(200);
   });
 
+  it('keeps one phone number per doctor, because doctors log in to the app with it', async () => {
+    const taken = await staff('put', '/doctor/profile', otherDoctorUser).send({ phone: '+92 321 5550000' });
+    expect(taken.status).toBe(409);
+    expect(taken.body.error.message).toContain('already used by');
+    const byAdmin = await request(app)
+      .patch(`/api/v1/branch/staff/${otherDoctorUser.id}`)
+      .set(bearer(admin))
+      .send({ phone: '03215550000' });
+    expect(byAdmin.status).toBe(409);
+    const newDoctor = await request(app).post('/api/v1/branch/staff').set(bearer(admin)).send({
+      role: 'doctor',
+      firstName: 'Same',
+      lastName: 'Phone',
+      email: 'same.phone@dsm.test',
+      username: 'samephone',
+      password: 'Doctor12345',
+      phone: '0321-5550000',
+    });
+    expect(newDoctor.status).toBe(409);
+    expect(
+      (await staff('put', '/doctor/profile', otherDoctorUser).send({ phone: '0321 5550001' })).status,
+    ).toBe(200);
+    expect((await staff('put', '/doctor/profile', doctorUser).send({ phone: '0321 5550000' })).status).toBe(
+      200,
+    );
+  });
+
   it('starts a chat, sends to the patient and gets a push when the patient answers', async () => {
     const opened = await staff('post', `/doctor/patients/${patientId}/chat`, doctorUser);
     expect(opened.status).toBe(200);

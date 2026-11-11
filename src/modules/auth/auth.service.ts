@@ -5,6 +5,7 @@ import { AppError } from '../../lib/errors';
 import { ACCESS_TOKEN_TTL_SECONDS, signAccessToken } from '../../lib/jwt';
 import { spendPasswordCheck } from '../../lib/password';
 import { permissionsFor } from '../../lib/permissions';
+import { assertDoctorPhoneFree } from '../staff/doctor-phone';
 import { auditService } from '../audit/audit.service';
 import { type StaffProfile } from '../staff/staff-profile.entity';
 import { staffAccounts } from '../staff/staff-accounts';
@@ -120,6 +121,8 @@ export const authService = {
 
   async updateOwnProfile(actor: Actor, input: UpdateOwnProfileInput) {
     const profile = await loadProfile(actor.userId);
+    if (profile.role === 'doctor' && input.phone !== undefined && input.phone !== profile.phone)
+      await assertDoctorPhoneFree(input.phone, profile.id);
     Object.assign(profile, input, { updatedBy: actor.userId });
     await staffRepository.save(profile);
     return await toMe(profile);
