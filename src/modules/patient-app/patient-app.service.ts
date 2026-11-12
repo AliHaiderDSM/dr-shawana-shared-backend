@@ -12,6 +12,7 @@ import { Prescription } from '../prescriptions/prescription.entity';
 import { auditService } from '../audit/audit.service';
 import { educationalResourcesService } from '../educational-resources/educational-resources.service';
 import { patientRequestsService } from './patient-requests.service';
+import { targetVisit } from './patient-intake.service';
 
 interface AppointmentRow {
   id: string;
@@ -322,8 +323,16 @@ export const patientAppService = {
     type: 'medical_record' | 'imaging' = 'medical_record',
   ) {
     if (files.length === 0) throw AppError.badRequest('Choose at least one file');
-    const branchId = await patientRequestsService.homeBranchOf(patientId);
-    const record = await medicalRecordsService.createFromPatient(branchId, patientId, title, files, type);
+    const visit = await targetVisit(patientId);
+    const branchId = visit?.branchId ?? (await patientRequestsService.homeBranchOf(patientId));
+    const record = await medicalRecordsService.createFromPatient(
+      branchId,
+      patientId,
+      title,
+      files,
+      type,
+      visit?.id ?? null,
+    );
     return (await documents(patientId)).find((d) => d.id === record.id) ?? null;
   },
 

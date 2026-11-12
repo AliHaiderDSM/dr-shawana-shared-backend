@@ -73,7 +73,7 @@ interface VisitRow {
 
 const editable = (v: VisitRow) => v.status === 'booked' && v.consultationStatus !== 'completed';
 
-async function targetVisit(patientId: string) {
+export async function targetVisit(patientId: string) {
   const rows = (await AppDataSource.query(
     `SELECT a.id, a.branch_id AS "branchId", a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo",
             a.date::text AS date, a.time_from::text AS "timeFrom", a.status::text AS status,

@@ -258,7 +258,11 @@ describe('patient app', () => {
     expect((await asPatient('get', `/patient/documents/files/${fileId}/url`)).status).toBe(200);
 
     const records = await staff('get', `/branch/patients/${patientId}/medical-records`, frontDesk);
-    expect(records.body.data[0]).toMatchObject({ uploadedByPatient: true, note: 'Blood test' });
+    expect(records.body.data[0]).toMatchObject({
+      uploadedByPatient: true,
+      note: 'Blood test',
+      appointmentId: upcomingAppointmentId,
+    });
 
     const bad = await asPatient('post', '/patient/documents').attach('files', Buffer.from('x'), {
       filename: 'a.exe',

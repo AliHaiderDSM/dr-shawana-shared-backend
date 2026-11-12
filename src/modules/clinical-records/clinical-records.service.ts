@@ -336,6 +336,7 @@ export const medicalRecordsService = {
     title: string | null,
     files: Express.Multer.File[],
     type: MedicalRecordType = 'medical_record',
+    appointmentId: string | null = null,
   ) {
     const uploaded = await uploadMedicalFiles(branchId, files);
     return withUploads(uploaded, () =>
@@ -345,7 +346,7 @@ export const medicalRecordsService = {
           recordRepo.create({
             branchId,
             patientId,
-            appointmentId: null,
+            appointmentId,
             type,
             date: today(),
             note: title,
