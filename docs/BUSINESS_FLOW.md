@@ -175,6 +175,7 @@ Online Sale: Pending --> Delivered / Returned
   |                     Returns section (pending inspection)
   |                       --> Restocked / Damaged / Sent to supplier
   |                       --> optional refund from an account
+  |                       --> damaged / expired on arrival: free replacement (REP#) of the same products
   |
   v
 Delivery slips printed (Delivery Print role)

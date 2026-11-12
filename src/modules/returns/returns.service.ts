@@ -23,6 +23,7 @@ import {
   type ReturnListQuery,
 } from './returns.schemas';
 import { stockBranchOf, stockProducts } from '../sales/fulfilment';
+import { REPLACEMENT_REFERENCE, replacementsService } from './replacements.service';
 
 const returns = branchScopedRepository(SaleReturn, 'sr');
 const returnItems = branchScopedRepository(SaleReturnItem, 'ri');
@@ -49,6 +50,10 @@ async function restoreSources(manager: EntityManager, saleId: string) {
   const siblings = await repo(SaleReturn, manager).find({ where: { saleId }, select: { id: true } });
   return [
     { referenceType: SALE_REFERENCE, referenceIds: [saleId] },
+    {
+      referenceType: REPLACEMENT_REFERENCE,
+      referenceIds: await replacementsService.idsForSale(manager, saleId),
+    },
     { referenceType: REFERENCE, referenceIds: siblings.map((r) => r.id) },
   ];
 }
@@ -67,9 +72,12 @@ interface SaleLine {
   name: string | null;
   barcode: string | null;
   sold: Decimal;
+  replaced: Decimal;
   returned: Decimal;
   lineTotal: Decimal;
 }
+
+const returnableOf = (line: SaleLine) => line.sold.plus(line.replaced).minus(line.returned);
 
 function toReturnDto(r: SaleReturn) {
   const { sale, items, refundAccountSheet, branch: _branch, ...rest } = withoutInternals(r);
@@ -142,6 +150,7 @@ async function saleLines(manager: EntityManager, saleId: string): Promise<Map<st
     name: string;
     barcode: string | null;
     sold: string;
+    replaced: string;
     returned: string;
     lineTotal: string;
   }[] = await manager.query(
@@ -149,7 +158,10 @@ async function saleLines(manager: EntityManager, saleId: string): Promise<Map<st
               SUM(si.qty)::text AS sold, SUM(si.line_total)::text AS "lineTotal",
               COALESCE((SELECT SUM(ri.qty) FROM sale_return_items ri
                           JOIN sale_returns r ON r.id = ri.sale_return_id AND r.deleted_at IS NULL
-                         WHERE r.sale_id = $1 AND ri.product_id = si.product_id AND ri.deleted_at IS NULL), 0)::text AS returned
+                         WHERE r.sale_id = $1 AND ri.product_id = si.product_id AND ri.deleted_at IS NULL), 0)::text AS returned,
+              COALESCE((SELECT SUM(pi.qty) FROM sale_replacement_items pi
+                          JOIN sale_replacements rp ON rp.id = pi.sale_replacement_id AND rp.deleted_at IS NULL AND rp.status = 'sent'
+                         WHERE rp.sale_id = $1 AND pi.product_id = si.product_id AND pi.deleted_at IS NULL), 0)::text AS replaced
          FROM sale_items si JOIN products p ON p.id = si.product_id
         WHERE si.sale_id = $1 AND si.deleted_at IS NULL
         GROUP BY si.product_id, p.name, p.barcode
@@ -164,6 +176,7 @@ async function saleLines(manager: EntityManager, saleId: string): Promise<Map<st
         name: r.name,
         barcode: r.barcode,
         sold: new Decimal(r.sold),
+        replaced: new Decimal(r.replaced),
         returned: new Decimal(r.returned),
         lineTotal: new Decimal(r.lineTotal),
       },
@@ -486,8 +499,9 @@ export const returnsService = {
         productId: l.productId,
         product: { id: l.productId, name: l.name ?? '', barcode: l.barcode },
         sold: toQuantity(l.sold),
+        replaced: toQuantity(l.replaced),
         returned: toQuantity(l.returned),
-        returnable: toQuantity(Decimal.max(l.sold.minus(l.returned), 0)),
+        returnable: toQuantity(Decimal.max(returnableOf(l), 0)),
         unitPrice: toMoney(l.sold.gt(0) ? l.lineTotal.div(l.sold).times(kept) : 0),
         trackSerials: tracked.has(l.productId),
         serials: sold.filter((i) => i.productId === stockIdOf(l.productId)).map((i) => i.serial),
@@ -502,7 +516,7 @@ export const returnsService = {
       const lines = await saleLines(em, sale.id);
       const problems = input.items.flatMap((item) => {
         const line = lines.get(item.productId);
-        const returnable = line ? line.sold.minus(line.returned) : new Decimal(0);
+        const returnable = line ? returnableOf(line) : new Decimal(0);
         return new Decimal(item.qty).greaterThan(returnable)
           ? [
               {
@@ -573,7 +587,7 @@ export const returnsService = {
         const serials = sold.filter((i) => i.productId === stockId).map((i) => i.serial);
         return {
           productId: l.productId,
-          qty: l.sold.minus(l.returned),
+          qty: returnableOf(l),
           serials: serials.length ? serials : undefined,
         };
       })
@@ -728,6 +742,11 @@ export const returnsService = {
         throw AppError.forbidden('Only the branch that sold it deletes a return');
       if ((record.items ?? []).some((i) => i.disposition !== 'pending')) {
         throw AppError.conflict('A return cannot be deleted after its items have been inspected');
+      }
+      if ((await replacementsService.countFor(em, record.id)) > 0) {
+        throw AppError.conflict(
+          'Delete its replacement first; a return with a replacement cannot be deleted',
+        );
       }
       const before = toReturnDto(record);
       for (const item of record.items ?? []) {

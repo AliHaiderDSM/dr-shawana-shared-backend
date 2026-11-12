@@ -54,7 +54,7 @@ interface Posting {
   reversalOfId: string | null;
 }
 
-const SELLABLE_ONLY: StockMovementType[] = ['sale', 'sale_edit_adjust', 'stock_out'];
+const SELLABLE_ONLY: StockMovementType[] = ['sale', 'sale_edit_adjust', 'stock_out', 'replacement'];
 
 const lotRank = (lot: Lot) => (lot.expiryDate ? 0 : lot.batchId === null ? 1 : 2);
 

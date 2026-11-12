@@ -35,7 +35,7 @@ export const createReturnSchema = registry.register(
       date: dateInput.optional(),
       reason: z.enum(NEW_RETURN_REASONS).openapi({
         description:
-          'Why the customer returned it. Damaged or expired stock is never sold, so it is not a reason.',
+          'Why the customer returned it. damaged / expired: it reached the customer damaged or expired; send a replacement from the return.',
       }),
       note: optionalText(5000),
       items: z
@@ -171,8 +171,9 @@ export const returnableSchema = registry.register(
         productId: z.uuid(),
         product: ref.extend({ barcode: z.string().nullable() }).nullable(),
         sold: quantityOutput,
+        replaced: quantityOutput.openapi({ description: 'Replacement pieces sent for this product' }),
         returned: quantityOutput,
-        returnable: quantityOutput,
+        returnable: quantityOutput.openapi({ description: 'sold + replaced - returned' }),
         unitPrice: moneyOutput.openapi({
           description:
             'What one unit really cost the customer: its line total after the product discount, less its share of the overall discount (shared by price)',

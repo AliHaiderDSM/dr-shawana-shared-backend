@@ -21,6 +21,7 @@ export const STOCK_MOVEMENT_TYPES = [
   'sale',
   'sale_return',
   'sale_edit_adjust',
+  'replacement',
   'manufacturing_in',
   'adjustment',
 ] as const;

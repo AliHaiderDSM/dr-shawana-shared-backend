@@ -315,6 +315,7 @@ export const inventoryItemsService = {
       date: string;
       sellableOnly?: boolean;
       saleId?: string;
+      soldOnSaleId?: string;
       productIds?: Set<string>;
       batchId?: string;
       note?: string | null;
@@ -365,7 +366,7 @@ export const inventoryItemsService = {
     const sets: string[] = ['status = $2', 'updated_by = $3', 'updated_at = now()'];
     const params: unknown[] = [ids, input.to, actor.userId];
     if (input.to === 'sold') {
-      params.push(input.ref.id, input.date);
+      params.push(input.soldOnSaleId ?? input.ref.id, input.date);
       sets.push(`sale_id = $${params.length - 1}`, `sold_on = $${params.length}`);
     }
     if (input.to === 'dispatched') {

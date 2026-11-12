@@ -16,7 +16,14 @@ export const RETURN_REASONS = [
   'other',
 ] as const;
 export type ReturnReason = (typeof RETURN_REASONS)[number];
-export const NEW_RETURN_REASONS = ['wrong_item', 'customer_refused', 'not_delivered', 'other'] as const;
+export const NEW_RETURN_REASONS = [
+  'damaged',
+  'expired',
+  'wrong_item',
+  'customer_refused',
+  'not_delivered',
+  'other',
+] as const;
 
 export const RETURN_STATUSES = ['pending', 'completed'] as const;
 export type ReturnStatus = (typeof RETURN_STATUSES)[number];

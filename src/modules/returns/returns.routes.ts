@@ -17,6 +17,8 @@ import {
   saleParamsSchema,
   setRefundSchema,
 } from './returns.schemas';
+import { createReplacementSchema } from './replacements.schemas';
+import { replacementsService } from './replacements.service';
 import { returnsService } from './returns.service';
 
 export const returnsRouter = Router();
@@ -58,6 +60,24 @@ returnsRouter.post(
     sendCreated(
       res,
       await returnsService.create(actorFrom(req), branchIdOf(req), validBody(req, createReturnSchema)),
+    );
+  },
+);
+
+returnsRouter.post(
+  `${path}/:id/replacements`,
+  requireRole('branch_admin', 'dispatcher'),
+  idempotent('replacement-create'),
+  validate({ params: idParamsSchema, body: createReplacementSchema }),
+  async (req, res) => {
+    sendCreated(
+      res,
+      await replacementsService.create(
+        actorFrom(req),
+        branchIdOf(req),
+        idOf(req),
+        validBody(req, createReplacementSchema),
+      ),
     );
   },
 );

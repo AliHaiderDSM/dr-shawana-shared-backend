@@ -22,6 +22,15 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-12 — Free replacements for damaged or expired returns
+
+- Migration `SaleReplacements1795200000000`: tables `sale_replacements` / `sale_replacement_items` (RLS on), enum `sale_replacement_status` (pending, sent), stock movement type `replacement`.
+- Return reasons `damaged` and `expired` can be chosen again ("on arrival").
+- `POST /branch/returns/:id/replacements` (branch_admin, dispatcher): same products, up to the returned qty. Office sale: stock and labels leave now. Online sale: pending until `POST /branch/replacements/:id/send` at the stock branch. Numbered `<CODE>-REP-000001`.
+- Not a sale: no payment, no revenue, not in sales, GDN or tax figures. Replacement pieces are linked to the original sale (`soldOnSaleId`), so returnable = sold + replaced - returned.
+- `GET /branch/replacements` (list, filters status/saleId/saleReturnId/dates), `GET/DELETE /:id` (delete only while pending). A return with a replacement cannot be deleted.
+- Tests: `replacements.test.ts`.
+
 ## 2026-11-12 — Doctor app: patient medicines
 
 - `GET /doctor/patients/{patientId}/medicines`: medicines and supplements of one of the doctor’s own patients, grouped by prescription, newest first. Same data as the patient app Medicines screen (`patientIntakeService.medicines`). Other patients get 404.

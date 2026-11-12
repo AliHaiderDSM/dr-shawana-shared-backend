@@ -34,6 +34,7 @@ import './modules/trace/trace.routes';
 import './modules/inventory/store-receipts';
 import './modules/inventory/stock-out-report';
 import './modules/returns/returns.docs';
+import './modules/returns/replacements.docs';
 import './modules/journal/journal.schemas';
 import './modules/expenses/expenses.schemas';
 import './modules/reports/reports.schemas';

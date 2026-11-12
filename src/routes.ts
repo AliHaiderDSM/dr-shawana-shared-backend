@@ -35,6 +35,7 @@ import { prescriptionsRouter } from './modules/prescriptions/prescriptions.route
 import { productsRouter } from './modules/products/products.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
 import { returnsRouter } from './modules/returns/returns.routes';
+import { replacementsRouter } from './modules/returns/replacements.routes';
 import { salesRouter } from './modules/sales/sales.routes';
 import { staffRouter } from './modules/staff/staff.routes';
 import { suppliersRouter } from './modules/suppliers/suppliers.routes';
@@ -78,6 +79,7 @@ apiRouter.use(prescriptionsRouter);
 apiRouter.use(salesRouter);
 apiRouter.use(discountRequestsRouter);
 apiRouter.use(returnsRouter);
+apiRouter.use(replacementsRouter);
 apiRouter.use(journalRouter);
 apiRouter.use(expensesRouter);
 apiRouter.use(reportsRouter);
