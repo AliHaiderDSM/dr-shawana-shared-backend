@@ -111,6 +111,17 @@ doctorAppRouter.get('/doctor/patients/:patientId', validate({ params: patientPar
   );
 });
 
+doctorAppRouter.get(
+  '/doctor/patients/:patientId/medicines',
+  validate({ params: patientParams }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await doctorAppService.patientMedicines(req.auth!.userId, validParams(req, patientParams).patientId),
+    );
+  },
+);
+
 doctorAppRouter.post(
   '/doctor/patients/:patientId/chat',
   validate({ params: patientParams }),
@@ -185,6 +196,15 @@ registry.registerPath({
     'Patient file for the doctor: appointments, prescriptions with medicines, clinical remarks and medical records, newest first. Only the doctor’s own patients.',
   request: { params: patientParams },
   responses: ok('Patient file'),
+});
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/doctor/patients/{patientId}/medicines',
+  summary:
+    'Medicines and supplements of one of the doctor’s patients, grouped by prescription, newest first (every doctor and branch)',
+  request: { params: patientParams },
+  responses: ok('Medicines by prescription'),
 });
 registry.registerPath({
   ...docs,

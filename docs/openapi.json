@@ -42281,7 +42281,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Medicines and supplements of every prescription, newest first (medicine, supplement, BHRT, GLP, skin and hair care; tests are left out).",
+        "summary": "Medicines and supplements of every prescription, newest first. Other items (tests, BHRT, GLP, skin and hair care) stay on the prescription.",
         "responses": {
           "200": {
             "description": "Medicines",
@@ -45660,6 +45660,95 @@
         "responses": {
           "200": {
             "description": "Patient file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/patients/{patientId}/medicines": {
+      "get": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Medicines and supplements of one of the doctor’s patients, grouped by prescription, newest first (every doctor and branch)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "patientId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Medicines by prescription",
             "content": {
               "application/json": {
                 "schema": {

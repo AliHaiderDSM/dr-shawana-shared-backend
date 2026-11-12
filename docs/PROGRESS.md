@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-12 — Doctor app: patient medicines
+
+- `GET /doctor/patients/{patientId}/medicines`: medicines and supplements of one of the doctor’s own patients, grouped by prescription, newest first. Same data as the patient app Medicines screen (`patientIntakeService.medicines`). Other patients get 404.
+- Mobile: doctor home has a Medicines tile (choose patient, then list) and the patient file has a Medicines button next to Message.
+
 ## 2026-11-12 — App uploads follow the patient visit
 
 - Patient app uploads (`POST /patient/documents`) now go to the branch of the same visit the medical history form uses (`targetVisit`: next open visit, else latest open, else latest completed) and are linked to that appointment.

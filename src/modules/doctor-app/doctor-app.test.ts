@@ -317,4 +317,33 @@ describe('doctor app', () => {
     expect((await login('03005550101', 'wrong-pass')).status).toBe(401);
     expect((await login(doctorRow!.email, 'wrong-pass')).status).toBe(401);
   });
+
+  it('shows only medicines and supplements of the doctor’s own patient', async () => {
+    const prescription = await staff('post', '/branch/prescriptions', doctorUser).send({
+      consultationId,
+      date: '2026-09-01',
+      diagnosis: 'Perimenopause',
+      items: [
+        { name: 'Vitamin D', category: 'supplement', dose: '1 daily' },
+        { name: 'Metformin', category: 'medicine', dose: '500 mg' },
+        { name: 'Sunscreen', category: 'skin_care' },
+      ],
+    });
+    expect(prescription.status).toBe(201);
+
+    const medicines = await staff('get', `/doctor/patients/${patientId}/medicines`, doctorUser);
+    expect(medicines.status).toBe(200);
+    expect(medicines.body.data).toHaveLength(1);
+    expect(medicines.body.data[0]).toMatchObject({
+      prescriptionId: prescription.body.data.id,
+      doctor: 'Dr. Shawana',
+    });
+    expect((medicines.body.data[0].items as { name: string }[]).map((i) => i.name).sort()).toEqual([
+      'Metformin',
+      'Vitamin D',
+    ]);
+    expect((await staff('get', `/doctor/patients/${patientId}/medicines`, otherDoctorUser)).status).toBe(404);
+    expect((await staff('get', `/doctor/patients/${strangerId}/medicines`, doctorUser)).status).toBe(404);
+    expect((await staff('get', `/doctor/patients/${patientId}/medicines`, frontDesk)).status).toBe(403);
+  });
 });

@@ -9,6 +9,7 @@ import { BLOOD_TEST_UNITS } from '../clinical-records/clinical-records.schemas';
 import { medicalRecordsService } from '../clinical-records/clinical-records.service';
 import { consultationsService } from '../consultations/consultations.service';
 import { doctorsService } from '../doctors/doctors.service';
+import { patientIntakeService } from '../patient-app/patient-intake.service';
 
 interface DoctorRow {
   id: string;
@@ -270,6 +271,12 @@ export const doctorAppService = {
       [patientId, doctor.id],
     )) as { id: string }[];
     return { conversationId: row!.id };
+  },
+
+  async patientMedicines(staffId: string, patientId: string) {
+    const doctor = await doctorOf(staffId);
+    await assertOwnPatient(doctor.id, patientId);
+    return patientIntakeService.medicines(patientId);
   },
 
   async patientFile(staffId: string, patientId: string) {
