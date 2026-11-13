@@ -35,7 +35,7 @@ export const createReturnSchema = registry.register(
       date: dateInput.optional(),
       reason: z.enum(NEW_RETURN_REASONS).openapi({
         description:
-          'Why the customer returned it. damaged / expired: it reached the customer damaged or expired; send a replacement from the return.',
+          'Why the customer returned it. damaged: it reached the customer damaged; send a replacement from the return. expired is kept only on old returns.',
       }),
       note: optionalText(5000),
       items: z

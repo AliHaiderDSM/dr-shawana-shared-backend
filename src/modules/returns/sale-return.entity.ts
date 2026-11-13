@@ -18,7 +18,6 @@ export const RETURN_REASONS = [
 export type ReturnReason = (typeof RETURN_REASONS)[number];
 export const NEW_RETURN_REASONS = [
   'damaged',
-  'expired',
   'wrong_item',
   'customer_refused',
   'not_delivered',

@@ -6,7 +6,7 @@ import { serialsInput } from '../inventory/inventory-items.schemas';
 import { REPLACEMENT_STATUSES } from './sale-replacement.entity';
 import { RETURN_REASONS } from './sale-return.entity';
 
-export const DIRECT_REPLACEMENT_REASONS = ['damaged', 'expired', 'wrong_item', 'other'] as const;
+export const DIRECT_REPLACEMENT_REASONS = ['damaged', 'wrong_item', 'other'] as const;
 
 const itemsInput = z
   .array(z.object({ productId: z.uuid(), qty: positiveQuantityInput }))

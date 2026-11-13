@@ -213,12 +213,15 @@ describe('Replacements with and without a return', () => {
         expect.objectContaining({ productId: toner, sold: '2.000', returned: '1.000', replaceable: '1.000' }),
       ]),
     );
-    const body = { reason: 'expired', note: 'Photo on WhatsApp', items: [{ productId: toner, qty: '1' }] };
+    const body = { reason: 'damaged', note: 'Photo on WhatsApp', items: [{ productId: toner, qty: '1' }] };
     expect((await api('post', `/branch/sales/${saleId}/replacements`, frontDesk).send(body)).status).toBe(
       403,
     );
     expect(
       (await api('post', `/branch/sales/${saleId}/replacements`).send({ items: body.items })).status,
+    ).toBe(400);
+    expect(
+      (await api('post', `/branch/sales/${saleId}/replacements`).send({ ...body, reason: 'expired' })).status,
     ).toBe(400);
     expect(
       (
@@ -238,7 +241,7 @@ describe('Replacements with and without a return', () => {
       replacementNo: `${invoiceNo}.2`,
       saleReturnId: null,
       returnNo: null,
-      reason: 'expired',
+      reason: 'damaged',
       status: 'pending_approval',
       files: [expect.objectContaining({ originalName: 'photo.png' })],
     });
@@ -289,7 +292,7 @@ describe('Replacements with and without a return', () => {
     await api('post', `/branch/sales/${order.body.data.id}/dispatch`, dispatcher).send({}).expect(200);
     const ret = await api('post', '/branch/returns', frontDesk).send({
       saleId: order.body.data.id,
-      reason: 'expired',
+      reason: 'damaged',
       items: [{ productId: toner, qty: '2' }],
     });
     expect(ret.status).toBe(201);

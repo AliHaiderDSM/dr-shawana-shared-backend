@@ -39,6 +39,7 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 - `POST /branch/sales/:id/replacements` (branch_admin, dispatcher): without a return, reason required, up to sold - returned - already replaced without a return (rejected ones do not count). Optional proof files (multipart `files`). `GET /branch/sales/:id/replaceable`, `GET /branch/replacements/:id/files/:fileId/url`.
 - List filter `kind=with_return|without_return`. Badge `replacements`: Super Admin = waiting for approval, branch = approved and waiting to be sent from its stock; push and realtime on every change.
 - Tests: `replacements.test.ts` rewritten (approval, without a return, online).
+- Reason `expired` can no longer be chosen for a new return or a replacement (expired stock is never sent); old rows keep it. The inspection outcome Expired stays.
 
 ## 2026-11-12 — Doctor app: patient medicines
 

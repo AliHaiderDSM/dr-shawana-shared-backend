@@ -175,7 +175,7 @@ Online Sale: Pending --> Delivered / Returned
   |                     Returns section (pending inspection)
   |                       --> Restocked / Damaged / Sent to supplier
   |                       --> optional refund from an account
-  |                       --> damaged / expired on arrival: free replacement (<invoice>.1) of the same products
+  |                       --> damaged on arrival: free replacement (<invoice>.1) of the same products
   |
   +--> Replacement without a return (from the sale, reason + optional photo)
          --> Super Admin approves or rejects every replacement --> stock branch sends it (stock leaves)

@@ -14592,13 +14592,12 @@
             "type": "string",
             "enum": [
               "damaged",
-              "expired",
               "wrong_item",
               "customer_refused",
               "not_delivered",
               "other"
             ],
-            "description": "Why the customer returned it. damaged / expired: it reached the customer damaged or expired; send a replacement from the return."
+            "description": "Why the customer returned it. damaged: it reached the customer damaged; send a replacement from the return. expired is kept only on old returns."
           },
           "note": {
             "type": [
@@ -18095,7 +18094,6 @@
             "type": "string",
             "enum": [
               "damaged",
-              "expired",
               "wrong_item",
               "other"
             ]
