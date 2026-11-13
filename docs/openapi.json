@@ -17656,6 +17656,9 @@
           "discountRequests": {
             "type": "integer"
           },
+          "replacements": {
+            "type": "integer"
+          },
           "returns": {
             "type": "integer"
           },
@@ -17675,6 +17678,7 @@
           "writeOffs",
           "observations",
           "discountRequests",
+          "replacements",
           "returns",
           "stockReceipts",
           "patientRequests",
@@ -18073,21 +18077,75 @@
             },
             "minItems": 1,
             "maxItems": 100
-          },
-          "serials": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^DSM-\\d{1,12}$",
-              "example": "DSM-000001"
-            },
-            "maxItems": 5000,
-            "description": "Office sale: labels of the new pieces handed over now. Online sale: leave out, the Dispatch Department scans them when it sends the replacement."
           }
         },
         "required": [
           "items"
         ]
+      },
+      "CreateDirectSaleReplacement": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-30"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "damaged",
+              "expired",
+              "wrong_item",
+              "other"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "qty": {
+                  "type": "string",
+                  "example": "10.000"
+                }
+              },
+              "required": [
+                "productId",
+                "qty"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "reason",
+          "items"
+        ]
+      },
+      "DecideSaleReplacement": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000
+          }
+        }
       },
       "SendSaleReplacement": {
         "type": "object",
@@ -18121,15 +18179,20 @@
             "format": "uuid"
           },
           "replacementSeq": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Number of the replacement on its sale"
           },
           "replacementNo": {
             "type": "string",
-            "description": "e.g. LHR-REP-000001"
+            "description": "Sale invoice number and the replacement number, e.g. LHR-000123.1"
           },
           "saleReturnId": {
-            "type": "string",
-            "format": "uuid"
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "null: a replacement without a return"
           },
           "returnNo": {
             "type": [
@@ -18203,6 +18266,17 @@
           "date": {
             "type": "string"
           },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "damaged",
+              "expired",
+              "wrong_item",
+              "customer_refused",
+              "not_delivered",
+              "other"
+            ]
+          },
           "note": {
             "type": [
               "string",
@@ -18212,10 +18286,32 @@
           "status": {
             "type": "string",
             "enum": [
-              "pending",
+              "pending_approval",
+              "approved",
+              "rejected",
               "sent"
             ],
-            "description": "pending: online, waiting for the Dispatch Department; sent: the new pieces left the stock"
+            "description": "pending_approval: waiting for the Super Admin; approved: waiting to be sent; rejected: refused by the Super Admin; sent: the new pieces left the stock"
+          },
+          "decidedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "decisionNote": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "sentOn": {
             "type": [
@@ -18282,6 +18378,33 @@
               ]
             }
           },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "originalName": {
+                  "type": "string"
+                },
+                "contentType": {
+                  "type": "string"
+                },
+                "sizeBytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "originalName",
+                "contentType",
+                "sizeBytes"
+              ]
+            }
+          },
           "serials": {
             "type": "array",
             "items": {
@@ -18319,15 +18442,84 @@
           "saleId",
           "sale",
           "date",
+          "reason",
           "note",
           "status",
+          "decidedBy",
+          "decidedAt",
+          "decisionNote",
           "sentOn",
           "sentBy",
           "items",
+          "files",
           "totalQty",
           "createdBy",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "SaleReplaceable": {
+        "type": "object",
+        "properties": {
+          "saleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceNo": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "productId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "barcode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sold": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "returned": {
+                  "type": "string",
+                  "example": "10.000"
+                },
+                "replaced": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "Already replaced without a return, still active"
+                },
+                "replaceable": {
+                  "type": "string",
+                  "example": "10.000"
+                }
+              },
+              "required": [
+                "productId",
+                "name",
+                "barcode",
+                "sold",
+                "returned",
+                "replaced",
+                "replaceable"
+              ]
+            }
+          }
+        },
+        "required": [
+          "saleId",
+          "invoiceNo",
+          "items"
         ]
       },
       "CreateJournalEntry": {
@@ -58826,7 +59018,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Branch Admin or dispatcher sends the same products again, free, for a damaged or expired return (up to the returned quantity). Office sale: the stock leaves now with its labels. Online sale: it waits for the Dispatch Department. Not a sale: no payment, no revenue.",
+        "summary": "Branch Admin or dispatcher asks to send the returned products again, free (up to the returned quantity). It waits for the Super Admin. Numbered on the sale: <invoice>.1, .2",
         "parameters": [
           {
             "schema": {
@@ -58853,6 +59045,28 @@
               "schema": {
                 "$ref": "#/components/schemas/CreateSaleReplacement"
               }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "JSON payload"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "Optional photos or PDFs as proof (up to 5)"
+                  }
+                },
+                "required": [
+                  "data"
+                ]
+              }
             }
           }
         },
@@ -58866,6 +59080,243 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/SaleReplacement"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/replacements": {
+      "post": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Branch Admin or dispatcher asks to replace products of a sale without a return (up to sold minus returned minus already replaced). It waits for the Super Admin.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDirectSaleReplacement"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "data": {
+                    "type": "string",
+                    "description": "JSON payload"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "Optional photos or PDFs as proof (up to 5)"
+                  }
+                },
+                "required": [
+                  "data"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReplacement"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/sales/{id}/replaceable": {
+      "get": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Products of a sale that can still be replaced without a return",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Replaceable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReplaceable"
                     }
                   },
                   "required": [
@@ -58978,10 +59429,10 @@
                 "-date",
                 "createdAt",
                 "-createdAt",
-                "replacementSeq",
-                "-replacementSeq"
+                "replacementNo",
+                "-replacementNo"
               ],
-              "default": "-date"
+              "default": "-createdAt"
             },
             "required": false,
             "name": "sort",
@@ -58991,12 +59442,26 @@
             "schema": {
               "type": "string",
               "enum": [
-                "pending",
+                "pending_approval",
+                "approved",
+                "rejected",
                 "sent"
               ]
             },
             "required": false,
             "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "with_return",
+                "without_return"
+              ]
+            },
+            "required": false,
+            "name": "kind",
             "in": "query"
           },
           {
@@ -59237,7 +59702,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Delete a replacement that is still waiting to be sent",
+        "summary": "Delete a replacement that is still waiting for approval",
         "parameters": [
           {
             "schema": {
@@ -59315,6 +59780,336 @@
         }
       }
     },
+    "/branch/replacements/{id}/files/{fileId}/url": {
+      "get": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Short-lived link to a proof file",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "expiresIn": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresIn"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/replacements/{id}/approve": {
+      "post": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin approves a replacement; then it can be sent",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideSaleReplacement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReplacement"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/replacements/{id}/reject": {
+      "post": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin rejects a replacement; a note is required",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideSaleReplacement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReplacement"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/replacements/{id}/send": {
       "post": {
         "tags": [
@@ -59325,7 +60120,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Dispatch Department sends a waiting online replacement: scans the labels and the stock leaves",
+        "summary": "Send an approved replacement: the stock branch scans the labels and the stock leaves (office: the selling branch; online: the Dispatch Department)",
         "parameters": [
           {
             "schema": {

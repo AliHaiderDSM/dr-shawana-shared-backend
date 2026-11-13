@@ -7,7 +7,7 @@ import { AppDataSource } from '../../database/data-source';
 const fake = installFakeSupabase();
 const app = createApp();
 
-describe('Replacements for damaged or expired returns', () => {
+describe('Replacements with and without a return', () => {
   let admin: { id: string };
   let owner: { id: string };
   let frontDesk: { id: string };
@@ -21,6 +21,7 @@ describe('Replacements for damaged or expired returns', () => {
   let serials: string[];
   let saleId: string;
   let saleTotal: string;
+  let invoiceNo: string;
   let returnId: string;
 
   const api = (
@@ -96,6 +97,7 @@ describe('Replacements for damaged or expired returns', () => {
     expect(sale.status).toBe(201);
     saleId = sale.body.data.id;
     saleTotal = sale.body.data.total;
+    invoiceNo = sale.body.data.invoiceNo;
     const ret = await api('post', '/branch/returns', frontDesk).send({
       saleId,
       reason: 'damaged',
@@ -110,13 +112,12 @@ describe('Replacements for damaged or expired returns', () => {
     returnId = ret.body.data.id;
   });
 
-  it('lets only the branch admin or the dispatcher send a replacement, up to what came back', async () => {
+  it('waits for the Super Admin before a return replacement leaves the stock', async () => {
     const body = {
       items: [
         { productId: serum, qty: '1' },
         { productId: toner, qty: '1' },
       ],
-      serials: [serials[2]],
     };
     expect((await api('post', `/branch/returns/${returnId}/replacements`, frontDesk).send(body)).status).toBe(
       403,
@@ -126,53 +127,63 @@ describe('Replacements for damaged or expired returns', () => {
     ).toBe(404);
     const tooMany = await api('post', `/branch/returns/${returnId}/replacements`).send({
       items: [{ productId: serum, qty: '2' }],
-      serials: [serials[2], serials[3]],
     });
     expect(tooMany.status).toBe(422);
     expect(tooMany.body.error.details.items[0]).toMatchObject({ replaceable: '1.000', requested: '2.000' });
-    const otherProduct = await api('post', `/branch/returns/${returnId}/replacements`).send({
-      items: [
-        { productId: toner, qty: '1' },
-        { productId: serum, qty: '1' },
-      ],
-    });
-    expect(otherProduct.status).toBe(422);
-    expect(otherProduct.body.error.details.labels[0]).toMatchObject({ required: '1', scanned: '0' });
-  });
 
-  it('hands an office replacement over now, free, with its labels, and keeps it out of sales', async () => {
     const tonerBefore = await stockOf(toner);
     const serumBefore = await stockOf(serum);
     const created = await api('post', `/branch/returns/${returnId}/replacements`).send({
+      ...body,
       note: 'Customer sent a photo',
-      items: [
-        { productId: serum, qty: '1' },
-        { productId: toner, qty: '1' },
-      ],
-      serials: [serials[2]],
     });
     expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
     expect(created.body.data).toMatchObject({
-      replacementNo: 'LHR-REP-000001',
-      status: 'sent',
+      replacementNo: `${invoiceNo}.1`,
+      replacementSeq: 1,
+      status: 'pending_approval',
+      reason: 'damaged',
       returnNo: 'LHR-RET-000001',
       totalQty: '2.000',
-      serials: [serials[2]],
+      files: [],
       sale: { id: saleId },
     });
+    expect(await stockOf(toner)).toBe(tonerBefore);
+
+    expect(
+      (
+        await api('post', `/branch/returns/${returnId}/replacements`).send({
+          items: [{ productId: toner, qty: '1' }],
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (await api('post', `/branch/replacements/${id}/send`).send({ serials: [serials[2]] })).status,
+    ).toBe(409);
+    expect((await api('post', `/admin/replacements/${id}/approve`).send({})).status).toBe(403);
+    expect((await api('post', `/admin/replacements/${id}/reject`, owner).send({})).status).toBe(400);
+
+    const approved = await api('post', `/admin/replacements/${id}/approve`, owner).send({ note: 'OK' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.data).toMatchObject({ status: 'approved', decidedBy: owner.id, decisionNote: 'OK' });
+    expect((await api('post', `/admin/replacements/${id}/approve`, owner).send({})).status).toBe(409);
+    expect((await api('delete', `/branch/replacements/${id}`)).status).toBe(409);
+
+    const unscanned = await api('post', `/branch/replacements/${id}/send`).send({});
+    expect(unscanned.status).toBe(422);
+    expect(unscanned.body.error.details.labels[0]).toMatchObject({ required: '1', scanned: '0' });
+    const sent = await api('post', `/branch/replacements/${id}/send`).send({ serials: [serials[2]] });
+    expect(sent.status).toBe(200);
+    expect(sent.body.data).toMatchObject({ status: 'sent', serials: [serials[2]] });
     expect(Number(await stockOf(toner))).toBe(Number(tonerBefore) - 1);
     expect(Number(await stockOf(serum))).toBe(Number(serumBefore) - 1);
 
     const moves = (await AppDataSource.query(
-      `SELECT type::text, qty::text FROM stock_movements WHERE reference_type = 'sale_replacement' AND reference_id = $1 ORDER BY qty`,
-      [created.body.data.id],
-    )) as { type: string; qty: string }[];
+      `SELECT type::text FROM stock_movements WHERE reference_type = 'sale_replacement' AND reference_id = $1`,
+      [id],
+    )) as { type: string }[];
     expect(moves.map((m) => m.type)).toEqual(['replacement', 'replacement']);
-
-    const again = await api('post', `/branch/returns/${returnId}/replacements`).send({
-      items: [{ productId: toner, qty: '1' }],
-    });
-    expect(again.status).toBe(422);
 
     const sales = await api('get', '/branch/sales?pageSize=100');
     expect(sales.body.data).toHaveLength(1);
@@ -191,18 +202,77 @@ describe('Replacements for damaged or expired returns', () => {
         }),
       ]),
     );
-
-    const listed = await api('get', `/branch/replacements?saleReturnId=${returnId}`, frontDesk);
-    expect(listed.status).toBe(200);
-    expect(listed.body.data).toHaveLength(1);
-    const detail = await api('get', `/branch/replacements/${created.body.data.id}`, frontDesk);
-    expect(detail.body.data.serials).toEqual([serials[2]]);
-
-    expect((await api('delete', `/branch/replacements/${created.body.data.id}`)).status).toBe(409);
     expect((await api('delete', `/branch/returns/${returnId}`)).status).toBe(409);
   });
 
-  it('waits for the dispatch on an online sale, then the stock leaves when it is sent', async () => {
+  it('replaces products of a sale without a return, with optional proof, after approval', async () => {
+    const replaceable = await api('get', `/branch/sales/${saleId}/replaceable`);
+    expect(replaceable.status).toBe(200);
+    expect(replaceable.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ productId: toner, sold: '2.000', returned: '1.000', replaceable: '1.000' }),
+      ]),
+    );
+    const body = { reason: 'expired', note: 'Photo on WhatsApp', items: [{ productId: toner, qty: '1' }] };
+    expect((await api('post', `/branch/sales/${saleId}/replacements`, frontDesk).send(body)).status).toBe(
+      403,
+    );
+    expect(
+      (await api('post', `/branch/sales/${saleId}/replacements`).send({ items: body.items })).status,
+    ).toBe(400);
+    expect(
+      (
+        await api('post', `/branch/sales/${saleId}/replacements`).send({
+          ...body,
+          items: [{ productId: toner, qty: '2' }],
+        })
+      ).status,
+    ).toBe(422);
+
+    const created = await api('post', `/branch/sales/${saleId}/replacements`)
+      .field('data', JSON.stringify(body))
+      .attach('files', Buffer.from('png'), { filename: 'photo.png', contentType: 'image/png' });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    expect(created.body.data).toMatchObject({
+      replacementNo: `${invoiceNo}.2`,
+      saleReturnId: null,
+      returnNo: null,
+      reason: 'expired',
+      status: 'pending_approval',
+      files: [expect.objectContaining({ originalName: 'photo.png' })],
+    });
+    const fileUrl = await api('get', `/branch/replacements/${id}/files/${created.body.data.files[0].id}/url`);
+    expect(fileUrl.status).toBe(200);
+
+    const left = await api('get', `/branch/sales/${saleId}/replaceable`);
+    expect(left.body.data.items.find((i: { productId: string }) => i.productId === toner)).toMatchObject({
+      replaced: '1.000',
+      replaceable: '0.000',
+    });
+    expect((await api('get', `/branch/badges?branchId=${ownerBranch}`, owner)).body.data.replacements).toBe(
+      1,
+    );
+
+    const rejected = await api('post', `/admin/replacements/${id}/reject`, owner).send({
+      note: 'Send the bottle back first',
+    });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.data).toMatchObject({
+      status: 'rejected',
+      decisionNote: 'Send the bottle back first',
+    });
+    const again = await api('get', `/branch/sales/${saleId}/replaceable`);
+    expect(again.body.data.items.find((i: { productId: string }) => i.productId === toner)).toMatchObject({
+      replaceable: '1.000',
+    });
+    const listed = await api('get', `/branch/replacements?saleId=${saleId}&kind=without_return`, frontDesk);
+    expect(listed.body.data.map((r: { id: string }) => r.id)).toEqual([id]);
+    expect((await api('delete', `/branch/replacements/${id}`)).status).toBe(409);
+    expect((await api('post', `/branch/replacements/${id}/send`).send({})).status).toBe(409);
+  });
+
+  it('lets the Dispatch Department send an approved online replacement', async () => {
     const order = await api('post', '/branch/sales', frontDesk).send({
       patientId,
       saleType: 'online',
@@ -210,6 +280,11 @@ describe('Replacements for damaged or expired returns', () => {
       payments: [{ method: 'cash', amount: '1000', accountSheetId: cashSheet }],
     });
     expect(order.status).toBe(201);
+    const notDispatched = await api('post', `/branch/sales/${order.body.data.id}/replacements`).send({
+      reason: 'damaged',
+      items: [{ productId: toner, qty: '1' }],
+    });
+    expect(notDispatched.status).toBe(409);
     await api('post', `/branch/sales/${order.body.data.id}/payments/approve`).send({}).expect(200);
     await api('post', `/branch/sales/${order.body.data.id}/dispatch`, dispatcher).send({}).expect(200);
     const ret = await api('post', '/branch/returns', frontDesk).send({
@@ -219,57 +294,33 @@ describe('Replacements for damaged or expired returns', () => {
     });
     expect(ret.status).toBe(201);
     const before = await stockOf(toner);
-    const withLabels = await api('post', `/branch/returns/${ret.body.data.id}/replacements`).send({
-      items: [{ productId: toner, qty: '2' }],
-      serials: [serials[4]],
-    });
-    expect(withLabels.status).toBe(400);
-    const created = await api('post', `/branch/returns/${ret.body.data.id}/replacements`).send({
+    const created = await api('post', `/branch/returns/${ret.body.data.id}/replacements`, dispatcher).send({
       items: [{ productId: toner, qty: '2' }],
     });
     expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
     expect(created.body.data).toMatchObject({
-      status: 'pending',
-      sentOn: null,
-      replacementNo: 'LHR-REP-000002',
+      status: 'pending_approval',
+      replacementNo: `${order.body.data.invoiceNo}.1`,
     });
-    expect(await stockOf(toner)).toBe(before);
-
-    const pending = await api('get', '/branch/replacements?status=pending', dispatcher);
-    expect(pending.body.data.map((r: { id: string }) => r.id)).toEqual([created.body.data.id]);
-    expect(
-      (await api('post', `/branch/replacements/${created.body.data.id}/send`, frontDesk).send({})).status,
-    ).toBe(403);
-    const sent = await api('post', `/branch/replacements/${created.body.data.id}/send`, dispatcher).send({});
+    expect((await api('post', `/branch/replacements/${id}/send`, dispatcher).send({})).status).toBe(409);
+    await api('post', `/admin/replacements/${id}/approve`, owner).send({}).expect(200);
+    expect((await api('get', '/branch/badges', dispatcher)).body.data.replacements).toBe(1);
+    expect((await api('post', `/branch/replacements/${id}/send`, frontDesk).send({})).status).toBe(403);
+    const sent = await api('post', `/branch/replacements/${id}/send`, dispatcher).send({});
     expect(sent.status).toBe(200);
     expect(sent.body.data).toMatchObject({ status: 'sent' });
     expect(Number(await stockOf(toner))).toBe(Number(before) - 2);
-    expect(
-      (await api('post', `/branch/replacements/${created.body.data.id}/send`, dispatcher).send({})).status,
-    ).toBe(409);
+    expect((await api('post', `/branch/replacements/${id}/send`, dispatcher).send({})).status).toBe(409);
 
-    const another = await api('post', '/branch/sales', frontDesk).send({
-      patientId,
-      saleType: 'online',
-      items: [{ productId: toner, qty: '1' }],
-      payments: [{ method: 'cash', amount: '500', accountSheetId: cashSheet }],
-    });
-    await api('post', `/branch/sales/${another.body.data.id}/payments/approve`).send({}).expect(200);
-    await api('post', `/branch/sales/${another.body.data.id}/dispatch`, dispatcher).send({}).expect(200);
-    const second = await api('post', '/branch/returns', frontDesk).send({
-      saleId: another.body.data.id,
-      reason: 'damaged',
+    const another = await api('post', `/branch/sales/${saleId}/replacements`, dispatcher).send({
+      reason: 'wrong_item',
       items: [{ productId: toner, qty: '1' }],
     });
-    const waiting = await api('post', `/branch/returns/${second.body.data.id}/replacements`, dispatcher).send(
-      {
-        items: [{ productId: toner, qty: '1' }],
-      },
-    );
-    expect(waiting.status).toBe(201);
-    expect((await api('delete', `/branch/replacements/${waiting.body.data.id}`, dispatcher)).status).toBe(
+    expect(another.status).toBe(201);
+    expect((await api('delete', `/branch/replacements/${another.body.data.id}`, dispatcher)).status).toBe(
       204,
     );
-    expect((await api('get', `/branch/replacements/${waiting.body.data.id}`)).status).toBe(404);
+    expect((await api('get', `/branch/replacements/${another.body.data.id}`)).status).toBe(404);
   });
 });

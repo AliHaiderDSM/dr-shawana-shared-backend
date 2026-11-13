@@ -31,6 +31,15 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 - `GET /branch/replacements` (list, filters status/saleId/saleReturnId/dates), `GET/DELETE /:id` (delete only while pending). A return with a replacement cannot be deleted.
 - Tests: `replacements.test.ts`.
 
+## 2026-11-13 — Replacement approvals and replacements without a return
+
+- Migration `ReplacementApprovals1795300000000`: status enum is now pending_approval / approved / rejected / sent (old `pending` became `approved`); `reason`, `decided_by`, `decided_at`, `decision_note`; `sale_return_id` nullable; new table `sale_replacement_files` (RLS on).
+- Numbering follows the sale like repeat visits: `<invoiceNo>.1`, `.2` (`replacement_seq` per sale, unique `(sale_id, replacement_seq)`). Existing replacements were renumbered.
+- Every replacement (with or without a return) waits for the Super Admin: `POST /admin/replacements/:id/approve|reject` (reject needs a note). Send only when approved; the stock leaves at send (office: selling branch, online: Dispatch Department). Delete only while pending approval.
+- `POST /branch/sales/:id/replacements` (branch_admin, dispatcher): without a return, reason required, up to sold - returned - already replaced without a return (rejected ones do not count). Optional proof files (multipart `files`). `GET /branch/sales/:id/replaceable`, `GET /branch/replacements/:id/files/:fileId/url`.
+- List filter `kind=with_return|without_return`. Badge `replacements`: Super Admin = waiting for approval, branch = approved and waiting to be sent from its stock; push and realtime on every change.
+- Tests: `replacements.test.ts` rewritten (approval, without a return, online).
+
 ## 2026-11-12 — Doctor app: patient medicines
 
 - `GET /doctor/patients/{patientId}/medicines`: medicines and supplements of one of the doctor’s own patients, grouped by prescription, newest first. Same data as the patient app Medicines screen (`patientIntakeService.medicines`). Other patients get 404.

@@ -3,6 +3,7 @@ import { idempotent } from '../../middleware/idempotency';
 import { actorFrom } from '../../lib/actor';
 import { idParamsSchema, sendCreated, sendNoContent, sendOk } from '../../lib/http';
 import { branchIdOf, idOf } from '../../lib/request';
+import { documentsUpload, jsonDataField, uploadedFiles } from '../../lib/upload';
 import { authenticate } from '../../middleware/auth';
 import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
@@ -68,15 +69,19 @@ returnsRouter.post(
   `${path}/:id/replacements`,
   requireRole('branch_admin', 'dispatcher'),
   idempotent('replacement-create'),
-  validate({ params: idParamsSchema, body: createReplacementSchema }),
+  validate({ params: idParamsSchema }),
+  documentsUpload('files'),
+  jsonDataField,
+  validate({ body: createReplacementSchema }),
   async (req, res) => {
     sendCreated(
       res,
-      await replacementsService.create(
+      await replacementsService.createForReturn(
         actorFrom(req),
         branchIdOf(req),
         idOf(req),
         validBody(req, createReplacementSchema),
+        uploadedFiles(req),
       ),
     );
   },

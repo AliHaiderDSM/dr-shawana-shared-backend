@@ -26,6 +26,7 @@ const BADGES: Record<BadgeKey, { label: string; path: string; anyOf: Permission[
   },
   discountRequests: { label: 'Discount requests', path: '/discount-requests', anyOf: ['sales.view'] },
   returns: { label: 'Returns', path: '/returns', anyOf: ['returns.view'] },
+  replacements: { label: 'Replacements', path: '/replacements', anyOf: ['returns.view'] },
   stockReceipts: { label: 'Store receipts', path: '/store-receipts', anyOf: ['stock.view'] },
   patientRequests: { label: 'Patient requests', path: '/patient-requests', anyOf: ['patients.view'] },
   patientMessages: { label: 'Patient messages', path: '/messages', anyOf: 'doctor' },

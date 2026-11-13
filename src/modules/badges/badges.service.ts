@@ -19,10 +19,16 @@ export interface BadgeCounts {
   observations: number;
   discountRequests: number;
   returns: number;
+  replacements: number;
   stockReceipts: number;
   patientRequests: number;
   patientMessages: number;
 }
+
+const PENDING_APPROVAL = `SELECT COUNT(*)::int AS n FROM sale_replacements WHERE status = 'pending_approval' AND deleted_at IS NULL`;
+
+const TO_SEND = `SELECT COUNT(*)::int AS n FROM sale_replacements rp JOIN sales s ON s.id = rp.sale_id
+  WHERE rp.status = 'approved' AND rp.deleted_at IS NULL AND COALESCE(s.fulfillment_branch_id, s.branch_id) = $1`;
 
 const OPEN_HOLDS = `SELECT COUNT(*)::int AS n FROM stock_holds WHERE status = 'open' AND ($1::uuid IS NULL OR branch_id = $1)`;
 
@@ -66,6 +72,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
       observations: await one(OPEN_HOLDS, [null]),
       discountRequests,
       returns,
+      replacements: await one(PENDING_APPROVAL, []),
       stockReceipts: (await pendingReceipts(null)) + (await pendingGrnEdits()),
       patientRequests: await patientRequestsService.openCount(null),
     };
@@ -96,6 +103,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
       observations: viewer.role === 'warehouse_keeper' ? await one(OPEN_HOLDS, [null]) : 0,
       discountRequests: 0,
       returns: 0,
+      replacements: 0,
       stockReceipts: await pendingReceipts(branchId),
       patientRequests: 0,
     };
@@ -142,6 +150,7 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
     observations: branch?.kind === 'dispatch' ? await one(OPEN_HOLDS, [branchId]) : 0,
     discountRequests,
     returns,
+    replacements: await one(TO_SEND, [branchId]),
     stockReceipts: 0,
     patientRequests: await patientRequestsService.openCount(branchId),
   };
