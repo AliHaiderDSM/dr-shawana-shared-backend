@@ -77,7 +77,7 @@ registry.registerPath({
               grossAmount: moneyOutput.openapi({ description: 'Before any discount (qty × price)' }),
               discountTotal: moneyOutput.openapi({ description: 'Item discounts plus the sale discount' }),
               refund: moneyOutput.openapi({ description: 'Money refunded on returns of this sale' }),
-              netAmount: moneyOutput.openapi({ description: 'Total after discounts minus refunds' }),
+              netAmount: moneyOutput.openapi({ description: 'Money received minus refunds' }),
             }),
           ),
           meta: pageMetaSchema.extend({

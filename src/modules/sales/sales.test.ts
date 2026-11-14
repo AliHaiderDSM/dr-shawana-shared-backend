@@ -313,6 +313,9 @@ describe('POS sales', () => {
       remaining: '500.00',
       paymentStatus: 'partial',
     });
+    const listed = await api('get', `/branch/sales?search=${after.body.data.invoiceNo}`, frontDesk);
+    expect(listed.body.data[0]).toMatchObject({ total: '1000.00', remaining: '500.00', netAmount: '500.00' });
+    expect(listed.body.meta.totals).toMatchObject({ received: '500.00', net: '500.00' });
     const proof = await api('get', `/branch/sales/${saleId}/payments/${payments[1].id}/proof-url`, frontDesk);
     expect(proof.status).toBe(200);
     const added = await api('post', `/branch/sales/${saleId}/payments`, frontDesk).send({

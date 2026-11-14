@@ -139,9 +139,9 @@ describe('Sale returns and barcodes', () => {
     const listed = (await api('get', '/branch/sales?pageSize=100', admin)).body;
     const row = listed.data.find((s: { id: string }) => s.id === saleId);
     expect(row.refund).toBe('1500.00');
-    expect(Number(row.netAmount)).toBe(Number(row.total) - 1500);
+    expect(Number(row.netAmount)).toBe(Number(row.received) - 1500);
     expect(listed.meta.totals.refund).toBe('1500.00');
-    expect(Number(listed.meta.totals.net)).toBe(Number(listed.meta.totals.total) - 1500);
+    expect(Number(listed.meta.totals.net)).toBe(Number(listed.meta.totals.received) - 1500);
 
     expect(
       (await api('post', '/branch/returns', pharmacy).send({ saleId, reason: 'other', items: [] })).status,

@@ -52083,7 +52083,7 @@
                           "netAmount": {
                             "type": "string",
                             "example": "1250.50",
-                            "description": "Total after discounts minus refunds"
+                            "description": "Money received minus refunds"
                           }
                         },
                         "required": [

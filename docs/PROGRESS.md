@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-14 — Sales list: net amount is the money received
+
+- `netAmount` on each sale and `meta.totals.net` are now money received minus refunds (were total minus refunds), so a partly paid sale shows what was actually paid; Remaining still shows what is owed. Tests updated.
+
 ## 2026-11-14 — GDN report: received and remaining per order
 
 - Each order of `GET /branch/sales/gdn-report` now also returns `received` and `remaining` (from the sale). Test updated.
