@@ -77,6 +77,8 @@ registry.registerPath({
               grossAmount: moneyOutput.openapi({ description: 'Before any discount (qty × price)' }),
               discountTotal: moneyOutput.openapi({ description: 'Item discounts plus the sale discount' }),
               refund: moneyOutput.openapi({ description: 'Money refunded on returns of this sale' }),
+              returns: z.number().int().openapi({ description: 'Returns recorded on this sale' }),
+              returnedQty: quantityOutput.openapi({ description: 'Pieces brought back on those returns' }),
               netAmount: moneyOutput.openapi({
                 description: 'Money received on the sale; refunds are shown apart and are not taken off',
               }),

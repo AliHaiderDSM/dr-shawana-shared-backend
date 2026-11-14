@@ -745,13 +745,18 @@ export const salesService = {
             .orderBy('si.createdAt', 'ASC')
             .getMany(),
           AppDataSource.query(
-            `SELECT sale_id AS "saleId", SUM(refund_amount)::text AS amount FROM sale_returns
-              WHERE sale_id = ANY($1::uuid[]) AND deleted_at IS NULL GROUP BY sale_id`,
+            `SELECT r.sale_id AS "saleId", SUM(r.refund_amount)::text AS amount, COUNT(*)::int AS count,
+                    (SELECT COALESCE(SUM(i.qty), 0) FROM sale_return_items i
+                       JOIN sale_returns x ON x.id = i.sale_return_id AND x.deleted_at IS NULL
+                      WHERE x.sale_id = r.sale_id AND i.deleted_at IS NULL)::text AS qty
+               FROM sale_returns r
+              WHERE r.sale_id = ANY($1::uuid[]) AND r.deleted_at IS NULL GROUP BY r.sale_id`,
             [ids],
-          ) as Promise<{ saleId: string; amount: string }[]>,
+          ) as Promise<{ saleId: string; amount: string; count: number; qty: string }[]>,
         ])
       : [[], [], []];
     const refundOf = (saleId: string) => new Decimal(refunds.find((x) => x.saleId === saleId)?.amount ?? 0);
+    const returnsOf = (saleId: string) => refunds.find((x) => x.saleId === saleId);
     const productsOf = (saleId: string) => {
       const summary = new Map<string, { name: string; qty: Decimal | null }>();
       for (const line of lines.filter((l) => l.saleId === saleId)) {
@@ -784,6 +789,8 @@ export const salesService = {
           grossAmount: toMoney(new Decimal(r.subtotal).plus(itemDiscountOf(r.id))),
           discountTotal: toMoney(itemDiscountOf(r.id).plus(r.discountAmount)),
           refund: toMoney(refundOf(r.id)),
+          returns: returnsOf(r.id)?.count ?? 0,
+          returnedQty: new Decimal(returnsOf(r.id)?.qty ?? 0).toFixed(3),
           netAmount: toMoney(r.received),
         };
       }),

@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-14 — Sales list: returns on each sale
+
+- Each sale in `GET /branch/sales` now has `returns` (how many returns) and `returnedQty` (pieces brought back), so a return without a refund is visible too. Test updated.
+
 ## 2026-11-14 — Sales list: refunds are not taken off the net amount
 
 - `netAmount` and `meta.totals.net` are now the money received on the sale; a return refund is shown in its own Refund column and in Returns, and leaves the account chosen as "Paid from" on the return. Tests updated.

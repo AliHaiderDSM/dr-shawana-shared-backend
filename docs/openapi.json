@@ -52080,6 +52080,15 @@
                             "example": "1250.50",
                             "description": "Money refunded on returns of this sale"
                           },
+                          "returns": {
+                            "type": "integer",
+                            "description": "Returns recorded on this sale"
+                          },
+                          "returnedQty": {
+                            "type": "string",
+                            "example": "10.000",
+                            "description": "Pieces brought back on those returns"
+                          },
                           "netAmount": {
                             "type": "string",
                             "example": "1250.50",
@@ -52120,6 +52129,8 @@
                           "grossAmount",
                           "discountTotal",
                           "refund",
+                          "returns",
+                          "returnedQty",
                           "netAmount"
                         ]
                       }
