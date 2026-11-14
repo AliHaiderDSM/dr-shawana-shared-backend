@@ -131,6 +131,25 @@ describe('appointment advances, balances, refunds and the payment report', () =>
     });
   });
 
+  it('counts an advance dated before the booking was entered on the booking line', async () => {
+    const earlier = shift(day0, -2);
+    const booked = await book('13:00', '13:30', '6000');
+    expect((await pay(booked.body.data.id, '2500', earlier)).status).toBe(201);
+    const rows = (await ledger(earlier, day0)).body.data.rows.filter(
+      (r: { appointment: { id: string } }) => r.appointment.id === booked.body.data.id,
+    );
+    expect(
+      rows.map((r: { kind: string; stateAfter: string; remainingAfter: string }) => [
+        r.kind,
+        r.stateAfter,
+        r.remainingAfter,
+      ]),
+    ).toEqual([
+      ['advance', 'advance', '3500.00'],
+      ['booked', 'advance', '3500.00'],
+    ]);
+  });
+
   it('lets only the Super Admin refund a cancelled appointment, up to what was received', async () => {
     const booked = await book('12:00', '12:30', '4000');
     const id = booked.body.data.id as string;

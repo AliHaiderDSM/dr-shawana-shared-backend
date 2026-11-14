@@ -194,6 +194,8 @@ export const appointmentPaymentsReportService = {
         });
       }
       if (inRange(bookedOn) && !paid.some((p) => p.date === bookedOn)) {
+        const before = (list: Movement[]) =>
+          list.filter((m) => m.date < bookedOn).reduce((sum, m) => sum.plus(m.amount), new Decimal(0));
         entries.push({
           kind: 'booked',
           id: `booked-${id}`,
@@ -202,8 +204,8 @@ export const appointmentPaymentsReportService = {
           amount: new Decimal(0),
           method: null,
           account: null,
-          paidAfter: new Decimal(0),
-          refundedAfter: new Decimal(0),
+          paidAfter: before(paid),
+          refundedAfter: before(back),
           appointment: a,
         });
       }
