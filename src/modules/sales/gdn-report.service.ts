@@ -16,6 +16,8 @@ interface OrderRow {
   deliveryStatus: string;
   paymentStatus: string;
   total: string;
+  received: string;
+  remaining: string;
   city: string | null;
   customerName: string | null;
   customerPhone: string | null;
@@ -55,7 +57,7 @@ export const gdnReportService = {
     const select = `SELECT s.id, s.sale_type AS "saleType", s.invoice_no AS "invoiceNo", s.gdn_no AS "gdnNo", s.date::text AS date,
               s.dispatched_on::text AS "dispatchedOn", s.cancelled_on::text AS "cancelledOn",
               s.delivery_status AS "deliveryStatus", s.payment_status AS "paymentStatus",
-              s.total::text AS total, COALESCE(s.patient_city, s.city) AS city,
+              s.total::text AS total, s.received::text AS received, s.remaining::text AS remaining, COALESCE(s.patient_city, s.city) AS city,
               p.name AS "customerName", p.phone AS "customerPhone",
               b.code AS "bookedCode", b.name AS "bookedName"
          FROM sales s
@@ -114,6 +116,8 @@ export const gdnReportService = {
         waitingDays: daysBetween(r.date, dispatchedToday ? (r.dispatchedOn ?? r.date) : to),
         paymentStatus: r.paymentStatus,
         total: Number(r.total).toFixed(2),
+        received: Number(r.received).toFixed(2),
+        remaining: Number(r.remaining).toFixed(2),
         city: r.city,
         customer: { name: r.customerName, phone: r.customerPhone },
         bookedAt: r.bookedCode ? { code: r.bookedCode, name: r.bookedName } : null,

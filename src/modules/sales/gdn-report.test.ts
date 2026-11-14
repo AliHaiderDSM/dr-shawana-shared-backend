@@ -21,9 +21,9 @@ describe('GDN day-end report', () => {
     seq += 1;
     const status = extra.dispatchedOn ? 'delivered' : extra.cancelledOn ? 'cancelled' : 'pending';
     await AppDataSource.query(
-      `INSERT INTO sales (branch_id, invoice_seq, invoice_no, patient_id, sale_type, city, date, subtotal, total,
+      `INSERT INTO sales (branch_id, invoice_seq, invoice_no, patient_id, sale_type, city, date, subtotal, total, received, remaining,
                           delivery_status, fulfillment_branch_id, dispatched_on, delivered_on, gdn_no, cancelled_on)
-       VALUES ($1, $2, $3, $4, 'online', 'Lahore', $5, 1000, 1000, $6, $7, $8, $8, $9, $10)`,
+       VALUES ($1, $2, $3, $4, 'online', 'Lahore', $5, 1000, 1000, 600, 400, $6, $7, $8, $8, $9, $10)`,
       [
         lahoreId,
         seq,
@@ -101,6 +101,9 @@ describe('GDN day-end report', () => {
       gdnNo: expect.stringMatching(/GDN/),
       customer: { name: 'Sana' },
       bookedAt: { code: 'LHR' },
+      total: '1000.00',
+      received: '600.00',
+      remaining: '400.00',
     });
   });
 

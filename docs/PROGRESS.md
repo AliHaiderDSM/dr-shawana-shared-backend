@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-14 — GDN report: received and remaining per order
+
+- Each order of `GET /branch/sales/gdn-report` now also returns `received` and `remaining` (from the sale). Test updated.
+
+## 2026-11-14 — Appointment payment report: booking line counts earlier advances
+
+- The booking line (the day the appointment was entered) now counts payments dated before that day, so an appointment entered late with an earlier advance no longer shows Unpaid with the whole fee remaining. Test in `appointment-refunds.test.ts`.
+
 ## 2026-11-12 — Free replacements for damaged or expired returns
 
 - Migration `SaleReplacements1795200000000`: tables `sale_replacements` / `sale_replacement_items` (RLS on), enum `sale_replacement_status` (pending, sent), stock movement type `replacement`.
