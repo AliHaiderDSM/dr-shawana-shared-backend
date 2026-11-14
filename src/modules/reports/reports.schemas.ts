@@ -188,7 +188,7 @@ const reportSchema = registry.register(
 const reports: [string, string, z.ZodObject][] = [
   [
     'sale-products',
-    'Sale products (posSoft Monthly Sale Products): one row per completed sale (paid and approved, handed over) with its products, discount, received and remaining',
+    'Sale products (posSoft Monthly Sale Products): one row per handed-over sale that is paid or partly paid (approved; its remaining shows what is still owed) with its products, discount, received and remaining',
     saleProductsQuerySchema,
   ],
   ['purchases', 'Buy products: purchase entries with supplier and amount', purchasesQuerySchema],

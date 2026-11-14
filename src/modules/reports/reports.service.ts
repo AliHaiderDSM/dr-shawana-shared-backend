@@ -158,7 +158,7 @@ export const reportsService = {
   async saleProducts(scope: ReportScope, q: SaleProductsQuery) {
     const f = scoped(scope, 's.branch_id')
       .add('s.deleted_at IS NULL')
-      .add("s.payment_status = 'paid'")
+      .add("s.payment_status IN ('paid', 'partial')")
       .add("(s.sale_type = 'office' OR s.delivery_status IN ('dispatched', 'delivered'))")
       .period('s.date', q)
       .when(q.patientId, 's.patient_id = ?', q.patientId)

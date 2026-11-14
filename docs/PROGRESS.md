@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-14 — Sale products report includes partly paid sales
+
+- `GET /branch/reports/sale-products` now lists handed-over sales that are paid or partly paid (was paid only); Received and Remaining show what came in and what is owed. Unpaid and awaiting-approval sales stay out. Test added.
+
 ## 2026-11-14 — Sales list: net amount is the money received
 
 - `netAmount` on each sale and `meta.totals.net` are now money received minus refunds (were total minus refunds), so a partly paid sale shows what was actually paid; Remaining still shows what is owed. Tests updated.

@@ -329,6 +329,19 @@ describe('accounts, expenses, reports and dashboard', () => {
         invoiceNo: 'LHR-000001',
       });
       expect(sales.body.data.totals).toMatchObject({ total: '2000.00', totalQty: '2.000' });
+      const setPayment = (status: string, received: string, remaining: string) =>
+        AppDataSource.query(
+          'UPDATE sales SET payment_status = $1, received = $2, remaining = $3 WHERE invoice_no = $4',
+          [status, received, remaining, 'LHR-000001'],
+        );
+      await setPayment('partial', '1500', '500');
+      expect((await report('sale-products', frontDesk, 'month=2026-09')).body.data.totals).toMatchObject({
+        received: '1500.00',
+        remaining: '500.00',
+      });
+      await setPayment('unpaid', '0', '2000');
+      expect((await report('sale-products', frontDesk, 'month=2026-09')).body.data.rows).toHaveLength(0);
+      await setPayment('paid', '2000', '0');
       expect(sales.body.data.columns[0]).toEqual({ key: 'sr', label: 'Sr.' });
       expect(sales.body.data.rows[0].sr).toBe(1);
       const wide = (await report('sale-products', frontDesk, 'month=2026-09&layout=products')).body.data;
