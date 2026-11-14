@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-14 — Sales list: refunds are not taken off the net amount
+
+- `netAmount` and `meta.totals.net` are now the money received on the sale; a return refund is shown in its own Refund column and in Returns, and leaves the account chosen as "Paid from" on the return. Tests updated.
+
 ## 2026-11-14 — Sale products report includes partly paid sales
 
 - `GET /branch/reports/sale-products` now lists handed-over sales that are paid or partly paid (was paid only); Received and Remaining show what came in and what is owed. Unpaid and awaiting-approval sales stay out. Test added.

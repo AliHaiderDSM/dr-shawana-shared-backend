@@ -784,7 +784,7 @@ export const salesService = {
           grossAmount: toMoney(new Decimal(r.subtotal).plus(itemDiscountOf(r.id))),
           discountTotal: toMoney(itemDiscountOf(r.id).plus(r.discountAmount)),
           refund: toMoney(refundOf(r.id)),
-          netAmount: toMoney(new Decimal(r.received).minus(refundOf(r.id))),
+          netAmount: toMoney(r.received),
         };
       }),
       meta: {
@@ -800,7 +800,7 @@ export const salesService = {
           received: toMoney(totals?.received ?? 0),
           remaining: toMoney(totals?.remaining ?? 0),
           refund: toMoney(totals?.refund ?? 0),
-          net: toMoney(new Decimal(totals?.received ?? 0).minus(totals?.refund ?? 0)),
+          net: toMoney(totals?.received ?? 0),
         },
         ...(byBranch
           ? {

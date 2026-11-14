@@ -52083,7 +52083,7 @@
                           "netAmount": {
                             "type": "string",
                             "example": "1250.50",
-                            "description": "Money received minus refunds"
+                            "description": "Money received on the sale; refunds are shown apart and are not taken off"
                           }
                         },
                         "required": [
