@@ -944,4 +944,18 @@ describe('POS sales', () => {
       );
     });
   });
+
+  it('dates a sale on the day its payment came in when no date is given', async () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const res = await api('post', '/branch/sales', admin).send({
+      patientId,
+      saleType: 'office',
+      items: [{ productId: serum, qty: '1' }],
+      payments: [{ method: 'cash', amount: '1000', date: yesterday, accountSheetId: cashSheet }],
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.date).toBe(yesterday);
+    expect(res.body.data.payments[0].date).toBe(yesterday);
+    await api('delete', `/branch/sales/${res.body.data.id}`, admin).expect(204);
+  });
 });

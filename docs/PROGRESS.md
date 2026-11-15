@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — A sale is dated the day its payment came in
+
+- `POST /branch/sales` without a `date` now takes the earliest payment date (then today), as posSoft: the sale date is the day the money came in, and the entry time stays in createdAt. Test added.
+
 ## 2026-11-15 — Inventory report: replaced column
 
 - The inventory report rows and totals now carry `replaced` (pieces sent out as free replacements); before, they only showed in the closing stock. `adjusted` (write-offs and sale edits) is documented. Test updated.

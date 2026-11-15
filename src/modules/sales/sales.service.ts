@@ -896,7 +896,13 @@ export const salesService = {
         const received = input.payments.reduce((sum, p) => sum.plus(p.amount), new Decimal(0));
         const totals = saleTotals(lines, received, input, online && input.payments.length > 0);
         const seq = await nextSequence(em, branchId, 'sale');
-        const date = input.date ?? today();
+        const date =
+          input.date ??
+          input.payments
+            .map((p) => p.date)
+            .filter((d): d is string => Boolean(d))
+            .sort()[0] ??
+          today();
         const gdnNo = online
           ? null
           : `${branch.code}-GDN-${String(await nextSequence(em, branchId, 'gdn')).padStart(6, '0')}`;
