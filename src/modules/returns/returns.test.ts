@@ -270,4 +270,81 @@ describe('Sale returns and barcodes', () => {
     expect(price(toner)).toBe(expected(toner));
     expect(Number(price(serum)) * 2 + Number(price(toner))).toBeCloseTo(Number(total), 1);
   });
+
+  it('sends a damaged item to the lab, which repairs it back into stock or removes it', async () => {
+    const warehouse = await createBranch({ code: 'WHL', kind: 'warehouse' });
+    const lab = await createStaff(fake, { role: 'lab_officer', branchId: warehouse.id });
+    const sale = await api('post', '/branch/sales', frontDesk).send({
+      patient: { name: 'Lubna', phone: '923007778889', city: 'Lahore' },
+      saleType: 'office',
+      items: [
+        { productId: serum, qty: '1' },
+        { productId: toner, qty: '1' },
+      ],
+      payments: [{ method: 'cash', amount: '2000', accountSheetId: cashSheet }],
+    });
+    expect(sale.status).toBe(201);
+    const serumBefore = Number(await stock(serum));
+    const tonerBefore = Number(await stock(toner));
+    const ret = (
+      await api('post', '/branch/returns', frontDesk).send({
+        saleId: sale.body.data.id,
+        reason: 'damaged',
+        items: [
+          { productId: serum, qty: '1' },
+          { productId: toner, qty: '1' },
+        ],
+      })
+    ).body.data;
+    const itemOf = (productId: string) =>
+      ret.items.find((i: { productId: string }) => i.productId === productId);
+    for (const productId of [serum, toner]) {
+      const sent = await api(
+        'post',
+        `/branch/returns/${ret.id}/items/${itemOf(productId).id}/resolve`,
+        admin,
+      ).send({
+        disposition: 'lab',
+        note: 'Cap broken',
+      });
+      expect(sent.status).toBe(200);
+      expect(sent.body.data.status).toBe('pending');
+    }
+    expect(
+      (
+        await api('post', `/branch/returns/${ret.id}/items/${itemOf(serum).id}/resolve`, admin).send({
+          disposition: 'restocked',
+        })
+      ).status,
+    ).toBe(409);
+
+    expect((await api('get', '/branch/lab-returns', admin)).status).toBe(403);
+    const waiting = (await api('get', '/branch/lab-returns', lab)).body.data;
+    expect(waiting.map((i: { id: string }) => i.id).sort()).toEqual(
+      [itemOf(serum).id, itemOf(toner).id].sort(),
+    );
+    expect(waiting[0]).toMatchObject({ returnNo: ret.returnNo, branch: { code: 'LHR' }, note: 'Cap broken' });
+    expect((await api('get', '/branch/badges', lab)).body.data.labReturns).toBe(2);
+
+    const decide = (productId: string, outcome: string, who: { id: string } = lab) =>
+      api('post', `/branch/lab-returns/${itemOf(productId).id}/decide`, who).send({
+        outcome,
+        note: 'Checked',
+      });
+    expect((await decide(serum, 'restocked', admin)).status).toBe(403);
+    expect((await decide(serum, 'restocked')).status).toBe(200);
+    expect(Number(await stock(serum))).toBe(serumBefore + 1);
+    const removed = await decide(toner, 'damaged');
+    expect(removed.body.data.status).toBe('completed');
+    expect(removed.body.data.items.find((i: { productId: string }) => i.productId === toner)).toMatchObject({
+      disposition: 'damaged',
+      resolutionNote: 'Cap broken · Lab: Checked',
+    });
+    expect(Number(await stock(toner))).toBe(tonerBefore);
+    expect((await decide(toner, 'restocked')).status).toBe(409);
+
+    expect((await api('get', '/branch/lab-returns', lab)).body.data).toEqual([]);
+    const done = (await api('get', '/branch/lab-returns?status=done', lab)).body.data;
+    expect(done.map((i: { disposition: string }) => i.disposition).sort()).toEqual(['damaged', 'restocked']);
+  });
 });

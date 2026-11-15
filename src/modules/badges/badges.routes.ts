@@ -24,6 +24,7 @@ const countsSchema = registry.register(
     stockReceipts: z.number().int(),
     patientRequests: z.number().int(),
     patientMessages: z.number().int(),
+    labReturns: z.number().int(),
   }),
 );
 

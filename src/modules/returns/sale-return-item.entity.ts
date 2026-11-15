@@ -12,6 +12,7 @@ export const RETURN_DISPOSITIONS = [
   'damaged',
   'expired',
   'supplier',
+  'lab',
 ] as const;
 export type ReturnDisposition = (typeof RETURN_DISPOSITIONS)[number];
 
@@ -73,4 +74,11 @@ export class SaleReturnItem extends BranchScopedEntity {
 
   @Column({ name: 'proposal_note', type: 'text', nullable: true })
   proposalNote: string | null;
+
+  @Index('IDX_sale_return_items_lab_sent_at')
+  @Column({ name: 'lab_sent_at', type: 'timestamptz', nullable: true })
+  labSentAt: Date | null;
+
+  @Column({ name: 'lab_sent_by', type: 'uuid', nullable: true })
+  labSentBy: string | null;
 }

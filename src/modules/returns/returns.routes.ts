@@ -12,6 +12,9 @@ import { validate, validBody, validParams, validQuery } from '../../middleware/v
 import {
   createReturnSchema,
   decideReturnItemSchema,
+  labDecisionSchema,
+  labItemParamsSchema,
+  labReturnsQuerySchema,
   resolveItemSchema,
   returnItemParamsSchema,
   returnListQuerySchema,
@@ -25,6 +28,28 @@ import { returnsService } from './returns.service';
 export const returnsRouter = Router();
 
 const path = '/branch/returns';
+const labPath = '/branch/lab-returns';
+
+returnsRouter.get(
+  labPath,
+  authenticate,
+  requireRole('lab_officer'),
+  validate({ query: labReturnsQuerySchema }),
+  async (req, res) => {
+    sendOk(res, await returnsService.labList(validQuery(req, labReturnsQuerySchema)));
+  },
+);
+
+returnsRouter.post(
+  `${labPath}/:itemId/decide`,
+  authenticate,
+  requireRole('lab_officer'),
+  validate({ params: labItemParamsSchema, body: labDecisionSchema }),
+  async (req, res) => {
+    const { itemId } = validParams(req, labItemParamsSchema);
+    sendOk(res, await returnsService.labDecide(actorFrom(req), itemId, validBody(req, labDecisionSchema)));
+  },
+);
 const byId = validate({ params: idParamsSchema });
 const can = (action: 'view' | 'create' | 'update' | 'delete') => requirePermission(`returns.${action}`);
 

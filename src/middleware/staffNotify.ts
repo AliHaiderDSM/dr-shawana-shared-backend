@@ -18,6 +18,7 @@ const WATCHED = [
   /^\/branch\/stock-holds/,
   /^\/admin\/discount-requests/,
   /^\/branch\/returns/,
+  /^\/branch\/lab-returns/,
   /^\/admin\/returns/,
   /^\/branch\/replacements/,
   /^\/admin\/replacements/,

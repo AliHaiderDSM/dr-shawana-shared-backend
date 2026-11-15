@@ -2063,7 +2063,8 @@
               "expired",
               "supplier_returned",
               "dispatched",
-              "written_off"
+              "written_off",
+              "at_lab"
             ]
           },
           "productId": {
@@ -2170,7 +2171,8 @@
               "expired",
               "supplier_returned",
               "dispatched",
-              "written_off"
+              "written_off",
+              "at_lab"
             ]
           },
           "productId": {
@@ -2318,7 +2320,8 @@
                     "supplier_returned",
                     "dispatched",
                     "dispatch_cancelled",
-                    "written_off"
+                    "written_off",
+                    "sent_to_lab"
                   ]
                 },
                 "referenceType": {
@@ -14672,7 +14675,8 @@
               "restocked",
               "damaged",
               "expired",
-              "supplier"
+              "supplier",
+              "lab"
             ]
           },
           "note": {
@@ -14685,6 +14689,141 @@
         },
         "required": [
           "disposition"
+        ]
+      },
+      "LabReturnDecision": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "restocked",
+              "damaged"
+            ],
+            "description": "restocked: repaired, goes back into the stock it came from; damaged: cannot be fixed, removed"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "LabReturnItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnNo": {
+            "type": "string"
+          },
+          "returnDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "invoiceNo": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "name"
+            ]
+          },
+          "product": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "string"
+          },
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "customer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disposition": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "quarantined",
+              "restocked",
+              "damaged",
+              "expired",
+              "supplier",
+              "lab"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "returnId",
+          "returnNo",
+          "returnDate",
+          "reason",
+          "invoiceNo",
+          "branch",
+          "product",
+          "qty",
+          "serials",
+          "customer",
+          "disposition",
+          "note",
+          "sentAt",
+          "sentBy",
+          "decidedAt"
         ]
       },
       "SetReturnRefund": {
@@ -14911,7 +15050,8 @@
                     "restocked",
                     "damaged",
                     "expired",
-                    "supplier"
+                    "supplier",
+                    "lab"
                   ]
                 },
                 "resolvedAt": {
@@ -14946,6 +15086,7 @@
                     "damaged",
                     "expired",
                     "supplier",
+                    "lab",
                     null
                   ],
                   "description": "Online returns: what the dispatcher found, waiting for the Super Admin"
@@ -16042,7 +16183,8 @@
                     "expired",
                     "supplier_returned",
                     "dispatched",
-                    "written_off"
+                    "written_off",
+                    "at_lab"
                   ]
                 }
               },
@@ -17683,6 +17825,9 @@
           },
           "patientMessages": {
             "type": "integer"
+          },
+          "labReturns": {
+            "type": "integer"
           }
         },
         "required": [
@@ -17695,7 +17840,8 @@
           "returns",
           "stockReceipts",
           "patientRequests",
-          "patientMessages"
+          "patientMessages",
+          "labReturns"
         ]
       },
       "Trace": {
@@ -26439,7 +26585,8 @@
                 "expired",
                 "supplier_returned",
                 "dispatched",
-                "written_off"
+                "written_off",
+                "at_lab"
               ]
             },
             "required": false,
@@ -26683,7 +26830,8 @@
                 "expired",
                 "supplier_returned",
                 "dispatched",
-                "written_off"
+                "written_off",
+                "at_lab"
               ],
               "description": "Only batches that have pieces in this status"
             },
@@ -51934,7 +52082,8 @@
                                     "expired",
                                     "supplier_returned",
                                     "dispatched",
-                                    "written_off"
+                                    "written_off",
+                                    "at_lab"
                                   ]
                                 }
                               },
@@ -57695,6 +57844,212 @@
         }
       }
     },
+    "/branch/lab-returns": {
+      "get": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Lab Officer and Super Admin: damaged return items sent to the lab from every branch (waiting), or the ones the lab has decided (done)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "waiting",
+                "done"
+              ],
+              "default": "waiting",
+              "description": "waiting: still at the lab; done: the lab has decided"
+            },
+            "required": false,
+            "description": "waiting: still at the lab; done: the lab has decided",
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LabReturnItem"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/lab-returns/{itemId}/decide": {
+      "post": {
+        "tags": [
+          "Returns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Lab Officer and Super Admin: repaired (restocked into the stock the sale came from) or cannot be fixed (damaged, removed)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabReturnDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated return",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/SaleReturn"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/returns": {
       "get": {
         "tags": [
@@ -57791,7 +58146,8 @@
                 "restocked",
                 "damaged",
                 "expired",
-                "supplier"
+                "supplier",
+                "lab"
               ]
             },
             "required": false,
@@ -58342,7 +58698,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Inspection result of one item: restocked (back into sellable stock), damaged (written off) or supplier (sent back)",
+        "summary": "Inspection result of one item: restocked (back into sellable stock), damaged (removed from inventory), lab (sent to the lab, which repairs it back into stock or removes it) or supplier (sent back)",
         "parameters": [
           {
             "schema": {

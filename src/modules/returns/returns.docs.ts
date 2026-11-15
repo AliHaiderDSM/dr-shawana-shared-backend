@@ -11,6 +11,10 @@ import { securedDocs } from '../../lib/openapi-crud';
 import {
   createReturnSchema,
   decideReturnItemSchema,
+  labDecisionSchema,
+  labItemParamsSchema,
+  labReturnItemSchema,
+  labReturnsQuerySchema,
   resolveItemSchema,
   returnableSchema,
   returnItemParamsSchema,
@@ -21,6 +25,32 @@ import {
 } from './returns.schemas';
 
 const docs = securedDocs('Returns');
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/branch/lab-returns',
+  summary:
+    'Lab Officer and Super Admin: damaged return items sent to the lab from every branch (waiting), or the ones the lab has decided (done)',
+  request: { query: labReturnsQuerySchema },
+  responses: {
+    200: { description: 'Items', ...jsonContent(dataEnvelope(labReturnItemSchema.array())) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'post',
+  path: '/branch/lab-returns/{itemId}/decide',
+  summary:
+    'Lab Officer and Super Admin: repaired (restocked into the stock the sale came from) or cannot be fixed (damaged, removed)',
+  request: { params: labItemParamsSchema, body: jsonContent(labDecisionSchema) },
+  responses: {
+    200: { description: 'Updated return', ...jsonContent(dataEnvelope(saleReturnSchema)) },
+    ...errorResponses,
+  },
+});
 const one = (description: string) => ({ description, ...jsonContent(dataEnvelope(saleReturnSchema)) });
 const byId = { params: idParamsSchema, query: branchQuerySchema };
 
@@ -72,7 +102,7 @@ registry.registerPath({
   method: 'post',
   path: '/branch/returns/{id}/items/{itemId}/resolve',
   summary:
-    'Inspection result of one item: restocked (back into sellable stock), damaged (written off) or supplier (sent back)',
+    'Inspection result of one item: restocked (back into sellable stock), damaged (removed from inventory), lab (sent to the lab, which repairs it back into stock or removes it) or supplier (sent back)',
   request: {
     params: returnItemParamsSchema,
     query: branchQuerySchema,

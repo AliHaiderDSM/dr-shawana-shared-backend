@@ -62,9 +62,54 @@ export const resolveItemSchema = registry.register(
         'damaged',
         'expired',
         'supplier',
+        'lab',
       ],
     ),
     note: optionalText(2000),
+  }),
+);
+
+export const LAB_OUTCOMES = ['restocked', 'damaged'] as const;
+
+export const labReturnsQuerySchema = z.object({
+  status: z
+    .enum(['waiting', 'done'])
+    .default('waiting')
+    .openapi({ description: 'waiting: still at the lab; done: the lab has decided' }),
+});
+
+export const labDecisionSchema = registry.register(
+  'LabReturnDecision',
+  z.object({
+    outcome: z.enum(LAB_OUTCOMES).openapi({
+      description:
+        'restocked: repaired, goes back into the stock it came from; damaged: cannot be fixed, removed',
+    }),
+    note: optionalText(2000),
+  }),
+);
+
+export const labItemParamsSchema = z.object({ itemId: z.uuid() });
+
+export const labReturnItemSchema = registry.register(
+  'LabReturnItem',
+  z.object({
+    id: z.uuid(),
+    returnId: z.uuid(),
+    returnNo: z.string(),
+    returnDate: z.iso.date(),
+    reason: z.string(),
+    invoiceNo: z.string(),
+    branch: z.object({ code: z.string(), name: z.string() }),
+    product: z.string(),
+    qty: z.string(),
+    serials: z.array(z.string()),
+    customer: z.string().nullable(),
+    disposition: z.enum(RETURN_DISPOSITIONS),
+    note: z.string().nullable(),
+    sentAt: z.iso.datetime(),
+    sentBy: z.string().nullable(),
+    decidedAt: z.iso.datetime().nullable(),
   }),
 );
 
@@ -189,3 +234,5 @@ export type CreateReturnInput = z.output<typeof createReturnSchema>;
 export type RefundInput = z.output<typeof refundInputSchema>;
 export type ResolveItemInput = z.output<typeof resolveItemSchema>;
 export type ReturnListQuery = z.output<typeof returnListQuerySchema>;
+export type LabReturnsQuery = z.output<typeof labReturnsQuerySchema>;
+export type LabDecision = z.output<typeof labDecisionSchema>;

@@ -7,7 +7,7 @@ import { badgeCounts, type BadgeCounts } from '../badges/badges.service';
 
 type BadgeKey = keyof BadgeCounts;
 
-const BADGES: Record<BadgeKey, { label: string; path: string; anyOf: Permission[] | 'doctor' }> = {
+const BADGES: Record<BadgeKey, { label: string; path: string; anyOf: Permission[] | 'doctor' | 'lab' }> = {
   stockRequests: {
     label: 'Stock requests',
     path: '/stock-requests',
@@ -30,6 +30,7 @@ const BADGES: Record<BadgeKey, { label: string; path: string; anyOf: Permission[
   stockReceipts: { label: 'Store receipts', path: '/store-receipts', anyOf: ['stock.view'] },
   patientRequests: { label: 'Patient requests', path: '/patient-requests', anyOf: ['patients.view'] },
   patientMessages: { label: 'Patient messages', path: '/messages', anyOf: 'doctor' },
+  labReturns: { label: 'Returns at the lab', path: '/lab-returns', anyOf: 'lab' },
 };
 
 export interface PushMessage {
@@ -84,6 +85,7 @@ const webPushSender: PushSender = async (target, message) => {
 function visible(key: BadgeKey, role: Role) {
   const rule = BADGES[key].anyOf;
   if (rule === 'doctor') return role === 'doctor';
+  if (rule === 'lab') return role === 'lab_officer' || role === 'super_admin';
   return role === 'super_admin' || rule.some((permission) => hasPermission(role, permission));
 }
 

@@ -173,7 +173,8 @@ Online Sale: Pending --> Delivered / Returned
   |                                  |
   v                                  v
   |                     Returns section (pending inspection)
-  |                       --> Restocked / Damaged / Sent to supplier
+  |                       --> Restocked / Damaged (remove from inventory) / Sent to supplier
+  |                       --> Send to lab: the Lab Officer repairs it back into the same stock, or removes it
   |                       --> optional refund from an account
   |                       --> damaged on arrival: free replacement (<invoice>.1) of the same products
   |

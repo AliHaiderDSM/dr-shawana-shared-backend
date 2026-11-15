@@ -13,6 +13,7 @@ export const ITEM_STATUSES = [
   'supplier_returned',
   'dispatched',
   'written_off',
+  'at_lab',
 ] as const;
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 

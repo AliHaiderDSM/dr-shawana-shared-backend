@@ -139,6 +139,7 @@ const STATUS_TEXT: Record<ItemStatus, string> = {
   supplier_returned: 'was sent back to the supplier',
   dispatched: 'was already sent out',
   written_off: 'was written off',
+  at_lab: 'is at the lab',
 };
 
 const LINEAGE_JOINS = `JOIN products p ON p.id = i.product_id

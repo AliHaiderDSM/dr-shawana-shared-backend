@@ -1,5 +1,6 @@
 import { type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
+import { AppDataSource } from '../../database/data-source';
 import { repo, withTransaction } from '../../database/transaction';
 import { Decimal, toMoney, toQuantity } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
@@ -18,6 +19,8 @@ import { SaleReturnItem, type ReturnDisposition } from './sale-return-item.entit
 import { SaleReturn, type ReturnReason } from './sale-return.entity';
 import {
   type CreateReturnInput,
+  type LabDecision,
+  type LabReturnsQuery,
   type RefundInput,
   type ResolveItemInput,
   type ReturnListQuery,
@@ -36,6 +39,7 @@ const PIECE_STATUS = {
   damaged: 'damaged',
   expired: 'expired',
   supplier: 'supplier_returned',
+  lab: 'at_lab',
 } as const;
 
 const PIECE_EVENT = {
@@ -44,7 +48,12 @@ const PIECE_EVENT = {
   damaged: 'damaged',
   expired: 'expired',
   supplier: 'supplier_returned',
+  lab: 'sent_to_lab',
 } as const;
+
+const OPEN_DISPOSITIONS: ReturnDisposition[] = ['pending', 'quarantined', 'lab'];
+const WAITING = "i.disposition = 'lab'";
+const DONE = "i.disposition <> 'lab'";
 
 async function restoreSources(manager: EntityManager, saleId: string) {
   const siblings = await repo(SaleReturn, manager).find({ where: { saleId }, select: { id: true } });
@@ -373,7 +382,7 @@ async function applyResolution(
   note: string | null | undefined,
 ) {
   const pieces = (await inventoryItemsService.itemsOf(em, { saleReturnItemIds: [item.id] })).filter((p) =>
-    ['returned', 'quarantined'].includes(p.status),
+    ['returned', 'quarantined', 'at_lab'].includes(p.status),
   );
   const pieceRef = { type: REFERENCE, id: record.id, label: record.returnNo };
   const owner = await repo(Sale, em).findOneByOrFail({ id: record.saleId });
@@ -426,13 +435,14 @@ async function applyResolution(
       resolvedAt: new Date(),
       resolvedBy: actor.userId,
       resolutionNote: note ?? null,
+      ...(disposition === 'lab' ? { labSentAt: new Date(), labSentBy: actor.userId } : {}),
       updatedBy: actor.userId,
     },
   );
   const open = (record.items ?? []).filter(
-    (i) => i.id !== item.id && (i.disposition === 'pending' || i.disposition === 'quarantined'),
+    (i) => i.id !== item.id && OPEN_DISPOSITIONS.includes(i.disposition),
   );
-  if (open.length === 0 && disposition !== 'quarantined') {
+  if (open.length === 0 && !OPEN_DISPOSITIONS.includes(disposition)) {
     await repo(SaleReturn, em).update({ id: record.id }, { status: 'completed', updatedBy: actor.userId });
   }
 }
@@ -629,6 +639,9 @@ export const returnsService = {
       const record = await getReturn(branchId, id, em);
       const item = record.items?.find((i) => i.id === itemId);
       if (!item) throw AppError.notFound('Return item');
+      if (item.disposition === 'lab') {
+        throw AppError.conflict('This item is at the lab; the lab decides what happens to it');
+      }
       if (item.disposition !== 'pending' && item.disposition !== 'quarantined') {
         throw AppError.conflict('This item has already been inspected');
       }
@@ -718,6 +731,67 @@ export const returnsService = {
         disposition: proposed,
         note: note ?? null,
       });
+      return toReturnDto(saved);
+    });
+  },
+
+  async labList(query: LabReturnsQuery) {
+    const rows = (await AppDataSource.query(
+      `SELECT i.id, r.id AS "returnId", r.return_no AS "returnNo", r.date::text AS "returnDate", r.reason::text AS reason,
+              s.invoice_no AS "invoiceNo", b.code AS "branchCode", b.name AS "branchName", p.name AS product,
+              i.qty::text AS qty, pt.name AS customer, i.disposition::text AS disposition,
+              i.resolution_note AS note, i.lab_sent_at AS "sentAt", i.resolved_at AS "decidedAt",
+              NULLIF(TRIM(CONCAT(st.first_name, ' ', st.last_name)), '') AS "sentBy",
+              COALESCE((SELECT array_agg(it.serial ORDER BY it.serial) FROM inventory_items it
+                         WHERE it.sale_return_item_id = i.id AND it.deleted_at IS NULL), '{}') AS serials
+         FROM sale_return_items i
+         JOIN sale_returns r ON r.id = i.sale_return_id AND r.deleted_at IS NULL
+         JOIN sales s ON s.id = r.sale_id
+         JOIN branches b ON b.id = r.branch_id
+         JOIN products p ON p.id = i.product_id
+         LEFT JOIN patients pt ON pt.id = s.patient_id
+         LEFT JOIN staff_profiles st ON st.id = i.lab_sent_by
+        WHERE i.deleted_at IS NULL AND i.lab_sent_at IS NOT NULL
+          AND ${query.status === 'waiting' ? WAITING : DONE}
+        ORDER BY ${query.status === 'waiting' ? 'i.lab_sent_at ASC' : 'i.resolved_at DESC'}
+        LIMIT 500`,
+    )) as (Record<string, unknown> & {
+      branchCode: string;
+      branchName: string;
+      qty: string;
+      disposition: string;
+      sentAt: Date;
+      decidedAt: Date | null;
+    })[];
+    return rows.map(({ branchCode, branchName, sentAt, decidedAt, qty, ...rest }) => ({
+      ...rest,
+      qty: toQuantity(qty),
+      branch: { code: branchCode, name: branchName },
+      sentAt: new Date(sentAt).toISOString(),
+      decidedAt: rest.disposition === 'lab' || !decidedAt ? null : new Date(decidedAt).toISOString(),
+    }));
+  },
+
+  async labDecide(actor: Actor, itemId: string, input: LabDecision) {
+    return withTransaction(async (em) => {
+      const item = await repo(SaleReturnItem, em).findOneBy({ id: itemId });
+      if (!item) throw AppError.notFound('Return item');
+      if (item.disposition !== 'lab') throw AppError.conflict('This item is not waiting at the lab');
+      const record = await getReturn(null, item.saleReturnId, em);
+      const current = record.items?.find((i) => i.id === itemId) ?? item;
+      const note = [current.resolutionNote, input.note ? `Lab: ${input.note}` : null]
+        .filter(Boolean)
+        .join(' · ');
+      await applyResolution(em, actor, record, current, input.outcome, note || null);
+      const saved = await getReturn(null, record.id, em);
+      await audit(
+        actor,
+        saved,
+        `item:lab:${input.outcome}`,
+        em,
+        { itemId, disposition: 'lab' },
+        { itemId, disposition: input.outcome },
+      );
       return toReturnDto(saved);
     });
   },

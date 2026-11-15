@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Damaged returns: send to lab or remove
+
+- New return disposition `lab` (migration ReturnLab: enum values `lab`, item status `at_lab`, event `sent_to_lab`, columns `lab_sent_at`/`lab_sent_by` on sale_return_items). Inspection can send an item to the lab; the branch cannot change it after that.
+- `GET /branch/lab-returns?status=waiting|done` and `POST /branch/lab-returns/:itemId/decide` (`restocked` or `damaged`) for the Lab Officer and the Super Admin, across branches. Repaired goes back into the stock the sale came from; the return completes when nothing is open. Sidebar badge and push `labReturns`.
+- `damaged` stays "remove from inventory" straight away. Tests added; full suite 44/353 green.
+
 ## 2026-11-15 — A sale is dated the day its payment came in
 
 - `POST /branch/sales` without a `date` now takes the earliest payment date (then today), as posSoft: the sale date is the day the money came in, and the entry time stays in createdAt. Test added.

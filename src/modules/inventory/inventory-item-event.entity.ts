@@ -27,6 +27,7 @@ export const ITEM_EVENTS = [
   'dispatched',
   'dispatch_cancelled',
   'written_off',
+  'sent_to_lab',
 ] as const;
 export type ItemEventType = (typeof ITEM_EVENTS)[number];
 
