@@ -282,7 +282,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
     expect(allocations(after.body.data.restockedBatches)).toEqual({ 'BATCH-002': '1.000' });
   });
 
-  it('records an expired return without adding stock', async () => {
+  it('no longer takes expired as a return outcome and adds no stock', async () => {
     const sale = await sell(serum, '2');
     const ret = await api('post', '/branch/returns', frontDesk).send({
       saleId: sale.body.data.id,
@@ -293,8 +293,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
       'post',
       `/branch/returns/${ret.body.data.id}/items/${ret.body.data.items[0].id}/resolve`,
     ).send({ disposition: 'expired' });
-    expect(resolved.status).toBe(200);
-    expect(resolved.body.data.items[0].disposition).toBe('expired');
+    expect(resolved.status).toBe(400);
     expect(await batches(serum)).toEqual({ 'BATCH-001': '120.000', 'BATCH-002': '48.000' });
   });
 

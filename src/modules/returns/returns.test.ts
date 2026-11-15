@@ -298,6 +298,13 @@ describe('Sale returns and barcodes', () => {
     ).body.data;
     const itemOf = (productId: string) =>
       ret.items.find((i: { productId: string }) => i.productId === productId);
+    expect(
+      (
+        await api('post', `/branch/returns/${ret.id}/items/${itemOf(serum).id}/resolve`, admin).send({
+          disposition: 'expired',
+        })
+      ).status,
+    ).toBe(400);
     for (const productId of [serum, toner]) {
       const sent = await api(
         'post',

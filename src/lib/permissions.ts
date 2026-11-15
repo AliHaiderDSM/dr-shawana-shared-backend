@@ -205,4 +205,4 @@ export function canManageRole(actorRole: Role, targetRole: Role): boolean {
 }
 
 export const canReportWriteOffs = (role: Role) =>
-  role === 'dispatcher' || hasPermission(role, 'stock.update');
+  role === 'dispatcher' || role === 'warehouse_keeper' || hasPermission(role, 'stock.update');

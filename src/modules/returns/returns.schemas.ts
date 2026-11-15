@@ -56,11 +56,10 @@ export const resolveItemSchema = registry.register(
   'ResolveReturnItem',
   z.object({
     disposition: z.enum(
-      RETURN_DISPOSITIONS.filter((d) => d !== 'pending') as [
+      RETURN_DISPOSITIONS.filter((d) => d !== 'pending' && d !== 'expired') as [
         'quarantined',
         'restocked',
         'damaged',
-        'expired',
         'supplier',
         'lab',
       ],

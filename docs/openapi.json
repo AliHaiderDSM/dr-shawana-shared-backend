@@ -14674,7 +14674,6 @@
               "quarantined",
               "restocked",
               "damaged",
-              "expired",
               "supplier",
               "lab"
             ]

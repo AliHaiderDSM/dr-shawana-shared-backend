@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Return outcomes and Warehouse Keeper write-offs
+
+- `expired` is no longer a return inspection outcome (old records keep it). The Warehouse Keeper can report write-offs (they wait for the Super Admin like a branch). Tests updated; full suite 44/355 green.
+
 ## 2026-11-15 — Counting transfers on receipt, under observation for the Super Admin
 
 - `POST /branch/incoming-stock/:transferNo/receive` takes `issues` (label + `missing`/`damaged` + note): those pieces go under observation at the branch (linked to the transfer and request), the rest into stock. Incoming stock items list their `serials`.
