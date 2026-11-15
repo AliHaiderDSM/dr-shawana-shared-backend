@@ -460,6 +460,11 @@ async function requestWriteOff(
 ) {
   const batch = await batches.findById(branchId, batchId, em);
   if (!batch) throw AppError.notFound('Batch');
+  if (input.reason === 'expired' && !(batch.expiryDate && batch.expiryDate < today())) {
+    throw AppError.badRequest(
+      `Batch ${batch.batchNo} has not expired. Expired is only for stock past its expiry date; use damaged or lost.`,
+    );
+  }
   const serials = input.serials ?? [];
   const tracked = await inventoryItemsService.trackedProducts(em, branchId, [batch.productId]);
   if (serials.length > 0) {

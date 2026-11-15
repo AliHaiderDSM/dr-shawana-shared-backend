@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Expired write-offs only for expired batches
+
+- A write-off with reason `expired` is refused (400) unless the batch is past its expiry date; use damaged or lost otherwise. Test updated; full suite 44/355 green.
+
 ## 2026-11-15 — Return outcomes and Warehouse Keeper write-offs
 
 - `expired` is no longer a return inspection outcome (old records keep it). The Warehouse Keeper can report write-offs (they wait for the Super Admin like a branch). Tests updated; full suite 44/355 green.

@@ -310,8 +310,12 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     expect(approved.status).toBe(200);
     expect(approved.body.data).toMatchObject({ status: 'approved', decisionNote: 'Checked photos' });
     expect(await stockOf('Rose Toner', lahoreId)).toBe('4.000');
-    const list = await as(lahoreAdmin, 'post', '/branch/inventory/write-offs').send({
+    const notExpired = await as(lahoreAdmin, 'post', '/branch/inventory/write-offs').send({
       items: [{ batchId: batches[0]!.id, qty: '1', reason: 'expired' }],
+    });
+    expect(notExpired.status).toBe(400);
+    const list = await as(lahoreAdmin, 'post', '/branch/inventory/write-offs').send({
+      items: [{ batchId: batches[0]!.id, qty: '1', reason: 'lost' }],
     });
     expect(list.status).toBe(201);
     const rejected = await as(superAdmin, 'post', `/admin/write-offs/${list.body.data[0].id}/reject`).send(
