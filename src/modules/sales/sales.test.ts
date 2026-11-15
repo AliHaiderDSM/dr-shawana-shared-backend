@@ -945,11 +945,12 @@ describe('POS sales', () => {
     });
   });
 
-  it('dates a sale on the day its payment came in when no date is given', async () => {
+  it('dates a sale on the day its payment came in, even when another date is typed', async () => {
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
     const res = await api('post', '/branch/sales', admin).send({
       patientId,
       saleType: 'office',
+      date: '2026-09-01',
       items: [{ productId: serum, qty: '1' }],
       payments: [{ method: 'cash', amount: '1000', date: yesterday, accountSheetId: cashSheet }],
     });

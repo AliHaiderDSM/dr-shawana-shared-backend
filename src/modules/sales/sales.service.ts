@@ -897,11 +897,11 @@ export const salesService = {
         const totals = saleTotals(lines, received, input, online && input.payments.length > 0);
         const seq = await nextSequence(em, branchId, 'sale');
         const date =
-          input.date ??
           input.payments
             .map((p) => p.date)
             .filter((d): d is string => Boolean(d))
             .sort()[0] ??
+          input.date ??
           today();
         const gdnNo = online
           ? null
