@@ -139,7 +139,7 @@ describe('Sale returns and barcodes', () => {
     const listed = (await api('get', '/branch/sales?pageSize=100', admin)).body;
     const row = listed.data.find((s: { id: string }) => s.id === saleId);
     expect(row.refund).toBe('1500.00');
-    expect(row).toMatchObject({ returns: 1, returnedQty: '4.000' });
+    expect(row).toMatchObject({ returns: 1, returnedQty: '4.000', enteredBy: expect.any(String) });
     expect(row.netAmount).toBe(row.received);
     expect(listed.meta.totals.refund).toBe('1500.00');
     expect(listed.meta.totals.net).toBe(listed.meta.totals.received);

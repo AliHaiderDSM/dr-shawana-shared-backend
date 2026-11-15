@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Sales list: who entered each sale
+
+- Each sale in `GET /branch/sales` carries `enteredBy` (staff name) next to `createdAt`. Test updated.
+
 ## 2026-11-15 — A new sale always takes its payment date
 
 - `POST /branch/sales`: the earliest payment date wins over a typed `date` (the typed date is used only when no payment has a date). Test updated; full suite 44/356 green.

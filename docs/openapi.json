@@ -52881,6 +52881,13 @@
                             "example": "1250.50",
                             "description": "Money refunded on returns of this sale"
                           },
+                          "enteredBy": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Staff who entered the sale"
+                          },
                           "returns": {
                             "type": "integer",
                             "description": "Returns recorded on this sale"
@@ -52930,6 +52937,7 @@
                           "grossAmount",
                           "discountTotal",
                           "refund",
+                          "enteredBy",
                           "returns",
                           "returnedQty",
                           "netAmount"
