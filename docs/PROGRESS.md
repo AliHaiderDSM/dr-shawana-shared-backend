@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Inventory report: write-offs in branches
+
+- Report rows carry `branchWrittenOff` (approved write-offs at the toBranchId branch, or every branch for the Super Admin stock) and each branch share has `writtenOff`. Test updated.
+
 ## 2026-11-15 — Sales list: who entered each sale
 
 - Each sale in `GET /branch/sales` carries `enteredBy` (staff name) next to `createdAt`. Test updated.

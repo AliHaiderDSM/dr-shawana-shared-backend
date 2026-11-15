@@ -41,6 +41,7 @@ const REPORT_COLUMNS = [
   'branchSold',
   'inBranch',
   'branchReturned',
+  'branchWrittenOff',
   'booked',
   'total',
 ] as const;
@@ -113,6 +114,7 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
     sent: string;
     sold: string;
     returned: string;
+    writtenOff: string;
     inBranch: string;
     booked: string;
   }[] = await AppDataSource.query(
@@ -126,6 +128,9 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
             COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
                        WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id
                          AND bm.type = 'sale_return' AND bm.date BETWEEN $2 AND $3), 0)::text AS returned,
+            COALESCE((SELECT -SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
+                       WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id
+                         AND bm.type = 'adjustment' AND bm.date BETWEEN $2 AND $3), 0)::text AS "writtenOff",
             COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm JOIN products bp ON bp.id = bm.product_id
                        WHERE bp.branch_id = b.id AND bp.origin_product_id = p.id AND bm.date <= $3), 0)::text AS "inBranch",
             COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
@@ -140,7 +145,12 @@ async function branchBreakdown(params: unknown[], filters: string[]) {
   );
   const byProduct = new Map<string, typeof rows>();
   for (const row of rows) {
-    if ([row.sent, row.sold, row.returned, row.inBranch, row.booked].every((v) => Number(v) === 0)) continue;
+    if (
+      [row.sent, row.sold, row.returned, row.writtenOff, row.inBranch, row.booked].every(
+        (v) => Number(v) === 0,
+      )
+    )
+      continue;
     byProduct.set(row.productId, [...(byProduct.get(row.productId) ?? []), row]);
   }
   return byProduct;
@@ -244,6 +254,10 @@ export const inventoryService = {
       ? `COALESCE((SELECT SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
             AND bm.type = 'sale_return' AND bm.date BETWEEN $2 AND $3), 0)`
       : '0';
+    const branchWrittenOff = branchProducts
+      ? `COALESCE((SELECT -SUM(bm.qty) FROM stock_movements bm WHERE bm.product_id IN (${branchProducts})
+            AND bm.type = 'adjustment' AND bm.date BETWEEN $2 AND $3), 0)`
+      : '0';
     const booked = `COALESCE((SELECT SUM(si.qty) FROM sale_items si JOIN sales s ON s.id = si.sale_id
             JOIN products sp ON sp.id = si.product_id
            WHERE (si.product_id = p.id OR sp.origin_product_id = p.id) AND ${BOOKED}${target ? ` AND s.branch_id = ${target}` : ''}), 0)`;
@@ -266,6 +280,7 @@ export const inventoryService = {
                 (${branchSold})::text AS "branchSold",
                 (${inBranch})::text AS "inBranch",
                 (${branchReturned})::text AS "branchReturned",
+                (${branchWrittenOff})::text AS "branchWrittenOff",
                 (${booked})::text AS booked,
                 '0' AS total,
                 COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['sale'])}), 0)::text AS sold,
@@ -292,6 +307,7 @@ export const inventoryService = {
         row.branchSold = list.reduce((sum, b) => sum.plus(b.sold), new Decimal(0)).toString();
         row.inBranch = list.reduce((sum, b) => sum.plus(b.inBranch), new Decimal(0)).toString();
         row.branchReturned = list.reduce((sum, b) => sum.plus(b.returned), new Decimal(0)).toString();
+        row.branchWrittenOff = list.reduce((sum, b) => sum.plus(b.writtenOff), new Decimal(0)).toString();
       }
     }
     for (const row of rows) row.total = new Decimal(row.inBranch).plus(row.closing).toString();
@@ -316,6 +332,7 @@ export const inventoryService = {
           sent: toQuantity(b.sent),
           sold: toQuantity(b.sold),
           returned: toQuantity(b.returned),
+          writtenOff: toQuantity(b.writtenOff),
           inBranch: toQuantity(b.inBranch),
           booked: toQuantity(b.booked),
         })),

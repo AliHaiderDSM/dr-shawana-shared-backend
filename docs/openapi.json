@@ -3417,6 +3417,11 @@
                   "example": "10.000",
                   "description": "Returned by customers back into stock at the toBranchId branch (or every branch)"
                 },
+                "branchWrittenOff": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "Written off (approved) at the toBranchId branch, or at every branch for the Super Admin stock"
+                },
                 "booked": {
                   "type": "string",
                   "example": "10.000",
@@ -3451,6 +3456,10 @@
                         "type": "string",
                         "example": "10.000"
                       },
+                      "writtenOff": {
+                        "type": "string",
+                        "example": "10.000"
+                      },
                       "inBranch": {
                         "type": "string",
                         "example": "10.000"
@@ -3466,6 +3475,7 @@
                       "sent",
                       "sold",
                       "returned",
+                      "writtenOff",
                       "inBranch",
                       "booked"
                     ]
@@ -3489,6 +3499,7 @@
                 "branchSold",
                 "inBranch",
                 "branchReturned",
+                "branchWrittenOff",
                 "booked",
                 "total",
                 "branches"
@@ -3555,6 +3566,11 @@
                 "example": "10.000",
                 "description": "Returned by customers back into stock at the toBranchId branch (or every branch)"
               },
+              "branchWrittenOff": {
+                "type": "string",
+                "example": "10.000",
+                "description": "Written off (approved) at the toBranchId branch, or at every branch for the Super Admin stock"
+              },
               "booked": {
                 "type": "string",
                 "example": "10.000",
@@ -3580,6 +3596,7 @@
               "branchSold",
               "inBranch",
               "branchReturned",
+              "branchWrittenOff",
               "booked",
               "total"
             ]

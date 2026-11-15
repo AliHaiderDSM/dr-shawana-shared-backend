@@ -456,8 +456,16 @@ describe('Main Warehouse transfers to branches', () => {
       branchSold: '1.000',
       inBranch: '3.000',
       branchReturned: '0.000',
+      branchWrittenOff: '0.000',
       branches: [
-        { branchName: 'Lahore', sent: '4.000', sold: '1.000', returned: '0.000', inBranch: '3.000' },
+        {
+          branchName: 'Lahore',
+          sent: '4.000',
+          sold: '1.000',
+          returned: '0.000',
+          writtenOff: '0.000',
+          inBranch: '3.000',
+        },
       ],
     });
     const branch = await asBranch('get', '/branch/inventory/report?from=2026-10-01&to=2026-12-31');

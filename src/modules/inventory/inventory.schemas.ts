@@ -102,6 +102,10 @@ const reportRow = z.object({
   branchReturned: quantityOutput.openapi({
     description: 'Returned by customers back into stock at the toBranchId branch (or every branch)',
   }),
+  branchWrittenOff: quantityOutput.openapi({
+    description:
+      'Written off (approved) at the toBranchId branch, or at every branch for the Super Admin stock',
+  }),
   booked: quantityOutput.openapi({
     description: 'In online orders booked and not dispatched yet (by the toBranchId branch, or every branch)',
   }),
@@ -114,6 +118,7 @@ const branchShare = z.object({
   sent: quantityOutput,
   sold: quantityOutput,
   returned: quantityOutput,
+  writtenOff: quantityOutput,
   inBranch: quantityOutput,
   booked: quantityOutput,
 });
