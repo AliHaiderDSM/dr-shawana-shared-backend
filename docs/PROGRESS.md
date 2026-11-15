@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Counting transfers on receipt, under observation for the Super Admin
+
+- `POST /branch/incoming-stock/:transferNo/receive` takes `issues` (label + `missing`/`damaged` + note): those pieces go under observation at the branch (linked to the transfer and request), the rest into stock. Incoming stock items list their `serials`.
+- Stock holds: `POST /branch/stock-holds` takes `serials` (up to 50) and returns the list; reasons for new holds are damaged, label issue, other (no expired). New reason `missing`, status `sent_back`, decision `send_back` (piece moves back to the Super Admin stock with its ledger lines). The Super Admin can decide any hold. List filters: reason, productId, from, to. Migration ReceiveIssues (enum values + `transfer_no`). Tests added; full suite green.
+
 ## 2026-11-15 — Damaged returns: send to lab or remove
 
 - New return disposition `lab` (migration ReturnLab: enum values `lab`, item status `at_lab`, event `sent_to_lab`, columns `lab_sent_at`/`lab_sent_by` on sale_return_items). Inspection can send an item to the lab; the branch cannot change it after that.

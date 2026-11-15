@@ -167,7 +167,7 @@ stockRequestsRouter.post(
         actorFrom(req),
         branchIdOf(req),
         validParams(req, transferParamsSchema).transferNo,
-        validBody(req, receiveStockSchema).date,
+        validBody(req, receiveStockSchema),
       ),
     );
   },

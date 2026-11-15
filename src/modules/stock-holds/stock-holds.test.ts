@@ -127,13 +127,14 @@ describe('Pieces under observation', () => {
 
   it('holds a piece while the Warehouse Keeper sends a request, shows it to the branch and releases it', async () => {
     const stockRequestId = await approvedRequest(app, superAdmin, lahoreId, [{ productId: serum, qty: '3' }]);
-    const body = { serial: serials[0], reason: 'damaged', note: 'Box crushed', stockRequestId };
+    const body = { serials: [serials[0]], reason: 'damaged', note: 'Box crushed', stockRequestId };
     expect((await as(superAdmin, 'post', '/branch/stock-holds', warehouseId).send(body)).status).toBe(403);
     expect((await as(lahoreAdmin, 'post', '/branch/stock-holds').send(body)).status).toBe(403);
 
     const held = await as(keeper, 'post', '/branch/stock-holds').send(body);
     expect(held.status).toBe(201);
-    expect(held.body.data).toMatchObject({
+    expect(held.body.data).toHaveLength(1);
+    expect(held.body.data[0]).toMatchObject({
       holdNo: 'HOLDWH-UO-000001',
       status: 'open',
       reason: 'damaged',
@@ -189,11 +190,16 @@ describe('Pieces under observation', () => {
     expect((await as(keeper, 'get', '/branch/badges')).body.data.observations).toBe(1);
     expect((await as(superAdmin, 'get', '/branch/badges')).body.data.observations).toBe(1);
 
-    const id = held.body.data.id as string;
+    const id = held.body.data[0].id as string;
     const decision = { decision: 'release', note: 'Box only, product fine' };
-    expect((await as(superAdmin, 'post', `/branch/stock-holds/${id}/decide`).send(decision)).status).toBe(
-      403,
-    );
+    expect(
+      (
+        await as(keeper, 'post', `/branch/stock-holds/${id}/decide`).send({
+          ...decision,
+          decision: 'send_back',
+        })
+      ).status,
+    ).toBe(400);
     expect((await as(nawab, 'post', `/branch/stock-holds/${id}/decide`).send(decision)).status).toBe(403);
     expect(
       (await as(keeper, 'post', `/branch/stock-holds/${id}/decide`).send({ decision: 'release' })).status,
@@ -213,13 +219,17 @@ describe('Pieces under observation', () => {
 
   it('writes a held piece off and takes it out of the stock', async () => {
     const before = await onHand(warehouseId, 'Pmositol');
+    expect(
+      (await as(keeper, 'post', '/branch/stock-holds').send({ serials: [serials[3]], reason: 'expired' }))
+        .status,
+    ).toBe(400);
     const held = await as(keeper, 'post', '/branch/stock-holds').send({
-      serial: serials[3],
-      reason: 'expired',
+      serials: [serials[3]],
+      reason: 'damaged',
     });
     expect(held.status).toBe(201);
     expect(await onHand(warehouseId, 'Pmositol')).toBe(before);
-    const done = await as(keeper, 'post', `/branch/stock-holds/${held.body.data.id}/decide`).send({
+    const done = await as(superAdmin, 'post', `/branch/stock-holds/${held.body.data[0].id}/decide`).send({
       decision: 'write_off',
       note: 'Expired print on the box',
     });
@@ -229,10 +239,10 @@ describe('Pieces under observation', () => {
       writeOffNo: expect.stringMatching(/-WO-/),
     });
     expect(await onHand(warehouseId, 'Pmositol')).toBe(before - 1);
-    expect(await labelStatus(serials[3]!)).toBe('expired');
+    expect(await labelStatus(serials[3]!)).toBe('damaged');
     const writeOffs = await as(superAdmin, 'get', '/branch/inventory/write-offs?status=approved');
     expect(writeOffs.body.data).toEqual(
-      expect.arrayContaining([expect.objectContaining({ reason: 'expired', serials: [serials[3]] })]),
+      expect.arrayContaining([expect.objectContaining({ reason: 'damaged', serials: [serials[3]] })]),
     );
   });
 
@@ -255,11 +265,11 @@ describe('Pieces under observation', () => {
     const saleId = order.body.data.id as string;
     await AppDataSource.query('UPDATE sale_payments SET approved_at = now() WHERE sale_id = $1', [saleId]);
 
-    const body = { serial: serials[4], reason: 'label_issue', note: 'Label torn', saleId };
+    const body = { serials: [serials[4]], reason: 'label_issue', note: 'Label torn', saleId };
     expect((await as(lahoreDesk, 'post', '/branch/stock-holds').send(body)).status).toBe(403);
     const held = await as(dispatcher, 'post', '/branch/stock-holds').send(body);
     expect(held.status).toBe(201);
-    expect(held.body.data).toMatchObject({
+    expect(held.body.data[0]).toMatchObject({
       holdNo: 'HFLC-UO-000001',
       sale: { id: saleId },
       canDecide: false,
@@ -274,7 +284,7 @@ describe('Pieces under observation', () => {
     expect((await as(nawab, 'get', '/branch/badges')).body.data.observations).toBe(1);
     expect((await as(lahoreAdmin, 'get', '/branch/stock-holds')).body.data).toHaveLength(1);
 
-    const id = held.body.data.id as string;
+    const id = held.body.data[0].id as string;
     const decision = { decision: 'supplier_return', note: 'Send back for new label' };
     expect((await as(dispatcher, 'post', `/branch/stock-holds/${id}/decide`).send(decision)).status).toBe(
       403,
@@ -293,5 +303,87 @@ describe('Pieces under observation', () => {
       serials: [serials[5]],
     });
     expect(sent.status).toBe(200);
+  });
+
+  it('holds several scanned labels at once and filters them by reason and product', async () => {
+    const held = await as(keeper, 'post', '/branch/stock-holds').send({
+      serials: [serials[6], serials[7]],
+      reason: 'label_issue',
+    });
+    expect(held.status).toBe(201);
+    expect(held.body.data.map((h: { serial: string }) => h.serial)).toEqual([serials[6], serials[7]]);
+    const filtered = await as(
+      superAdmin,
+      'get',
+      `/branch/stock-holds?status=open&reason=label_issue&productId=${serum}`,
+    );
+    expect(filtered.body.data.map((h: { serial: string }) => h.serial).sort()).toEqual(
+      [serials[6], serials[7]].sort(),
+    );
+    expect((await as(superAdmin, 'get', '/branch/stock-holds?reason=missing')).body.data).toEqual([]);
+    for (const hold of held.body.data as { id: string }[]) {
+      const done = await as(superAdmin, 'post', `/branch/stock-holds/${hold.id}/decide`).send({
+        decision: 'release',
+        note: 'Relabelled',
+      });
+      expect(done.status).toBe(200);
+      expect(done.body.data.decidedBy.id).toBe(superAdmin.id);
+    }
+  });
+
+  it('lets a branch count a transfer and holds what was missing, which the Super Admin sends back', async () => {
+    const stockRequestId = await approvedRequest(app, superAdmin, lahoreId, [{ productId: serum, qty: '2' }]);
+    const sent = await as(keeper, 'post', '/branch/stock-outs').send({
+      date: '2026-10-05',
+      toBranchId: lahoreId,
+      stockRequestId,
+      items: [{ productId: serum, qty: '2', serials: [serials[8], serials[9]] }],
+    });
+    expect(sent.status).toBe(201);
+    const transferNo = sent.body.data[0].transferNo as string;
+    const lahoreBefore = await onHand(lahoreId, 'Pmositol');
+    const warehouseBefore = await onHand(warehouseId, 'Pmositol');
+    const stranger = await as(lahoreAdmin, 'post', `/branch/incoming-stock/${transferNo}/receive`).send({
+      date: '2026-10-05',
+      issues: [{ serial: serials[0], reason: 'missing' }],
+    });
+    expect(stranger.status).toBe(422);
+    const received = await as(lahoreAdmin, 'post', `/branch/incoming-stock/${transferNo}/receive`).send({
+      date: '2026-10-05',
+      issues: [{ serial: serials[8], reason: 'missing', note: 'Not in the box' }],
+    });
+    expect(received.status).toBe(200);
+    expect(await labelStatus(serials[9]!)).toBe('in_stock');
+    expect(await labelStatus(serials[8]!)).toBe('quarantined');
+    expect(await onHand(lahoreId, 'Pmositol')).toBe(lahoreBefore + 2);
+
+    const branchView = await as(lahoreAdmin, 'get', '/branch/stock-holds?status=open');
+    const hold = branchView.body.data.find((h: { serial: string }) => h.serial === serials[8]);
+    expect(hold).toMatchObject({ reason: 'missing', transferNo, canDecide: false });
+    expect(
+      (
+        await as(lahoreAdmin, 'post', `/branch/stock-holds/${hold.id}/decide`).send({
+          decision: 'release',
+          note: 'x',
+        })
+      ).status,
+    ).toBe(403);
+
+    const listed = await as(superAdmin, 'get', '/branch/stock-holds?status=open&reason=missing');
+    expect(listed.body.data[0]).toMatchObject({ canDecide: true, canSendBack: true });
+    const back = await as(superAdmin, 'post', `/branch/stock-holds/${hold.id}/decide`).send({
+      decision: 'send_back',
+      note: 'Found in the warehouse',
+    });
+    expect(back.status).toBe(200);
+    expect(back.body.data.status).toBe('sent_back');
+    expect(await labelStatus(serials[8]!)).toBe('in_stock');
+    const [piece] = (await AppDataSource.query(
+      'SELECT branch_id AS "branchId" FROM inventory_items WHERE serial = $1',
+      [serials[8]],
+    )) as { branchId: string }[];
+    expect(piece!.branchId).toBe(warehouseId);
+    expect(await onHand(lahoreId, 'Pmositol')).toBe(lahoreBefore + 1);
+    expect(await onHand(warehouseId, 'Pmositol')).toBe(warehouseBefore + 1);
   });
 });

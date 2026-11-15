@@ -6,8 +6,9 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { escapeLike } from '../../lib/pagination';
 import { type Role } from '../../lib/permissions';
-import { today } from '../../lib/validation';
+import { CLINIC_TIME_ZONE, today } from '../../lib/validation';
 import { auditService } from '../audit/audit.service';
+import { type ItemStatus } from '../inventory/inventory-item.entity';
 import { inventoryItemsService, normalizeSerials } from '../inventory/inventory-items.service';
 import { writeOffHeldPieces } from '../inventory/product-batches.service';
 import { stockLedger } from '../inventory/stock-ledger';
@@ -32,6 +33,15 @@ const REASON_TEXT: Record<StockHoldReason, string> = {
   expired: 'expired',
   label_issue: 'label issue',
   other: 'other',
+  missing: 'missing',
+};
+
+const WRITE_OFF_REASON: Record<StockHoldReason, 'expired' | 'damaged' | 'lost' | 'adjustment'> = {
+  damaged: 'damaged',
+  expired: 'expired',
+  label_issue: 'adjustment',
+  other: 'adjustment',
+  missing: 'lost',
 };
 
 export interface HoldViewer {
@@ -64,7 +74,7 @@ const SELECT = `
            'branchName', rb.name) END AS "stockRequest",
          ${person('rp')} AS "reportedBy", ${person('dc')} AS "decidedBy",
          h.decided_at AS "decidedAt", h.decision_note AS "decisionNote", w.write_off_no AS "writeOffNo",
-         h.created_at AS "createdAt"
+         h.transfer_no AS "transferNo", h.created_at AS "createdAt"
     FROM stock_holds h
     JOIN inventory_items i ON i.id = h.item_id
     JOIN products p ON p.id = h.product_id
@@ -85,8 +95,8 @@ interface HoldRow {
 }
 
 function canDecide(viewer: HoldViewer, hold: { status: string; branch: { id: string; kind: string } }) {
-  if (hold.status !== 'open' || viewer.isSuperAdmin) return false;
-  if (viewer.role === 'warehouse_keeper') return true;
+  if (hold.status !== 'open') return false;
+  if (viewer.isSuperAdmin || viewer.role === 'warehouse_keeper') return true;
   return (
     viewer.role === 'branch_admin' && hold.branch.kind === 'dispatch' && hold.branch.id === viewer.branchId
   );
@@ -104,6 +114,88 @@ async function fetchOne(manager: EntityManager, id: string) {
   const [row] = (await manager.query(`${SELECT} WHERE h.id = $1`, [id])) as HoldRow[];
   if (!row) throw AppError.notFound('Piece under observation');
   return row;
+}
+
+const withActions = (viewer: HoldViewer, row: HoldRow) => {
+  const decide = canDecide(viewer, row);
+  return { ...row, canDecide: decide, canSendBack: decide && row.branch.kind !== 'warehouse' };
+};
+
+export async function createHold(
+  manager: EntityManager,
+  actor: Actor,
+  input: {
+    branchId: string;
+    serial: string;
+    from: ItemStatus[];
+    reason: StockHoldReason;
+    note?: string | null;
+    saleId?: string | null;
+    stockRequestId?: string | null;
+    transferNo?: string | null;
+    source?: string | null;
+  },
+) {
+  const [item] = (await manager.query(
+    `SELECT i.id, i.product_id AS "productId", i.batch_id AS "batchId"
+       FROM inventory_items i WHERE i.serial = $1 AND i.branch_id = $2 AND i.deleted_at IS NULL`,
+    [input.serial, input.branchId],
+  )) as { id: string; productId: string; batchId: string | null }[];
+  if (!item) throw AppError.unprocessable(`${input.serial} is not a label of this branch`);
+  const id = randomUUID();
+  const [branch] = (await manager.query('SELECT code FROM branches WHERE id = $1', [input.branchId])) as {
+    code: string;
+  }[];
+  const holdNo = `${branch?.code ?? 'UO'}-UO-${String(await nextSequence(manager, input.branchId, 'stock_hold')).padStart(6, '0')}`;
+  await inventoryItemsService.take(manager, actor, {
+    branchId: input.branchId,
+    serials: [input.serial],
+    from: input.from,
+    to: 'quarantined',
+    event: 'quarantined',
+    ref: { type: REFERENCE, id, label: `${holdNo} under observation` },
+    date: today(),
+    note: [`${REASON_TEXT[input.reason]}${input.source ? ` on ${input.source}` : ''}`, input.note]
+      .filter(Boolean)
+      .join(': '),
+  });
+  await manager.query(
+    `INSERT INTO stock_holds (id, hold_no, branch_id, item_id, product_id, batch_id, reason, note, sale_id,
+                              stock_request_id, transfer_no, created_by, updated_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)`,
+    [
+      id,
+      holdNo,
+      input.branchId,
+      item.id,
+      item.productId,
+      item.batchId,
+      input.reason,
+      input.note ?? null,
+      input.saleId ?? null,
+      input.stockRequestId ?? null,
+      input.transferNo ?? null,
+      actor.userId,
+    ],
+  );
+  await auditService.record(
+    {
+      actor,
+      branchId: input.branchId,
+      action: 'stock_hold',
+      entity: 'stock_hold',
+      entityId: id,
+      after: {
+        holdNo,
+        serial: input.serial,
+        reason: input.reason,
+        note: input.note ?? null,
+        source: input.source,
+      },
+    },
+    manager,
+  );
+  return id;
 }
 
 async function sameProductOn(
@@ -124,6 +216,86 @@ async function sameProductOn(
   return Boolean(row);
 }
 
+async function sendBackToWarehouse(
+  manager: EntityManager,
+  actor: Actor,
+  hold: {
+    id: string;
+    holdNo: string;
+    branchId: string;
+    productId: string;
+    batchId: string | null;
+    serial: string;
+  },
+  note: string,
+) {
+  const [warehouse] = (await manager.query(
+    `SELECT id FROM branches WHERE kind = 'warehouse' AND deleted_at IS NULL ORDER BY created_at LIMIT 1`,
+  )) as { id: string }[];
+  if (!warehouse) throw AppError.conflict('There is no Super Admin stock to send this back to');
+  const [target] = (await manager.query(
+    `SELECT wp.id AS "productId", wb.id AS "batchId"
+       FROM products bp
+       JOIN products wp ON wp.id = COALESCE(bp.origin_product_id, bp.id) AND wp.branch_id = $2
+       LEFT JOIN product_batches bb ON bb.id = $3
+       LEFT JOIN product_batches wb ON wb.product_id = wp.id AND wb.batch_no = bb.batch_no AND wb.deleted_at IS NULL
+      WHERE bp.id = $1`,
+    [hold.productId, warehouse.id, hold.batchId],
+  )) as { productId: string; batchId: string | null }[];
+  if (!target) throw AppError.conflict('This product is not in the Super Admin stock');
+  const date = today();
+  const pieces = await inventoryItemsService.take(manager, actor, {
+    branchId: hold.branchId,
+    serials: [hold.serial],
+    from: ['quarantined'],
+    to: 'dispatched',
+    event: 'dispatched',
+    ref: { type: REFERENCE, id: hold.id, label: `${hold.holdNo} sent back to the Super Admin stock` },
+    date,
+    note,
+  });
+  await stockLedger.apply(
+    manager,
+    { branchId: hold.branchId, referenceType: REFERENCE, referenceId: hold.id, actorId: actor.userId },
+    inventoryItemsService.movements(pieces, -1, {
+      type: 'stock_out',
+      date,
+      note: `${hold.holdNo}: sent back to the Super Admin stock: ${note}`,
+    }),
+  );
+  await stockLedger.apply(
+    manager,
+    { branchId: warehouse.id, referenceType: REFERENCE, referenceId: hold.id, actorId: actor.userId },
+    [
+      {
+        productId: target.productId,
+        batchId: target.batchId,
+        type: 'stock_in',
+        qty: 1,
+        date,
+        note: `${hold.holdNo}: back from the branch: ${note}`,
+      },
+    ],
+  );
+  await manager.query(
+    `UPDATE inventory_items SET branch_id = $2, product_id = $3, batch_id = $4, status = 'in_stock',
+            updated_by = $5, updated_at = now()
+      WHERE id = ANY($1)`,
+    [pieces.map((p) => p.id), warehouse.id, target.productId, target.batchId, actor.userId],
+  );
+  await manager.query(
+    `INSERT INTO inventory_item_events (item_id, branch_id, type, reference_type, reference_id, reference_label, created_by, created_at)
+     SELECT id, branch_id, 'received', $2, $3, $4, $5, clock_timestamp() FROM inventory_items WHERE id = ANY($1)`,
+    [
+      pieces.map((p) => p.id),
+      REFERENCE,
+      hold.id,
+      `${hold.holdNo} back in the Super Admin stock`,
+      actor.userId,
+    ],
+  );
+}
+
 export const stockHoldsService = {
   async list(viewer: HoldViewer, query: StockHoldListQuery) {
     const scope = await scopeOf(viewer);
@@ -137,6 +309,15 @@ export const stockHoldsService = {
     if (scope.kind === 'requests') add('r.branch_id = ?', scope.branchId);
     if (scope.kind === 'all' && viewer.isSuperAdmin && query.branchId) add('h.branch_id = ?', query.branchId);
     if (query.status) add('h.status = ?', query.status);
+    if (query.reason) add('h.reason = ?', query.reason);
+    if (query.productId) {
+      add(
+        'COALESCE(p.origin_product_id, p.id) = (SELECT COALESCE(x.origin_product_id, x.id) FROM products x WHERE x.id = ?)',
+        query.productId,
+      );
+    }
+    if (query.from) add(`(h.created_at AT TIME ZONE '${CLINIC_TIME_ZONE}')::date >= ?`, query.from);
+    if (query.to) add(`(h.created_at AT TIME ZONE '${CLINIC_TIME_ZONE}')::date <= ?`, query.to);
     if (query.saleId) add('h.sale_id = ?', query.saleId);
     if (query.stockRequestId) add('h.stock_request_id = ?', query.stockRequestId);
     if (query.search) {
@@ -151,7 +332,7 @@ export const stockHoldsService = {
         ORDER BY (h.status = 'open') DESC, h.created_at DESC LIMIT 500`,
       params,
     )) as HoldRow[];
-    return rows.map((r) => ({ ...r, canDecide: canDecide(viewer, r) }));
+    return rows.map((r) => withActions(viewer, r));
   },
 
   async openCount(viewer: HoldViewer) {
@@ -175,14 +356,15 @@ export const stockHoldsService = {
           'Only the Warehouse Keeper and the Dispatch Department put pieces under observation',
         );
       }
-      const [serial] = normalizeSerials([input.serial]);
-      const [item] = (await em.query(
-        `SELECT i.id, i.product_id AS "productId", i.batch_id AS "batchId", i.status, p.name
+      const serials = normalizeSerials(input.serials);
+      const items = (await em.query(
+        `SELECT i.serial, i.product_id AS "productId", p.name
            FROM inventory_items i JOIN products p ON p.id = i.product_id
-          WHERE i.serial = $1 AND i.branch_id = $2 AND i.deleted_at IS NULL`,
-        [serial, branchId],
-      )) as { id: string; productId: string; batchId: string | null; status: string; name: string }[];
-      if (!item) throw AppError.unprocessable(`${serial} is not a label of this branch`);
+          WHERE i.serial = ANY($1) AND i.branch_id = $2 AND i.deleted_at IS NULL`,
+        [serials, branchId],
+      )) as { serial: string; productId: string; name: string }[];
+      const unknown = serials.filter((serial) => !items.some((i) => i.serial === serial));
+      if (unknown.length) throw AppError.unprocessable(`Not a label of this branch: ${unknown.join(', ')}`);
 
       let saleLabel: string | null = null;
       if (input.saleId) {
@@ -193,8 +375,10 @@ export const stockHoldsService = {
           [input.saleId, branchId],
         )) as { invoiceNo: string }[];
         if (!sale) throw AppError.unprocessable('This order is not waiting for dispatch here');
-        if (!(await sameProductOn(em, 'sale_items', 'sale_id', input.saleId, item.productId))) {
-          throw AppError.unprocessable(`${serial} is ${item.name}, which is not on this order`);
+        for (const item of items) {
+          if (!(await sameProductOn(em, 'sale_items', 'sale_id', input.saleId, item.productId))) {
+            throw AppError.unprocessable(`${item.serial} is ${item.name}, which is not on this order`);
+          }
         }
         saleLabel = sale.invoiceNo;
       }
@@ -210,69 +394,40 @@ export const stockHoldsService = {
         if (request.status !== 'approved' && request.status !== 'sent') {
           throw AppError.conflict(`${request.requestNo} is ${request.status}, not waiting to be sent`);
         }
-        if (
-          !(await sameProductOn(
-            em,
-            'stock_request_items',
-            'request_id',
-            input.stockRequestId,
-            item.productId,
-          ))
-        ) {
-          throw AppError.unprocessable(`${serial} is ${item.name}, which is not on this request`);
+        for (const item of items) {
+          if (
+            !(await sameProductOn(
+              em,
+              'stock_request_items',
+              'request_id',
+              input.stockRequestId,
+              item.productId,
+            ))
+          ) {
+            throw AppError.unprocessable(`${item.serial} is ${item.name}, which is not on this request`);
+          }
         }
         requestLabel = request.requestNo;
       }
 
-      const id = randomUUID();
-      const [branch] = (await em.query('SELECT code FROM branches WHERE id = $1', [branchId])) as {
-        code: string;
-      }[];
-      const holdNo = `${branch?.code ?? 'UO'}-UO-${String(await nextSequence(em, branchId, 'stock_hold')).padStart(6, '0')}`;
-      const source = saleLabel ?? requestLabel;
-      await inventoryItemsService.take(em, actor, {
-        branchId,
-        serials: [serial!],
-        from: ['in_stock'],
-        to: 'quarantined',
-        event: 'quarantined',
-        ref: { type: REFERENCE, id, label: `${holdNo} under observation` },
-        date: today(),
-        note: [`${REASON_TEXT[input.reason]}${source ? ` on ${source}` : ''}`, input.note]
-          .filter(Boolean)
-          .join(': '),
-      });
-      await em.query(
-        `INSERT INTO stock_holds (id, hold_no, branch_id, item_id, product_id, batch_id, reason, note, sale_id,
-                                  stock_request_id, created_by, updated_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)`,
-        [
-          id,
-          holdNo,
-          branchId,
-          item.id,
-          item.productId,
-          item.batchId,
-          input.reason,
-          input.note ?? null,
-          input.saleId ?? null,
-          input.stockRequestId ?? null,
-          actor.userId,
-        ],
-      );
-      await auditService.record(
-        {
-          actor,
-          branchId,
-          action: 'stock_hold',
-          entity: 'stock_hold',
-          entityId: id,
-          after: { holdNo, serial, reason: input.reason, note: input.note ?? null, source },
-        },
-        em,
-      );
-      const row = await fetchOne(em, id);
-      return { ...row, canDecide: canDecide(actor, row) };
+      const ids: string[] = [];
+      for (const serial of serials) {
+        ids.push(
+          await createHold(em, actor, {
+            branchId,
+            serial,
+            from: ['in_stock'],
+            reason: input.reason,
+            note: input.note,
+            saleId: input.saleId,
+            stockRequestId: input.stockRequestId,
+            source: saleLabel ?? requestLabel,
+          }),
+        );
+      }
+      const rows = [];
+      for (const id of ids) rows.push(withActions(actor, await fetchOne(em, id)));
+      return rows;
     });
   },
 
@@ -300,9 +455,14 @@ export const stockHoldsService = {
       }[];
       if (!hold) throw AppError.notFound('Piece under observation');
       if (!canDecide(actor, { status: 'open', branch: { id: hold.branchId, kind: hold.kind } })) {
-        throw AppError.forbidden('Only the Warehouse Keeper and the Dispatch Department admin decide this');
+        throw AppError.forbidden(
+          'Only the Super Admin, the Warehouse Keeper and the Dispatch Department admin decide this',
+        );
       }
       if (hold.status !== 'open') throw AppError.conflict(`${hold.holdNo} is already decided`);
+      if (input.decision === 'send_back' && hold.kind === 'warehouse') {
+        throw AppError.badRequest('This piece is already in the Super Admin stock; release it instead');
+      }
 
       const date = today();
       let status: StockHoldStatus;
@@ -325,12 +485,14 @@ export const stockHoldsService = {
           productId: hold.productId,
           batchId: hold.batchId,
           serials: [hold.serial],
-          reason:
-            hold.reason === 'expired' ? 'expired' : hold.reason === 'damaged' ? 'damaged' : 'adjustment',
+          reason: WRITE_OFF_REASON[hold.reason],
           note: `${hold.holdNo}: ${input.note}`,
         });
         writeOffId = record.id;
         status = 'written_off';
+      } else if (input.decision === 'send_back') {
+        await sendBackToWarehouse(em, actor, hold, input.note);
+        status = 'sent_back';
       } else {
         const pieces = await inventoryItemsService.take(em, actor, {
           branchId: hold.branchId,
@@ -371,8 +533,7 @@ export const stockHoldsService = {
         },
         em,
       );
-      const row = await fetchOne(em, hold.id);
-      return { ...row, canDecide: false };
+      return withActions(actor, await fetchOne(em, hold.id));
     });
   },
 };

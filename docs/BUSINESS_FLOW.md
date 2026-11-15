@@ -197,7 +197,8 @@ Delivery slips printed (Delivery Print role)
 - **Stock Out** records stock sent out through a dispatcher.
 - **Inventory Report** shows stock per product for the branch.
 - Stock is kept **per branch**. One branch's sales and stock never affect another branch.
-- **Main Warehouse:** factory stock is received into the Main Warehouse, which only the Super Admin runs and which never sells. A warehouse Stock Out with "Transfer to branch" moves the stock (same batches and labels) straight into that branch's stock; the branch does not enter it again. Branches never receive stock any other way.
+- **Main Warehouse:** factory stock is received into the Main Warehouse, which only the Super Admin runs and which never sells. A warehouse Stock Out with "Transfer to branch" moves the stock (same batches and labels) straight into that branch's stock; the branch does not enter it again. Branches never receive stock any other way. The branch admin counts each transfer label by label when receiving: what arrived goes into the branch stock, pieces that are missing or damaged go **under observation**, and the Super Admin (or the Warehouse Keeper) decides: release to the branch, send back to the Super Admin stock, write off, or send to the supplier.
+- **Under observation:** the Warehouse Keeper and the Dispatch Department hold labelled pieces while sending (damaged, label issue, other; several labels at once; expired stock is never sent, so it is not a reason). The Super Admin can decide every held piece too.
 - **Expiry alerts:** batches that expire within 3 months appear on the dashboard (every branch for the Super Admin, own branch for branch staff) and on the Stock page.
 
 ### 4.7 Manufacturing (Raw Materials)

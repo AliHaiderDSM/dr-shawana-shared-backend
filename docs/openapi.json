@@ -16898,17 +16898,24 @@
       "ReportStockHold": {
         "type": "object",
         "properties": {
-          "serial": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 30,
-            "example": "DSM-000123"
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "example": [
+              "DSM-000123",
+              "DSM-000124"
+            ]
           },
           "reason": {
             "type": "string",
             "enum": [
               "damaged",
-              "expired",
               "label_issue",
               "other"
             ]
@@ -16932,7 +16939,7 @@
           }
         },
         "required": [
-          "serial",
+          "serials",
           "reason"
         ]
       },
@@ -16944,7 +16951,8 @@
             "enum": [
               "release",
               "write_off",
-              "supplier_return"
+              "supplier_return",
+              "send_back"
             ]
           },
           "note": {
@@ -16974,7 +16982,8 @@
               "open",
               "released",
               "written_off",
-              "supplier_returned"
+              "supplier_returned",
+              "sent_back"
             ]
           },
           "reason": {
@@ -16983,7 +16992,8 @@
               "damaged",
               "expired",
               "label_issue",
-              "other"
+              "other",
+              "missing"
             ]
           },
           "note": {
@@ -17156,7 +17166,16 @@
               "null"
             ]
           },
+          "transferNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "canDecide": {
+            "type": "boolean"
+          },
+          "canSendBack": {
             "type": "boolean"
           },
           "createdAt": {
@@ -17182,7 +17201,9 @@
           "decidedAt",
           "decisionNote",
           "writeOffNo",
+          "transferNo",
           "canDecide",
+          "canSendBack",
           "createdAt"
         ]
       },
@@ -17272,6 +17293,40 @@
             "type": "string",
             "format": "date",
             "example": "2026-09-30"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serial": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "missing",
+                    "damaged"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "serial",
+                "reason"
+              ]
+            },
+            "maxItems": 500,
+            "default": [],
+            "description": "Labels that did not arrive (missing) or arrived broken (damaged). They go under observation for the Super Admin; every other piece goes into stock."
           }
         }
       },
@@ -17499,7 +17554,8 @@
                     "damaged",
                     "expired",
                     "label_issue",
-                    "other"
+                    "other",
+                    "missing"
                   ]
                 },
                 "note": {
@@ -17514,7 +17570,8 @@
                     "open",
                     "released",
                     "written_off",
-                    "supplier_returned"
+                    "supplier_returned",
+                    "sent_back"
                   ]
                 },
                 "decisionNote": {
@@ -17765,6 +17822,13 @@
                 },
                 "labels": {
                   "type": "integer"
+                },
+                "serials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The DSM labels sent on this line"
                 }
               },
               "required": [
@@ -17774,7 +17838,8 @@
                 "unit",
                 "qty",
                 "received",
-                "labels"
+                "labels",
+                "serials"
               ]
             }
           }
@@ -55797,11 +55862,54 @@
                 "open",
                 "released",
                 "written_off",
-                "supplier_returned"
+                "supplier_returned",
+                "sent_back"
               ]
             },
             "required": false,
             "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "damaged",
+                "expired",
+                "label_issue",
+                "other",
+                "missing"
+              ]
+            },
+            "required": false,
+            "name": "reason",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "productId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "to",
             "in": "query"
           },
           {
@@ -55924,7 +56032,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Put a labelled piece under observation while dispatching an order or sending a stock request. It can no longer be sold or sent until it is decided.",
+        "summary": "Put one or more labelled pieces under observation while dispatching an order or sending a stock request (expired stock is never sent, so it is not a reason here). They can no longer be sold or sent until decided.",
         "parameters": [
           {
             "schema": {
@@ -55954,7 +56062,10 @@
                   "type": "object",
                   "properties": {
                     "data": {
-                      "$ref": "#/components/schemas/StockHold"
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StockHold"
+                      }
                     }
                   },
                   "required": [
@@ -56027,7 +56138,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Warehouse Keeper (any piece) or the Dispatch Department admin (its own pieces) decides: release back to stock, write off, or send back to the supplier",
+        "summary": "Super Admin or Warehouse Keeper (any piece) or the Dispatch Department admin (its own pieces) decides: release back to stock, write off, send back to the supplier, or (a piece a branch held while receiving) send back to the Super Admin stock",
         "parameters": [
           {
             "schema": {

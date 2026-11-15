@@ -9,14 +9,17 @@ import { escapeLike } from '../../lib/pagination';
 import { TODAY_SQL, today } from '../../lib/validation';
 import { auditService } from '../audit/audit.service';
 import { MIN_SHELF_DAYS } from '../inventory/shelf-life';
+import { normalizeSerials } from '../inventory/inventory-items.service';
 import { transfersService } from '../inventory/transfers.service';
 import { StockOut } from '../inventory/stock-out.entity';
 import { nextSequence } from '../sequences/sequences';
+import { createHold } from '../stock-holds/stock-holds.service';
 import { StockRequest, StockRequestItem, type StockRequestStatus } from './stock-request.entity';
 import {
   type CreateStockRequestInput,
   type DecideStockRequestInput,
   type IncomingStockQuery,
+  type ReceiveStockInput,
   type StockRequestListQuery,
 } from './stock-requests.schemas';
 
@@ -484,7 +487,9 @@ export const stockRequestsService = {
               MAX(o.note) AS note,
               json_agg(json_build_object('id', o.id, 'productId', o.product_id, 'productName', p.name, 'unit', p.unit,
                        'qty', o.qty::text, 'received', o.received_at IS NOT NULL,
-                       'labels', (SELECT COUNT(*) FROM inventory_items i WHERE i.stock_out_id = o.id)::int)
+                       'labels', (SELECT COUNT(*) FROM inventory_items i WHERE i.stock_out_id = o.id)::int,
+                       'serials', COALESCE((SELECT json_agg(i.serial ORDER BY i.serial) FROM inventory_items i
+                                             WHERE i.stock_out_id = o.id AND i.deleted_at IS NULL), '[]'::json))
                        ORDER BY p.name) AS items
          FROM stock_outs o
          JOIN products p ON p.id = o.product_id
@@ -499,7 +504,8 @@ export const stockRequestsService = {
     return rows.map((r) => ({ ...r, items: r.items.map((i) => ({ ...i, qty: toQuantity(i.qty) })) }));
   },
 
-  async receive(actor: Actor, branchId: string, transferNo: string, date?: string) {
+  async receive(actor: Actor, branchId: string, transferNo: string, input: ReceiveStockInput) {
+    const { date } = input;
     await withTransaction(async (em) => {
       const outs = await repo(StockOut, em)
         .createQueryBuilder('o')
@@ -517,6 +523,13 @@ export const stockRequestsService = {
         name: string;
       }[];
       const day = date ?? today();
+      const issues = new Map(
+        normalizeSerials(input.issues.map((i) => i.serial)).map((serial, index) => [
+          serial,
+          input.issues[index]!,
+        ]),
+      );
+      const arriving = new Map<string, { stockRequestId: string | null }>();
       for (const out of waiting) {
         if (day < out.date) throw AppError.badRequest('The receiving date cannot be before the sending date');
         const pieces = (await em.query(
@@ -524,6 +537,7 @@ export const stockRequestsService = {
              FROM inventory_items WHERE stock_out_id = $1`,
           [out.id],
         )) as { id: string; serial: string; productId: string; batchId: string | null }[];
+        for (const piece of pieces) arriving.set(piece.serial, { stockRequestId: out.stockRequestId });
         await transfersService.receive(
           em,
           actor,
@@ -533,6 +547,22 @@ export const stockRequestsService = {
         );
         await repo(StockOut, em).update({ id: out.id }, { receivedAt: new Date(), receivedBy: actor.userId });
       }
+      const strangers = [...issues.keys()].filter((serial) => !arriving.has(serial));
+      if (strangers.length) {
+        throw AppError.unprocessable(`Not on ${transferNo}: ${strangers.join(', ')}`);
+      }
+      for (const [serial, issue] of issues) {
+        await createHold(em, actor, {
+          branchId,
+          serial,
+          from: ['in_stock'],
+          reason: issue.reason,
+          note: issue.note ?? null,
+          stockRequestId: arriving.get(serial)?.stockRequestId ?? null,
+          transferNo,
+          source: transferNo,
+        });
+      }
       await auditService.record(
         {
           actor,
@@ -540,7 +570,11 @@ export const stockRequestsService = {
           action: 'receive',
           entity: 'stock_transfer',
           entityId: waiting[0]!.id,
-          after: { transferNo, items: waiting.map((o) => ({ productId: o.productId, qty: o.qty })) },
+          after: {
+            transferNo,
+            items: waiting.map((o) => ({ productId: o.productId, qty: o.qty })),
+            issues: [...issues.entries()].map(([serial, issue]) => ({ serial, reason: issue.reason })),
+          },
         },
         em,
       );

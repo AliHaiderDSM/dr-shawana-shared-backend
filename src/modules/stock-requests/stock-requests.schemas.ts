@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { STOCK_HOLD_REASONS, STOCK_HOLD_STATUSES } from '../stock-holds/stock-holds.schemas';
 import { branchQuerySchema, dataEnvelope, errorResponses, idParamsSchema, jsonContent } from '../../lib/http';
 import { registry } from '../../lib/openapi';
+import { RECEIVE_ISSUE_REASONS } from '../stock-holds/stock-holds.schemas';
 import { securedDocs } from '../../lib/openapi-crud';
 import {
   dateInput,
@@ -59,7 +60,26 @@ export const incomingStockQuerySchema = z.object({
 
 export const transferParamsSchema = z.object({ transferNo: z.string().trim().min(1).max(30) });
 
-export const receiveStockSchema = registry.register('ReceiveStock', z.object({ date: dateInput.optional() }));
+export const receiveStockSchema = registry.register(
+  'ReceiveStock',
+  z.object({
+    date: dateInput.optional(),
+    issues: z
+      .array(
+        z.object({
+          serial: z.string().trim().min(1).max(30),
+          reason: z.enum(RECEIVE_ISSUE_REASONS),
+          note: z.string().trim().max(500).nullish(),
+        }),
+      )
+      .max(500)
+      .default([])
+      .openapi({
+        description:
+          'Labels that did not arrive (missing) or arrived broken (damaged). They go under observation for the Super Admin; every other piece goes into stock.',
+      }),
+  }),
+);
 
 const person = z.object({ id: z.uuid(), name: z.string(), role: z.string() }).nullable();
 
@@ -143,6 +163,7 @@ export const incomingStockSchema = registry.register(
         qty: quantityOutput,
         received: z.boolean(),
         labels: z.number().int(),
+        serials: z.array(z.string()).openapi({ description: 'The DSM labels sent on this line' }),
       }),
     ),
   }),
@@ -160,6 +181,7 @@ const catalogItemSchema = z.object({
 export type CreateStockRequestInput = z.output<typeof createStockRequestSchema>;
 export type DecideStockRequestInput = z.output<typeof decideStockRequestSchema>;
 export type StockRequestListQuery = z.output<typeof stockRequestListQuerySchema>;
+export type ReceiveStockInput = z.output<typeof receiveStockSchema>;
 export type IncomingStockQuery = Partial<z.output<typeof incomingStockQuerySchema>>;
 
 const docs = securedDocs('Stock requests');

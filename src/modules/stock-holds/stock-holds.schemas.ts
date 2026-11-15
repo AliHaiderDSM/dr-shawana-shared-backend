@@ -4,21 +4,34 @@ import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
 import { optionalText, requiredText } from '../../lib/validation';
 
-export const STOCK_HOLD_REASONS = ['damaged', 'expired', 'label_issue', 'other'] as const;
+export const STOCK_HOLD_REASONS = ['damaged', 'expired', 'label_issue', 'other', 'missing'] as const;
 export type StockHoldReason = (typeof STOCK_HOLD_REASONS)[number];
 
-export const STOCK_HOLD_STATUSES = ['open', 'released', 'written_off', 'supplier_returned'] as const;
+export const REPORT_REASONS = ['damaged', 'label_issue', 'other'] as const;
+export const RECEIVE_ISSUE_REASONS = ['missing', 'damaged'] as const;
+
+export const STOCK_HOLD_STATUSES = [
+  'open',
+  'released',
+  'written_off',
+  'supplier_returned',
+  'sent_back',
+] as const;
 export type StockHoldStatus = (typeof STOCK_HOLD_STATUSES)[number];
 
-export const STOCK_HOLD_DECISIONS = ['release', 'write_off', 'supplier_return'] as const;
+export const STOCK_HOLD_DECISIONS = ['release', 'write_off', 'supplier_return', 'send_back'] as const;
 export type StockHoldDecision = (typeof STOCK_HOLD_DECISIONS)[number];
 
 export const reportStockHoldSchema = registry.register(
   'ReportStockHold',
   z
     .object({
-      serial: requiredText(1, 30).openapi({ example: 'DSM-000123' }),
-      reason: z.enum(STOCK_HOLD_REASONS),
+      serials: z
+        .array(requiredText(1, 30))
+        .min(1, 'Scan at least one label')
+        .max(50)
+        .openapi({ example: ['DSM-000123', 'DSM-000124'] }),
+      reason: z.enum(REPORT_REASONS),
       note: optionalText(500),
       saleId: z.uuid().optional().openapi({ description: 'The online order being dispatched' }),
       stockRequestId: z.uuid().optional().openapi({ description: 'The stock request being sent' }),
@@ -39,6 +52,10 @@ export const decideStockHoldSchema = registry.register(
 
 export const stockHoldListQuerySchema = z.object({
   status: z.enum(STOCK_HOLD_STATUSES).optional(),
+  reason: z.enum(STOCK_HOLD_REASONS).optional(),
+  productId: z.uuid().optional(),
+  from: z.iso.date().optional(),
+  to: z.iso.date().optional(),
   saleId: z.uuid().optional(),
   stockRequestId: z.uuid().optional(),
   search: z.string().trim().max(100).optional(),
@@ -68,7 +85,9 @@ export const stockHoldSchema = registry.register(
     decidedAt: z.string().nullable(),
     decisionNote: z.string().nullable(),
     writeOffNo: z.string().nullable(),
+    transferNo: z.string().nullable(),
     canDecide: z.boolean(),
+    canSendBack: z.boolean(),
     createdAt: z.string(),
   }),
 );
@@ -98,12 +117,15 @@ registry.registerPath({
   method: 'post',
   path: '/branch/stock-holds',
   summary:
-    'Put a labelled piece under observation while dispatching an order or sending a stock request. It can no longer be sold or sent until it is decided.',
+    'Put one or more labelled pieces under observation while dispatching an order or sending a stock request (expired stock is never sent, so it is not a reason here). They can no longer be sold or sent until decided.',
   request: {
     query: branchQuerySchema,
     body: { content: { 'application/json': { schema: reportStockHoldSchema } } },
   },
-  responses: { 201: one('Under observation'), ...errorResponses },
+  responses: {
+    201: { description: 'Under observation', ...jsonContent(dataEnvelope(z.array(stockHoldSchema))) },
+    ...errorResponses,
+  },
 });
 
 registry.registerPath({
@@ -111,7 +133,7 @@ registry.registerPath({
   method: 'post',
   path: '/branch/stock-holds/{id}/decide',
   summary:
-    'Warehouse Keeper (any piece) or the Dispatch Department admin (its own pieces) decides: release back to stock, write off, or send back to the supplier',
+    'Super Admin or Warehouse Keeper (any piece) or the Dispatch Department admin (its own pieces) decides: release back to stock, write off, send back to the supplier, or (a piece a branch held while receiving) send back to the Super Admin stock',
   request: {
     params: idParamsSchema,
     body: { content: { 'application/json': { schema: decideStockHoldSchema } } },
