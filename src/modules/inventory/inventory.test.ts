@@ -169,7 +169,9 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
     await AppDataSource.query(
       `INSERT INTO stock_movements (branch_id, product_id, type, qty, reference_type, reference_id, date) VALUES
         ($1, $2, 'sale', -4, 'sale', gen_random_uuid(), '2026-09-20'),
-        ($1, $2, 'sale_return', 1, 'sale', gen_random_uuid(), '2026-09-21')`,
+        ($1, $2, 'sale_return', 1, 'sale', gen_random_uuid(), '2026-09-21'),
+        ($1, $2, 'replacement', -1, 'sale_replacement', gen_random_uuid(), '2026-09-19'),
+        ($1, $2, 'adjustment', 1, 'stock_write_off', gen_random_uuid(), '2026-09-19')`,
       [lahoreId, productId],
     );
     expect(await balance()).toBe('9.000');
@@ -184,6 +186,8 @@ describe('inventory: stock in, stock out, ledger and reports', () => {
       stockOut: '8.000',
       sold: '4.000',
       returned: '1.000',
+      adjusted: '1.000',
+      replaced: '1.000',
       closing: '9.000',
     });
 

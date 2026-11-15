@@ -90,7 +90,8 @@ const reportRow = z.object({
   stockOut: quantityOutput,
   sold: quantityOutput,
   returned: quantityOutput,
-  adjusted: quantityOutput,
+  adjusted: quantityOutput.openapi({ description: 'Write-offs and sale edits (negative when stock left)' }),
+  replaced: quantityOutput.openapi({ description: 'Sent out as free replacements' }),
   closing: quantityOutput,
   branchSold: quantityOutput.openapi({
     description: 'Sold at the toBranchId branch, or at every branch for the Super Admin stock',

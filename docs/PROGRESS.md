@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Inventory report: replaced column
+
+- The inventory report rows and totals now carry `replaced` (pieces sent out as free replacements); before, they only showed in the closing stock. `adjusted` (write-offs and sale edits) is documented. Test updated.
+
 ## 2026-11-14 — Sales list: returns on each sale
 
 - Each sale in `GET /branch/sales` now has `returns` (how many returns) and `returnedQty` (pieces brought back), so a return without a refund is visible too. Test updated.

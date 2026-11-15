@@ -36,6 +36,7 @@ const REPORT_COLUMNS = [
   'sold',
   'returned',
   'adjusted',
+  'replaced',
   'closing',
   'branchSold',
   'inBranch',
@@ -270,6 +271,7 @@ export const inventoryService = {
                 COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['sale'])}), 0)::text AS sold,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_return'])}), 0)::text AS returned,
                 COALESCE(SUM(m.qty) FILTER (WHERE ${inRange(['sale_edit_adjust', 'adjustment'])}), 0)::text AS adjusted,
+                COALESCE(-SUM(m.qty) FILTER (WHERE ${inRange(['replacement'])}), 0)::text AS replaced,
                 COALESCE(SUM(m.qty) FILTER (WHERE m.date <= $3), 0)::text AS closing
            FROM products p
            LEFT JOIN categories c ON c.id = p.category_id

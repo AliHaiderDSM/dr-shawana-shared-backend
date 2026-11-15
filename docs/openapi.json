@@ -3387,7 +3387,13 @@
                 },
                 "adjusted": {
                   "type": "string",
-                  "example": "10.000"
+                  "example": "10.000",
+                  "description": "Write-offs and sale edits (negative when stock left)"
+                },
+                "replaced": {
+                  "type": "string",
+                  "example": "10.000",
+                  "description": "Sent out as free replacements"
                 },
                 "closing": {
                   "type": "string",
@@ -3475,6 +3481,7 @@
                 "sold",
                 "returned",
                 "adjusted",
+                "replaced",
                 "closing",
                 "branchSold",
                 "inBranch",
@@ -3518,7 +3525,13 @@
               },
               "adjusted": {
                 "type": "string",
-                "example": "10.000"
+                "example": "10.000",
+                "description": "Write-offs and sale edits (negative when stock left)"
+              },
+              "replaced": {
+                "type": "string",
+                "example": "10.000",
+                "description": "Sent out as free replacements"
               },
               "closing": {
                 "type": "string",
@@ -3559,6 +3572,7 @@
               "sold",
               "returned",
               "adjusted",
+              "replaced",
               "closing",
               "branchSold",
               "inBranch",
