@@ -16,8 +16,9 @@ import { branchScope } from '../../middleware/branchScope';
 import { requirePermission } from '../../middleware/requirePermission';
 import { validate, validBody, validParams, validQuery } from '../../middleware/validate';
 import { auditService } from '../audit/audit.service';
-import { inventoryItemsService, normalizeSerials } from './inventory-items.service';
-import { serialsInput } from './inventory-items.schemas';
+import { RECEIVE_ISSUE_REASONS } from '../stock-holds/stock-holds.schemas';
+import { createHold } from '../stock-holds/stock-holds.service';
+import { normalizeSerials } from './inventory-items.service';
 import { StockIn } from './stock-in.entity';
 import { stockLedger } from './stock-ledger';
 
@@ -38,12 +39,28 @@ const confirmSchema = registry.register(
           id: z.uuid(),
           receivedQty: quantityInput,
           note: optionalText(500),
-          missingSerials: serialsInput.optional(),
         }),
       )
       .max(200)
       .optional()
-      .openapi({ description: 'Lines that did not arrive in full. Lines left out arrived in full.' }),
+      .openapi({
+        description:
+          'Unlabelled lines that did not arrive in full. Lines left out arrived in full. Labelled lines use issues.',
+      }),
+    issues: z
+      .array(
+        z.object({
+          serial: z.string().trim().min(1).max(30),
+          reason: z.enum(RECEIVE_ISSUE_REASONS),
+          note: z.string().trim().max(500).nullish(),
+        }),
+      )
+      .max(500)
+      .default([])
+      .openapi({
+        description:
+          'Labels that did not arrive (missing) or arrived broken (damaged). They go under observation for the Super Admin.',
+      }),
   }),
 );
 
@@ -74,6 +91,10 @@ const receiptSchema = registry.register(
         manufacturingDate: z.string().nullable(),
         unitCost: z.string().nullable(),
         labels: z.number().int(),
+        serials: z.array(z.string()),
+        issues: z.array(
+          z.object({ serial: z.string(), reason: z.string(), status: z.string(), holdNo: z.string() }),
+        ),
         receiptNote: z.string().nullable(),
       }),
     ),
@@ -98,7 +119,7 @@ registry.registerPath({
   method: 'post',
   path: '/branch/stock-receipts/{grnNo}/confirm',
   summary:
-    'Warehouse Keeper confirms what arrived. Short lines keep the received quantity and a note; missing labels are written off.',
+    'Warehouse Keeper confirms what arrived. Labelled pieces that are missing or damaged go under observation for the Super Admin; an unlabelled short line keeps the received quantity and a note.',
   request: {
     params: grnParamsSchema,
     query: branchQuerySchema,
@@ -139,7 +160,13 @@ async function list(branchId: string, status?: 'pending' | 'confirmed', grnNo?: 
               'qty', si.qty::text, 'receivedQty', si.received_qty::text, 'batch', si.batch,
               'expiryDate', to_char(si.expiry_date, 'YYYY-MM-DD'), 'receiptNote', si.receipt_note,
               'manufacturingDate', to_char(si.manufacturing_date, 'YYYY-MM-DD'), 'unitCost', si.unit_cost::text,
-              'labels', (SELECT COUNT(*) FROM inventory_items i WHERE i.source_type = 'stock_in' AND i.source_id = si.id)::int
+              'labels', (SELECT COUNT(*) FROM inventory_items i WHERE i.source_type = 'stock_in' AND i.source_id = si.id)::int,
+              'serials', COALESCE((SELECT json_agg(i.serial ORDER BY i.serial) FROM inventory_items i
+                                    WHERE i.source_type = 'stock_in' AND i.source_id = si.id AND i.deleted_at IS NULL), '[]'::json),
+              'issues', COALESCE((SELECT json_agg(json_build_object('serial', i.serial, 'reason', h.reason,
+                                           'status', h.status, 'holdNo', h.hold_no) ORDER BY i.serial)
+                                    FROM stock_holds h JOIN inventory_items i ON i.id = h.item_id
+                                   WHERE h.transfer_no = si.grn_no AND i.source_type = 'stock_in' AND i.source_id = si.id), '[]'::json)
             ) ORDER BY p.name) AS lines
        FROM stock_ins si
        JOIN products p ON p.id = si.product_id
@@ -176,13 +203,20 @@ async function confirm(actor: Actor, branchId: string, grnNo: string, input: z.o
     if (pending.length === 0) throw AppError.conflict(`${grnNo} is already confirmed`);
     const date = input.date ?? today();
     const given = new Map((input.lines ?? []).map((l) => [l.id, l]));
+    const issues = new Map(
+      normalizeSerials(input.issues.map((i) => i.serial)).map((serial, index) => [
+        serial,
+        input.issues[index]!,
+      ]),
+    );
+    const known = new Set<string>();
     for (const id of given.keys()) {
       if (!pending.some((r) => r.id === id)) throw AppError.badRequest('A line is not waiting on this GRN');
     }
     for (const row of pending) {
       if (date < row.date) throw AppError.badRequest('The confirm date cannot be before the Stock In date');
       const line = given.get(row.id);
-      const received = new Decimal(line?.receivedQty ?? row.qty);
+      let received = new Decimal(line?.receivedQty ?? row.qty);
       if (received.isNegative() || received.gt(row.qty)) {
         throw AppError.unprocessable('Received quantity must be between 0 and the entered quantity');
       }
@@ -191,33 +225,18 @@ async function confirm(actor: Actor, branchId: string, grnNo: string, input: z.o
           WHERE source_type = 'stock_in' AND source_id = $1 AND status = 'quarantined' AND deleted_at IS NULL`,
         [row.id],
       )) as { id: string; serial: string }[];
-      const ref = { type: 'stock_in', id: row.id, label: grnNo };
+      const held: { serial: string; reason: 'missing' | 'damaged'; note: string | null }[] = [];
       if (pieces.length > 0) {
-        const missing = new Set(normalizeSerials(line?.missingSerials ?? []));
-        const short = new Decimal(row.qty).minus(received);
-        if (!short.equals(missing.size)) {
-          throw AppError.unprocessable(
-            `Scan the ${short.toString()} missing label(s) of ${grnNo} (${missing.size} scanned)`,
-          );
+        for (const p of pieces) {
+          known.add(p.serial);
+          const issue = issues.get(p.serial);
+          if (issue) held.push({ serial: p.serial, reason: issue.reason, note: issue.note ?? null });
         }
-        const unknown = [...missing].filter((s) => !pieces.some((p) => p.serial === s));
-        if (unknown.length)
-          throw AppError.unprocessable(`${unknown.join(', ')} is not a label of this entry`);
-        const lost = pieces.filter((p) => missing.has(p.serial)).map((p) => p.id);
-        const arrived = pieces.filter((p) => !missing.has(p.serial)).map((p) => p.id);
-        if (arrived.length) {
-          await em.query(
-            `UPDATE inventory_items SET status = 'in_stock', updated_by = $2, updated_at = now() WHERE id = ANY($1)`,
-            [arrived, actor.userId],
-          );
-        }
-        await inventoryItemsService.setStatus(em, actor, {
-          ids: lost,
-          to: 'written_off',
-          event: 'written_off',
-          ref,
-          note: line?.note ?? 'Did not arrive at the store',
-        });
+        received = new Decimal(row.qty);
+        await em.query(
+          `UPDATE inventory_items SET status = 'in_stock', updated_by = $2, updated_at = now() WHERE id = ANY($1)`,
+          [pieces.map((p) => p.id), actor.userId],
+        );
       }
       if (received.gt(0)) {
         await stockLedger.apply(
@@ -236,11 +255,23 @@ async function confirm(actor: Actor, branchId: string, grnNo: string, input: z.o
           ],
         );
       }
+      for (const issue of held) {
+        await createHold(em, actor, {
+          branchId,
+          serial: issue.serial,
+          from: ['in_stock'],
+          reason: issue.reason,
+          note: issue.note,
+          transferNo: grnNo,
+          source: grnNo,
+        });
+      }
+      const missing = held.filter((h) => h.reason === 'missing').length;
       await repo(StockIn, em).update(
         { id: row.id },
         {
           receiptStatus: 'confirmed',
-          receivedQty: toQuantity(received),
+          receivedQty: toQuantity(received.minus(missing)),
           receiptNote: line?.note ?? input.note ?? null,
           confirmedBy: actor.userId,
           confirmedAt: new Date(),
@@ -248,6 +279,8 @@ async function confirm(actor: Actor, branchId: string, grnNo: string, input: z.o
         },
       );
     }
+    const strangers = [...issues.keys()].filter((serial) => !known.has(serial));
+    if (strangers.length) throw AppError.unprocessable(`Not on ${grnNo}: ${strangers.join(', ')}`);
     await auditService.record(
       {
         actor,

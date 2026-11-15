@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Store receipts: missing or damaged pieces go under observation
+
+- `POST /branch/stock-receipts/:grnNo/confirm` takes `issues` (label + missing/damaged + note) for labelled lines instead of `missingSerials`: those pieces go under observation at the Super Admin stock (linked by the GRN number) for the Super Admin or the Warehouse Keeper to decide, instead of being written off at once. Unlabelled lines still use `receivedQty`. Receipt lines list their `serials` and `issues`. Test added; full suite 44/356 green.
+
 ## 2026-11-15 — Received transfers show what was held; write-off product filter
 
 - Incoming stock items carry `issues` (label, reason, status, hold number) for the pieces held while receiving.

@@ -395,4 +395,53 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     });
     expect(out.status).toBe(403);
   });
+
+  it('holds missing or damaged labelled pieces of a Lab Officer stock in for the Super Admin', async () => {
+    const lab = await createStaff(fake, { role: 'lab_officer', branchId: warehouseId });
+    const before = Number(await stockOf('Rose Toner', warehouseId));
+    const entry = await as(lab, 'post', '/branch/stock-ins').send({
+      date: '2026-10-06',
+      items: [
+        {
+          unitCost: '100',
+          productId: toner,
+          qty: '4',
+          batch: 'T-3',
+          expiryDate: '2028-07-31',
+          labels: 'generate',
+        },
+      ],
+    });
+    expect(entry.status).toBe(201);
+    const grn = entry.body.data[0].grnNo as string;
+    const pending = (await as(keeper, 'get', `/branch/stock-receipts?grnNo=${grn}`)).body.data[0];
+    const serials = pending.lines[0].serials as string[];
+    expect(serials).toHaveLength(4);
+    expect(
+      (
+        await as(keeper, 'post', `/branch/stock-receipts/${grn}/confirm`).send({
+          issues: [{ serial: 'DSM-999999', reason: 'missing' }],
+        })
+      ).status,
+    ).toBe(422);
+    const done = await as(keeper, 'post', `/branch/stock-receipts/${grn}/confirm`).send({
+      date: '2026-10-06',
+      issues: [
+        { serial: serials[0], reason: 'missing', note: 'Not in the box' },
+        { serial: serials[1], reason: 'damaged' },
+      ],
+    });
+    expect(done.status).toBe(200);
+    expect(done.body.data.lines[0]).toMatchObject({ receivedQty: '3.000' });
+    expect(done.body.data.lines[0].issues.map((i: { reason: string }) => i.reason).sort()).toEqual([
+      'damaged',
+      'missing',
+    ]);
+    expect(Number(await stockOf('Rose Toner', warehouseId))).toBe(before + 4);
+    const held = (await as(superAdmin, 'get', '/branch/stock-holds?status=open')).body.data.filter(
+      (h: { transferNo: string }) => h.transferNo === grn,
+    );
+    expect(held.map((h: { serial: string }) => h.serial).sort()).toEqual([serials[0], serials[1]].sort());
+    expect(held[0].canDecide).toBe(true);
+  });
 });

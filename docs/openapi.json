@@ -8665,6 +8665,318 @@
         ],
         "description": "Supabase Realtime broadcast channel that pings when a new message arrives (no message content). Null when realtime is off; then poll slowly."
       },
+      "ReportStockHold": {
+        "type": "object",
+        "properties": {
+          "serials": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 30
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "example": [
+              "DSM-000123",
+              "DSM-000124"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "damaged",
+              "label_issue",
+              "other"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500
+          },
+          "saleId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The online order being dispatched"
+          },
+          "stockRequestId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The stock request being sent"
+          }
+        },
+        "required": [
+          "serials",
+          "reason"
+        ]
+      },
+      "DecideStockHold": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "release",
+              "write_off",
+              "supplier_return",
+              "send_back"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "decision",
+          "note"
+        ]
+      },
+      "StockHold": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "holdNo": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "released",
+              "written_off",
+              "supplier_returned",
+              "sent_back"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "damaged",
+              "expired",
+              "label_issue",
+              "other",
+              "missing"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serial": {
+            "type": "string"
+          },
+          "itemStatus": {
+            "type": "string"
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "batchNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiryDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "branch": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "code",
+              "kind"
+            ]
+          },
+          "sale": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "invoiceNo": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "invoiceNo"
+            ]
+          },
+          "stockRequest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "requestNo": {
+                "type": "string"
+              },
+              "branchName": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "requestNo",
+              "branchName"
+            ]
+          },
+          "reportedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "role"
+            ]
+          },
+          "decidedBy": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "role"
+            ]
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decisionNote": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "writeOffNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "transferNo": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canDecide": {
+            "type": "boolean"
+          },
+          "canSendBack": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "holdNo",
+          "status",
+          "reason",
+          "note",
+          "serial",
+          "itemStatus",
+          "product",
+          "batchNo",
+          "expiryDate",
+          "branch",
+          "sale",
+          "stockRequest",
+          "reportedBy",
+          "decidedBy",
+          "decidedAt",
+          "decisionNote",
+          "writeOffNo",
+          "transferNo",
+          "canDecide",
+          "canSendBack",
+          "createdAt"
+        ]
+      },
       "ConfirmStoreReceipt": {
         "type": "object",
         "properties": {
@@ -8699,16 +9011,6 @@
                     "null"
                   ],
                   "maxLength": 500
-                },
-                "missingSerials": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^DSM-\\d{1,12}$",
-                    "example": "DSM-000001"
-                  },
-                  "maxItems": 5000,
-                  "description": "Scanned piece labels. Required for products tracked by label."
                 }
               },
               "required": [
@@ -8717,7 +9019,41 @@
               ]
             },
             "maxItems": 200,
-            "description": "Lines that did not arrive in full. Lines left out arrived in full."
+            "description": "Unlabelled lines that did not arrive in full. Lines left out arrived in full. Labelled lines use issues."
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "serial": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "missing",
+                    "damaged"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "serial",
+                "reason"
+              ]
+            },
+            "maxItems": 500,
+            "default": [],
+            "description": "Labels that did not arrive (missing) or arrived broken (damaged). They go under observation for the Super Admin."
           }
         }
       },
@@ -8879,6 +9215,38 @@
                 "labels": {
                   "type": "integer"
                 },
+                "serials": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "serial": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "holdNo": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "serial",
+                      "reason",
+                      "status",
+                      "holdNo"
+                    ]
+                  }
+                },
                 "receiptNote": {
                   "type": [
                     "string",
@@ -8898,6 +9266,8 @@
                 "manufacturingDate",
                 "unitCost",
                 "labels",
+                "serials",
+                "issues",
                 "receiptNote"
               ]
             }
@@ -16891,318 +17261,6 @@
           "saleId",
           "invoiceNo",
           "customer",
-          "createdAt"
-        ]
-      },
-      "ReportStockHold": {
-        "type": "object",
-        "properties": {
-          "serials": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 30
-            },
-            "minItems": 1,
-            "maxItems": 50,
-            "example": [
-              "DSM-000123",
-              "DSM-000124"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "enum": [
-              "damaged",
-              "label_issue",
-              "other"
-            ]
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500
-          },
-          "saleId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The online order being dispatched"
-          },
-          "stockRequestId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "The stock request being sent"
-          }
-        },
-        "required": [
-          "serials",
-          "reason"
-        ]
-      },
-      "DecideStockHold": {
-        "type": "object",
-        "properties": {
-          "decision": {
-            "type": "string",
-            "enum": [
-              "release",
-              "write_off",
-              "supplier_return",
-              "send_back"
-            ]
-          },
-          "note": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          }
-        },
-        "required": [
-          "decision",
-          "note"
-        ]
-      },
-      "StockHold": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "holdNo": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "open",
-              "released",
-              "written_off",
-              "supplier_returned",
-              "sent_back"
-            ]
-          },
-          "reason": {
-            "type": "string",
-            "enum": [
-              "damaged",
-              "expired",
-              "label_issue",
-              "other",
-              "missing"
-            ]
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "serial": {
-            "type": "string"
-          },
-          "itemStatus": {
-            "type": "string"
-          },
-          "product": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name"
-            ]
-          },
-          "batchNo": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "expiryDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "branch": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              },
-              "code": {
-                "type": "string"
-              },
-              "kind": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "code",
-              "kind"
-            ]
-          },
-          "sale": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "invoiceNo": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "invoiceNo"
-            ]
-          },
-          "stockRequest": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "requestNo": {
-                "type": "string"
-              },
-              "branchName": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "requestNo",
-              "branchName"
-            ]
-          },
-          "reportedBy": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "role"
-            ]
-          },
-          "decidedBy": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "name": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "role"
-            ]
-          },
-          "decidedAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "decisionNote": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "writeOffNo": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "transferNo": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "canDecide": {
-            "type": "boolean"
-          },
-          "canSendBack": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "holdNo",
-          "status",
-          "reason",
-          "note",
-          "serial",
-          "itemStatus",
-          "product",
-          "batchNo",
-          "expiryDate",
-          "branch",
-          "sale",
-          "stockRequest",
-          "reportedBy",
-          "decidedBy",
-          "decidedAt",
-          "decisionNote",
-          "writeOffNo",
-          "transferNo",
-          "canDecide",
-          "canSendBack",
           "createdAt"
         ]
       },
@@ -45296,6 +45354,485 @@
         }
       }
     },
+    "/branch/stock-holds": {
+      "get": {
+        "tags": [
+          "Under observation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Labelled pieces under observation. The Super Admin and the Warehouse Keeper see every one, Dispatch Department staff see their own, other branches see the ones held on their stock requests.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "released",
+                "written_off",
+                "supplier_returned",
+                "sent_back"
+              ]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "damaged",
+                "expired",
+                "label_issue",
+                "other",
+                "missing"
+              ]
+            },
+            "required": false,
+            "name": "reason",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "productId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "saleId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "stockRequestId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pieces",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StockHold"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Under observation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Put one or more labelled pieces under observation while dispatching an order or sending a stock request (expired stock is never sent, so it is not a reason here). They can no longer be sold or sent until decided.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportStockHold"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Under observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StockHold"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/stock-holds/{id}/decide": {
+      "post": {
+        "tags": [
+          "Under observation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Super Admin or Warehouse Keeper (any piece) or the Dispatch Department admin (its own pieces) decides: release back to stock, write off, send back to the supplier, or (a piece a branch held while receiving) send back to the Super Admin stock",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideStockHold"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/StockHold"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/stock-holds/open-count": {
+      "get": {
+        "tags": [
+          "Under observation"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "How many pieces are under observation for the viewer",
+        "responses": {
+          "200": {
+            "description": "Count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "open": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "open"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/branch/stock-receipts": {
       "get": {
         "tags": [
@@ -45424,7 +45961,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Warehouse Keeper confirms what arrived. Short lines keep the received quantity and a note; missing labels are written off.",
+        "summary": "Warehouse Keeper confirms what arrived. Labelled pieces that are missing or damaged go under observation for the Super Admin; an unlabelled short line keeps the received quantity and a note.",
         "parameters": [
           {
             "schema": {
@@ -55816,485 +56353,6 @@
                       },
                       "required": [
                         "pending"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/stock-holds": {
-      "get": {
-        "tags": [
-          "Under observation"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Labelled pieces under observation. The Super Admin and the Warehouse Keeper see every one, Dispatch Department staff see their own, other branches see the ones held on their stock requests.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "open",
-                "released",
-                "written_off",
-                "supplier_returned",
-                "sent_back"
-              ]
-            },
-            "required": false,
-            "name": "status",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "damaged",
-                "expired",
-                "label_issue",
-                "other",
-                "missing"
-              ]
-            },
-            "required": false,
-            "name": "reason",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "productId",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "required": false,
-            "name": "from",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "date"
-            },
-            "required": false,
-            "name": "to",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "saleId",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "stockRequestId",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "maxLength": 100
-            },
-            "required": false,
-            "name": "search",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Pieces",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/StockHold"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Under observation"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Put one or more labelled pieces under observation while dispatching an order or sending a stock request (expired stock is never sent, so it is not a reason here). They can no longer be sold or sent until decided.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": false,
-            "name": "branchId",
-            "in": "query"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReportStockHold"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Under observation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/StockHold"
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/stock-holds/{id}/decide": {
-      "post": {
-        "tags": [
-          "Under observation"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "Super Admin or Warehouse Keeper (any piece) or the Dispatch Department admin (its own pieces) decides: release back to stock, write off, send back to the supplier, or (a piece a branch held while receiving) send back to the Super Admin stock",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DecideStockHold"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Decided",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "$ref": "#/components/schemas/StockHold"
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not authenticated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/branch/stock-holds/open-count": {
-      "get": {
-        "tags": [
-          "Under observation"
-        ],
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "summary": "How many pieces are under observation for the viewer",
-        "responses": {
-          "200": {
-            "description": "Count",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "open": {
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "open"
                       ]
                     }
                   },
