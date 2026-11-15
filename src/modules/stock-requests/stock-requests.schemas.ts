@@ -164,6 +164,11 @@ export const incomingStockSchema = registry.register(
         received: z.boolean(),
         labels: z.number().int(),
         serials: z.array(z.string()).openapi({ description: 'The DSM labels sent on this line' }),
+        issues: z
+          .array(
+            z.object({ serial: z.string(), reason: z.string(), status: z.string(), holdNo: z.string() }),
+          )
+          .openapi({ description: 'Pieces the branch held while receiving (missing or damaged)' }),
       }),
     ),
   }),

@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-15 — Received transfers show what was held; write-off product filter
+
+- Incoming stock items carry `issues` (label, reason, status, hold number) for the pieces held while receiving.
+- `GET /branch/inventory/write-offs` takes `productId` (matches the product in every branch). Test updated.
+
 ## 2026-11-15 — Expired write-offs only for expired batches
 
 - A write-off with reason `expired` is refused (400) unless the batch is past its expiry date; use damaged or lost otherwise. Test updated; full suite 44/355 green.

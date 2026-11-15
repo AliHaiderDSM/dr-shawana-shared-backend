@@ -489,7 +489,11 @@ export const stockRequestsService = {
                        'qty', o.qty::text, 'received', o.received_at IS NOT NULL,
                        'labels', (SELECT COUNT(*) FROM inventory_items i WHERE i.stock_out_id = o.id)::int,
                        'serials', COALESCE((SELECT json_agg(i.serial ORDER BY i.serial) FROM inventory_items i
-                                             WHERE i.stock_out_id = o.id AND i.deleted_at IS NULL), '[]'::json))
+                                             WHERE i.stock_out_id = o.id AND i.deleted_at IS NULL), '[]'::json),
+                       'issues', COALESCE((SELECT json_agg(json_build_object('serial', i.serial, 'reason', h.reason,
+                                                    'status', h.status, 'holdNo', h.hold_no) ORDER BY i.serial)
+                                             FROM stock_holds h JOIN inventory_items i ON i.id = h.item_id
+                                            WHERE h.transfer_no = o.transfer_no AND i.stock_out_id = o.id), '[]'::json))
                        ORDER BY p.name) AS items
          FROM stock_outs o
          JOIN products p ON p.id = o.product_id

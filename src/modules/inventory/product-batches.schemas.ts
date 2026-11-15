@@ -48,6 +48,7 @@ export const writeOffSchema = registry.register(
 
 export const writeOffListQuerySchema = z.object({
   reason: z.enum(WRITE_OFF_REASONS).optional(),
+  productId: z.uuid().optional(),
   status: z.enum(WRITE_OFF_STATUSES).optional(),
   from: dateInput.optional(),
   to: dateInput.optional(),

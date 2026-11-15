@@ -263,6 +263,12 @@ export const productBatchesService = {
     };
     if (branchId) add('w.branch_id = ?', branchId);
     if (query.reason) add('w.reason = ?', query.reason);
+    if (query.productId) {
+      add(
+        'COALESCE(p.origin_product_id, p.id) = (SELECT COALESCE(x.origin_product_id, x.id) FROM products x WHERE x.id = ?)',
+        query.productId,
+      );
+    }
     if (query.status) add('w.status = ?', query.status);
     if (query.from) add('w.date >= ?', query.from);
     if (query.to) add('w.date <= ?', query.to);

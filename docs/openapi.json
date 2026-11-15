@@ -17828,6 +17828,33 @@
                     "type": "string"
                   },
                   "description": "The DSM labels sent on this line"
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "serial": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "holdNo": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "serial",
+                      "reason",
+                      "status",
+                      "holdNo"
+                    ]
+                  },
+                  "description": "Pieces the branch held while receiving (missing or damaged)"
                 }
               },
               "required": [
@@ -17838,7 +17865,8 @@
                 "qty",
                 "received",
                 "labels",
-                "serials"
+                "serials",
+                "issues"
               ]
             }
           }
@@ -51138,6 +51166,15 @@
             },
             "required": false,
             "name": "reason",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "productId",
             "in": "query"
           },
           {

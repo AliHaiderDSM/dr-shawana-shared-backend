@@ -356,6 +356,12 @@ describe('Pieces under observation', () => {
     expect(await labelStatus(serials[9]!)).toBe('in_stock');
     expect(await labelStatus(serials[8]!)).toBe('quarantined');
     expect(await onHand(lahoreId, 'Pmositol')).toBe(lahoreBefore + 2);
+    const incoming = (await as(lahoreAdmin, 'get', '/branch/incoming-stock')).body.data.find(
+      (t: { transferNo: string }) => t.transferNo === transferNo,
+    );
+    expect(incoming.items[0].issues).toEqual([
+      expect.objectContaining({ serial: serials[8], reason: 'missing', status: 'open' }),
+    ]);
 
     const branchView = await as(lahoreAdmin, 'get', '/branch/stock-holds?status=open');
     const hold = branchView.body.data.find((h: { serial: string }) => h.serial === serials[8]);
