@@ -409,15 +409,20 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
         return await withTransaction(async (em) => {
           const partyId = input[config.partyKey] ?? null;
           await assertParty(branchId, partyId, em);
-          if (config.kind === 'stock_in') await transfersService.assertReceivesFromWarehouse(em, branchId);
-          else await transfersService.assertSendsFromWarehouse(em, branchId);
-          const route =
-            config.kind === 'stock_out' && input.toBranchId
-              ? await transfersService.assertRoute(em, branchId, input.toBranchId)
-              : null;
           const [here] = (await em.query('SELECT kind::text AS kind, code FROM branches WHERE id = $1', [
             branchId,
           ])) as { kind: string; code: string }[];
+          const betweenBranches =
+            config.kind === 'stock_out' && here?.kind !== 'warehouse' && Boolean(input.stockRequestId);
+          if (config.kind === 'stock_in') await transfersService.assertReceivesFromWarehouse(em, branchId);
+          else if (!betweenBranches) await transfersService.assertSendsFromWarehouse(em, branchId);
+          if (betweenBranches && !actor.isSuperAdmin && actor.role !== 'branch_admin') {
+            throw AppError.forbidden('Only the branch admin sends stock to another branch');
+          }
+          const route =
+            config.kind === 'stock_out' && input.toBranchId
+              ? await transfersService.assertRoute(em, branchId, input.toBranchId, betweenBranches)
+              : null;
           const storeEntry = config.kind === 'stock_in' && here?.kind === 'warehouse';
           const pendingReceipt =
             storeEntry && (opts.receipt ? opts.receipt === 'pending' : !actor.isSuperAdmin);
@@ -443,7 +448,12 @@ export function createStockDocumentService<T extends StockDocument>(config: Docu
             throw AppError.badRequest('A stock request is answered with a transfer to the branch that asked');
           }
           if (route && input.stockRequestId) {
-            await stockRequestsService.assertSendable(em, input.stockRequestId, route.id);
+            await stockRequestsService.assertSendable(
+              em,
+              input.stockRequestId,
+              route.id,
+              betweenBranches ? branchId : null,
+            );
             await stockRequestsService.assertWithinApproval(em, input.stockRequestId, input.items);
           }
           const transferNo = route ? await transfersService.nextTransferNo(em, branchId) : null;

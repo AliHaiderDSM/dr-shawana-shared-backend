@@ -45,26 +45,24 @@ async function categoryIn(manager: EntityManager, actor: Actor, branchId: string
 }
 
 async function productIn(manager: EntityManager, actor: Actor, branchId: string, sourceProductId: string) {
-  const [linked] = (await manager.query(
-    'SELECT id FROM products WHERE branch_id = $1 AND origin_product_id = $2 AND deleted_at IS NULL',
-    [branchId, sourceProductId],
-  )) as { id: string }[];
-  if (linked) return linked.id;
   const [source] = (await manager.query('SELECT * FROM products WHERE id = $1', [sourceProductId])) as Record<
     string,
     unknown
   >[];
   if (!source) throw AppError.notFound('Product');
+  const originId = (source.origin_product_id as string | null) ?? sourceProductId;
+  const [linked] = (await manager.query(
+    'SELECT id FROM products WHERE branch_id = $1 AND (origin_product_id = $2 OR id = $2) AND deleted_at IS NULL',
+    [branchId, originId],
+  )) as { id: string }[];
+  if (linked) return linked.id;
   const [sameName] = (await manager.query(
     `SELECT id FROM products WHERE branch_id = $1 AND lower(name) = lower($2)
         AND origin_product_id IS NULL AND deleted_at IS NULL LIMIT 1`,
     [branchId, source.name],
   )) as { id: string }[];
   if (sameName) {
-    await manager.query('UPDATE products SET origin_product_id = $2 WHERE id = $1', [
-      sameName.id,
-      sourceProductId,
-    ]);
+    await manager.query('UPDATE products SET origin_product_id = $2 WHERE id = $1', [sameName.id, originId]);
     return sameName.id;
   }
   const categoryId = await categoryIn(manager, actor, branchId, source.category_id as string);
@@ -92,7 +90,7 @@ async function productIn(manager: EntityManager, actor: Actor, branchId: string,
       source.unit,
       source.low_stock_threshold,
       source.sale_price,
-      sourceProductId,
+      originId,
       actor.userId,
       source.size_unit,
     ],
@@ -150,9 +148,19 @@ export const transfersService = {
     }
   },
 
-  async assertRoute(manager: EntityManager, fromBranchId: string, toBranchId: string) {
+  async assertRoute(
+    manager: EntityManager,
+    fromBranchId: string,
+    toBranchId: string,
+    betweenBranches = false,
+  ) {
     const from = await branchOf(manager, fromBranchId);
-    if (from?.kind !== 'warehouse') {
+    if (betweenBranches) {
+      if (from?.kind !== 'branch' && from?.kind !== 'dispatch') {
+        throw AppError.badRequest('Only a branch sends stock to another branch');
+      }
+      if (fromBranchId === toBranchId) throw AppError.badRequest('A branch cannot send stock to itself');
+    } else if (from?.kind !== 'warehouse') {
       throw AppError.badRequest('Stock is transferred to branches from the Super Admin stock only');
     }
     const to = await branchOf(manager, toBranchId);
@@ -171,6 +179,8 @@ export const transfersService = {
     pieces: TakenItem[],
   ) {
     const productId = await productIn(manager, actor, toBranch.id, stockOut.productId);
+    const sender = await branchOf(manager, stockOut.branchId);
+    const fromLabel = sender && sender.kind !== 'warehouse' ? `From ${sender.name}` : 'From Super Admin';
     const movements = await stockLedger.movementsFor(manager, stockOut.branchId, 'stock_out', [stockOut.id]);
     const byBatch = new Map<string | null, Decimal>();
     for (const m of movements) byBatch.set(m.batchId, (byBatch.get(m.batchId) ?? new Decimal(0)).plus(m.qty));
@@ -191,7 +201,7 @@ export const transfersService = {
           manufacturingDate: batch?.manufacturingDate ?? null,
           expiryDate: batch?.expiryDate ?? null,
           unitCost: batch?.unitCost ?? null,
-          note: ['From Super Admin', stockOut.note].filter(Boolean).join(' · '),
+          note: [fromLabel, stockOut.note].filter(Boolean).join(' · '),
           transferOutId: stockOut.id,
         },
         manager,
@@ -206,7 +216,7 @@ export const transfersService = {
             type: 'stock_in',
             qty: qty.negated(),
             date: stockOut.date,
-            note: 'From Super Admin',
+            note: fromLabel,
           },
         ],
       );
@@ -220,8 +230,8 @@ export const transfersService = {
         );
         await manager.query(
           `INSERT INTO inventory_item_events (item_id, branch_id, type, reference_type, reference_id, reference_label, created_by, created_at)
-           SELECT id, branch_id, 'received', 'stock_in', $2, 'From Super Admin', $3, clock_timestamp() FROM inventory_items WHERE id = ANY($1)`,
-          [moving, stockIn.id, actor.userId],
+           SELECT id, branch_id, 'received', 'stock_in', $2, $4, $3, clock_timestamp() FROM inventory_items WHERE id = ANY($1)`,
+          [moving, stockIn.id, actor.userId, fromLabel],
         );
         await manager.query('UPDATE products SET track_serials = true WHERE id = $1', [productId]);
       }

@@ -17297,6 +17297,14 @@
       "CreateStockRequest": {
         "type": "object",
         "properties": {
+          "fromBranchId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Ask another branch instead of the Super Admin stock. Leave empty to ask the Super Admin stock. It cannot change after the request is made."
+          },
           "note": {
             "type": [
               "string",
@@ -17312,7 +17320,7 @@
                 "productId": {
                   "type": "string",
                   "format": "uuid",
-                  "description": "A product of the Super Admin stock"
+                  "description": "A product of the stock the request asks from"
                 },
                 "qty": {
                   "type": "string",
@@ -17494,6 +17502,30 @@
               "code",
               "kind"
             ]
+          },
+          "fromBranch": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "code"
+            ],
+            "description": "The branch that sends this stock; null for the Super Admin stock"
           },
           "requestedBy": {
             "type": [
@@ -17759,6 +17791,7 @@
           "receivedAt",
           "createdAt",
           "branch",
+          "fromBranch",
           "requestedBy",
           "decidedBy",
           "receivedBy",
@@ -17854,6 +17887,30 @@
               "id",
               "name",
               "code"
+            ]
+          },
+          "fromBranch": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "code",
+              "kind"
             ]
           },
           "request": {
@@ -17968,6 +18025,7 @@
           "receivedBy",
           "sentBy",
           "toBranch",
+          "fromBranch",
           "request",
           "note",
           "items"
@@ -56575,7 +56633,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Ask the Super Admin for stock: which products and how many",
+        "summary": "Ask for stock: which products and how many, from the Super Admin stock or another branch. The Super Admin approves it either way.",
         "parameters": [
           {
             "schema": {
@@ -56678,7 +56736,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Products of the Super Admin stock a branch can ask for, with the stock there now",
+        "summary": "Products a branch can ask for, with the stock there now: the Super Admin stock, or another branch with ?fromBranchId=",
         "parameters": [
           {
             "schema": {
@@ -56687,6 +56745,15 @@
             },
             "required": false,
             "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "fromBranchId",
             "in": "query"
           },
           {
@@ -56746,6 +56813,124 @@
                           "batchNo",
                           "categoryName",
                           "available"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/stock-requests/sources": {
+      "get": {
+        "tags": [
+          "Stock requests"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Other active branches this branch can ask for stock",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "code",
+                          "kind"
                         ]
                       }
                     }

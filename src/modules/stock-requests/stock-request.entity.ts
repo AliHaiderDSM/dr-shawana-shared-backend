@@ -2,6 +2,7 @@ import { type Decimal } from 'decimal.js';
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { BranchScopedEntity } from '../../database/branch-scoped.entity';
 import { quantityColumn } from '../../database/transformers';
+import { Branch } from '../branches/branch.entity';
 import { Product } from '../products/product.entity';
 
 export const STOCK_REQUEST_STATUSES = [
@@ -27,6 +28,14 @@ export class StockRequest extends BranchScopedEntity {
     default: 'pending',
   })
   status: StockRequestStatus;
+
+  @Index('IDX_stock_requests_from_branch_id')
+  @Column({ name: 'from_branch_id', type: 'uuid', nullable: true })
+  fromBranchId: string | null;
+
+  @ManyToOne(() => Branch, { onDelete: 'RESTRICT', nullable: true })
+  @JoinColumn({ name: 'from_branch_id', foreignKeyConstraintName: 'FK_stock_requests_from_branch' })
+  fromBranch?: Branch | null;
 
   @Column({ type: 'varchar', length: 1000, nullable: true })
   note: string | null;

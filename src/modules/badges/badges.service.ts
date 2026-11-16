@@ -90,7 +90,8 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
   if (branch?.kind === 'warehouse') {
     const [toSend, onTheWay] = await Promise.all([
       one(
-        `SELECT COUNT(*)::int AS n FROM stock_requests WHERE status = 'approved' AND deleted_at IS NULL`,
+        `SELECT COUNT(*)::int AS n FROM stock_requests
+          WHERE status = 'approved' AND from_branch_id IS NULL AND deleted_at IS NULL`,
         [],
       ),
       one(
@@ -116,7 +117,8 @@ export async function badgeCounts(viewer: BadgeViewer): Promise<BadgeCounts> {
   const [stockRequests, incomingStock, writeOffs, discountRequests, returns] = await Promise.all([
     one(
       `SELECT COUNT(*)::int AS n FROM stock_requests
-        WHERE branch_id = $1 AND status IN ('approved', 'sent') AND deleted_at IS NULL`,
+        WHERE deleted_at IS NULL
+          AND ((branch_id = $1 AND status IN ('approved', 'sent')) OR (from_branch_id = $1 AND status = 'approved'))`,
       [branchId],
     ),
     one(

@@ -46,7 +46,18 @@ stockRequestsRouter.get(
   canView,
   validate({ query: stockRequestCatalogQuerySchema }),
   async (req, res) => {
-    sendOk(res, await stockRequestsService.catalog(validQuery(req, stockRequestCatalogQuerySchema).search));
+    const query = validQuery(req, stockRequestCatalogQuerySchema);
+    sendOk(res, await stockRequestsService.catalog(query.search, query.fromBranchId ?? null));
+  },
+);
+
+stockRequestsRouter.get(
+  `${path}/sources`,
+  authenticate,
+  branchScope({ allowAllForSuperAdmin: true }),
+  canView,
+  async (req, res) => {
+    sendOk(res, await stockRequestsService.sources(req.branchId ?? null));
   },
 );
 

@@ -33,6 +33,20 @@ export async function viewScope(branchId: string | null) {
   return row?.kind === 'warehouse' ? null : branchId;
 }
 
+async function sourceBranch(manager: EntityManager, fromBranchId: string | null, askingBranchId?: string) {
+  if (!fromBranchId) return warehouseId(manager);
+  if (fromBranchId === askingBranchId) throw AppError.badRequest('A branch cannot ask itself for stock');
+  const [row] = (await manager.query(
+    `SELECT id, name, kind::text AS kind, status::text AS status FROM branches WHERE id = $1 AND deleted_at IS NULL`,
+    [fromBranchId],
+  )) as { id: string; name: string; kind: string; status: string }[];
+  if (!row || (row.kind !== 'branch' && row.kind !== 'dispatch')) {
+    throw AppError.badRequest('Choose a branch to ask the stock from');
+  }
+  if (row.status !== 'active') throw AppError.badRequest(`${row.name} is inactive`);
+  return row.id;
+}
+
 async function warehouseId(manager: EntityManager) {
   const [row] = (await manager.query(
     `SELECT id FROM branches WHERE kind::text = 'warehouse' AND deleted_at IS NULL LIMIT 1`,
@@ -52,6 +66,8 @@ const SELECT = `
   SELECT r.id, r.request_no AS "requestNo", r.status, r.note, r.decision_note AS "decisionNote",
          r.decided_at AS "decidedAt", r.sent_at AS "sentAt", r.received_at AS "receivedAt", r.created_at AS "createdAt",
          json_build_object('id', b.id, 'name', b.name, 'code', b.code, 'kind', b.kind) AS branch,
+         CASE WHEN fb.id IS NULL THEN NULL
+              ELSE json_build_object('id', fb.id, 'name', fb.name, 'code', fb.code) END AS "fromBranch",
          ${person('rq')} AS "requestedBy", ${person('dc')} AS "decidedBy", ${person('rc')} AS "receivedBy",
          COALESCE((SELECT json_agg(json_build_object(
                     'id', it.id, 'productId', it.product_id, 'productName', p.name, 'unit', p.unit,
@@ -85,6 +101,7 @@ const SELECT = `
                    WHERE h.stock_request_id = r.id), '[]') AS holds
     FROM stock_requests r
     JOIN branches b ON b.id = r.branch_id
+    LEFT JOIN branches fb ON fb.id = r.from_branch_id
     LEFT JOIN staff_profiles rq ON rq.id = r.created_by
     LEFT JOIN staff_profiles dc ON dc.id = r.decided_by
     LEFT JOIN staff_profiles rc ON rc.id = r.received_by
@@ -122,7 +139,7 @@ async function findOne(id: string, branchId: string | null, manager?: EntityMana
   let where = ' AND r.id = $1';
   if (branchId) {
     params.push(branchId);
-    where += ' AND r.branch_id = $2';
+    where += ' AND (r.branch_id = $2 OR r.from_branch_id = $2)';
   }
   const [row] = (await (manager ?? AppDataSource.manager).query(`${SELECT}${where}`, params)) as (Record<
     string,
@@ -142,8 +159,14 @@ async function lock(manager: EntityManager, id: string) {
   return request;
 }
 
-async function checkItems(em: EntityManager, input: CreateStockRequestInput) {
-  const source = await warehouseId(em);
+async function checkItems(em: EntityManager, input: CreateStockRequestInput, source: string) {
+  const [from] = (await em.query('SELECT name, kind::text AS kind FROM branches WHERE id = $1', [
+    source,
+  ])) as {
+    name: string;
+    kind: string;
+  }[];
+  const stockName = from?.kind === 'warehouse' ? 'the Super Admin stock' : (from?.name ?? 'that branch');
   const ids = [...new Set(input.items.map((i) => i.productId))];
   if (ids.length !== input.items.length) throw AppError.badRequest('Each product can be asked once');
   const found = (await em.query(
@@ -152,7 +175,7 @@ async function checkItems(em: EntityManager, input: CreateStockRequestInput) {
     [ids, source],
   )) as { id: string; name: string; available: string }[];
   if (found.length !== ids.length) {
-    throw AppError.badRequest('Ask only for products of the Super Admin stock');
+    throw AppError.badRequest(`Ask only for products of ${stockName}`);
   }
   const short = input.items.flatMap((item) => {
     const product = found.find((p) => p.id === item.productId)!;
@@ -168,7 +191,7 @@ async function checkItems(em: EntityManager, input: CreateStockRequestInput) {
   });
   if (short.length) {
     throw AppError.unprocessable(
-      short.map((p) => `${p.name}: only ${p.available} in the Super Admin stock`).join('; '),
+      short.map((p) => `${p.name}: only ${p.available} in ${stockName}`).join('; '),
       { products: short },
     );
   }
@@ -211,9 +234,9 @@ async function record(
 }
 
 export const stockRequestsService = {
-  async catalog(search?: string) {
+  async catalog(search: string | undefined, fromBranchId: string | null) {
     const manager = AppDataSource.manager;
-    const source = await warehouseId(manager);
+    const source = await sourceBranch(manager, fromBranchId);
     const params: unknown[] = [source];
     let filter = '';
     if (search) {
@@ -230,13 +253,28 @@ export const stockRequestsService = {
     return rows.map((r) => ({ ...r, available: toQuantity(r.available) }));
   },
 
+  async sources(viewer: string | null) {
+    const params: unknown[] = [];
+    let mine = '';
+    if (viewer) {
+      params.push(viewer);
+      mine = ' AND id <> $1';
+    }
+    return (await AppDataSource.query(
+      `SELECT id, name, code, kind::text AS kind FROM branches
+        WHERE kind::text IN ('branch', 'dispatch') AND status::text = 'active' AND deleted_at IS NULL${mine}
+        ORDER BY name`,
+      params,
+    )) as { id: string; name: string; code: string; kind: string }[];
+  },
+
   async list(viewer: string | null, query: StockRequestListQuery) {
     const branchId = await viewScope(viewer);
     const params: unknown[] = [];
     let where = '';
     if (branchId) {
       params.push(branchId);
-      where += ` AND r.branch_id = $${params.length}`;
+      where += ` AND (r.branch_id = $${params.length} OR r.from_branch_id = $${params.length})`;
     }
     if (query.status) {
       params.push(query.status);
@@ -269,7 +307,8 @@ export const stockRequestsService = {
       if (!branch || (branch.kind !== 'branch' && branch.kind !== 'dispatch')) {
         throw AppError.conflict('Only a branch or the Dispatch Department asks the Super Admin for stock');
       }
-      await checkItems(em, input);
+      const fromBranchId = input.fromBranchId ?? null;
+      await checkItems(em, input, await sourceBranch(em, fromBranchId, branchId));
       const seq = await nextSequence(em, branchId, 'stock_request');
       const requests = repo(StockRequest, em);
       const saved = await requests.save(
@@ -277,6 +316,7 @@ export const stockRequestsService = {
           branchId,
           requestNo: `${branch.code}-SR-${String(seq).padStart(6, '0')}`,
           status: 'pending',
+          fromBranchId,
           note: input.note ?? null,
           createdBy: actor.userId,
           updatedBy: actor.userId,
@@ -297,7 +337,7 @@ export const stockRequestsService = {
       }
       const before = await findOne(id, branchId, em);
       const beforeNote = request.note;
-      await checkItems(em, input);
+      await checkItems(em, input, await sourceBranch(em, request.fromBranchId, branchId));
       await repo(StockRequestItem, em).delete({ requestId: id });
       await saveItems(em, id, input);
       request.note = input.note ?? null;
@@ -390,10 +430,22 @@ export const stockRequestsService = {
     });
   },
 
-  async assertSendable(manager: EntityManager, requestId: string, toBranchId: string) {
+  async assertSendable(
+    manager: EntityManager,
+    requestId: string,
+    toBranchId: string,
+    fromBranchId: string | null,
+  ) {
     const request = await lock(manager, requestId);
     if (request.branchId !== toBranchId) {
       throw AppError.badRequest(`${request.requestNo} was asked by another branch`);
+    }
+    if ((request.fromBranchId ?? null) !== fromBranchId) {
+      throw AppError.forbidden(
+        request.fromBranchId
+          ? `${request.requestNo} is sent by the branch it was asked from`
+          : `${request.requestNo} is sent from the Super Admin stock`,
+      );
     }
     if (request.status !== 'approved' && request.status !== 'sent') {
       throw AppError.conflict(`${request.requestNo} is ${request.status}. Approve it before sending stock.`);
@@ -482,6 +534,7 @@ export const stockRequestsService = {
               (SELECT ${person('rc')} FROM staff_profiles rc WHERE rc.id = (array_agg(o.received_by))[1]) AS "receivedBy",
               (SELECT ${person('sd')} FROM staff_profiles sd WHERE sd.id = (array_agg(o.created_by))[1]) AS "sentBy",
               json_build_object('id', tb.id, 'name', tb.name, 'code', tb.code) AS "toBranch",
+              json_build_object('id', fb.id, 'name', fb.name, 'code', fb.code, 'kind', fb.kind) AS "fromBranch",
               (SELECT json_build_object('id', sr.id, 'requestNo', sr.request_no) FROM stock_requests sr
                 WHERE sr.id = (array_agg(o.stock_request_id))[1]) AS request,
               MAX(o.note) AS note,
@@ -498,8 +551,9 @@ export const stockRequestsService = {
          FROM stock_outs o
          JOIN products p ON p.id = o.product_id
          JOIN branches tb ON tb.id = o.to_branch_id
+         JOIN branches fb ON fb.id = o.branch_id
         WHERE ${where.join(' AND ')}
-        GROUP BY o.transfer_no, tb.id
+        GROUP BY o.transfer_no, tb.id, fb.id
         ${having}
         ORDER BY bool_and(o.received_at IS NOT NULL) ASC, MIN(o.created_at) DESC
         LIMIT 300`,

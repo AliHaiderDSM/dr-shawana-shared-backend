@@ -16,11 +16,15 @@ import { STOCK_REQUEST_STATUSES } from './stock-request.entity';
 export const createStockRequestSchema = registry.register(
   'CreateStockRequest',
   z.object({
+    fromBranchId: z.uuid().nullish().openapi({
+      description:
+        'Ask another branch instead of the Super Admin stock. Leave empty to ask the Super Admin stock. It cannot change after the request is made.',
+    }),
     note: optionalText(1000),
     items: z
       .array(
         z.object({
-          productId: z.uuid().openapi({ description: 'A product of the Super Admin stock' }),
+          productId: z.uuid().openapi({ description: 'A product of the stock the request asks from' }),
           qty: positiveQuantityInput,
           note: optionalText(500),
         }),
@@ -49,6 +53,7 @@ export const stockRequestListQuerySchema = z.object({
 
 export const stockRequestCatalogQuerySchema = z.object({
   search: z.string().trim().max(100).optional(),
+  fromBranchId: z.uuid().optional(),
   branchId: z.uuid().optional(),
 });
 
@@ -96,6 +101,10 @@ export const stockRequestSchema = registry.register(
     receivedAt: z.string().nullable(),
     createdAt: z.string(),
     branch: z.object({ id: z.uuid(), name: z.string(), code: z.string(), kind: z.string() }),
+    fromBranch: z
+      .object({ id: z.uuid(), name: z.string(), code: z.string() })
+      .nullable()
+      .openapi({ description: 'The branch that sends this stock; null for the Super Admin stock' }),
     requestedBy: person,
     decidedBy: person,
     receivedBy: person,
@@ -152,6 +161,7 @@ export const incomingStockSchema = registry.register(
     receivedBy: person,
     sentBy: person,
     toBranch: z.object({ id: z.uuid(), name: z.string(), code: z.string() }),
+    fromBranch: z.object({ id: z.uuid(), name: z.string(), code: z.string(), kind: z.string() }),
     request: z.object({ id: z.uuid(), requestNo: z.string() }).nullable(),
     note: z.string().nullable(),
     items: z.array(
@@ -165,9 +175,7 @@ export const incomingStockSchema = registry.register(
         labels: z.number().int(),
         serials: z.array(z.string()).openapi({ description: 'The DSM labels sent on this line' }),
         issues: z
-          .array(
-            z.object({ serial: z.string(), reason: z.string(), status: z.string(), holdNo: z.string() }),
-          )
+          .array(z.object({ serial: z.string(), reason: z.string(), status: z.string(), holdNo: z.string() }))
           .openapi({ description: 'Pieces the branch held while receiving (missing or damaged)' }),
       }),
     ),
@@ -181,6 +189,13 @@ const catalogItemSchema = z.object({
   batchNo: z.string().nullable(),
   categoryName: z.string().nullable(),
   available: quantityOutput,
+});
+
+const sourceBranchSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  code: z.string(),
+  kind: z.string(),
 });
 
 export type CreateStockRequestInput = z.output<typeof createStockRequestSchema>;
@@ -207,7 +222,8 @@ registry.registerPath({
   ...docs,
   method: 'get',
   path: '/branch/stock-requests/catalog',
-  summary: 'Products of the Super Admin stock a branch can ask for, with the stock there now',
+  summary:
+    'Products a branch can ask for, with the stock there now: the Super Admin stock, or another branch with ?fromBranchId=',
   request: { query: stockRequestCatalogQuerySchema },
   responses: {
     200: { description: 'Products', ...jsonContent(dataEnvelope(z.array(catalogItemSchema))) },
@@ -216,9 +232,21 @@ registry.registerPath({
 });
 registry.registerPath({
   ...docs,
+  method: 'get',
+  path: '/branch/stock-requests/sources',
+  summary: 'Other active branches this branch can ask for stock',
+  request: { query: branchQuerySchema },
+  responses: {
+    200: { description: 'Branches', ...jsonContent(dataEnvelope(z.array(sourceBranchSchema))) },
+    ...errorResponses,
+  },
+});
+registry.registerPath({
+  ...docs,
   method: 'post',
   path: '/branch/stock-requests',
-  summary: 'Ask the Super Admin for stock: which products and how many',
+  summary:
+    'Ask for stock: which products and how many, from the Super Admin stock or another branch. The Super Admin approves it either way.',
   request: {
     query: branchQuerySchema,
     body: { content: { 'application/json': { schema: createStockRequestSchema } } },

@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-16 — Branch to branch stock requests
+
+- `stock_requests.from_branch_id` (migration `1795600000000-BranchToBranchRequests`): a branch can ask another active branch instead of the Super Admin stock. `POST /branch/stock-requests` takes `fromBranchId`; `GET /branch/stock-requests/sources` lists the branches; the catalog takes `?fromBranchId=`.
+- The Super Admin approves as before. The branch admin of the source branch sends it with a Stock Out (`toBranchId` + `stockRequestId`); the Warehouse Keeper cannot send a branch request and the source branch cannot send a Super Admin request.
+- The receiving branch admin checks and receives it under Incoming stock, with missing/damaged pieces going under observation. Incoming transfers carry `fromBranch`.
+- Received products link to the original Super Admin product (`origin_product_id`), so the same product never doubles in a branch.
+- Badges: the source branch sees approved requests to send; the Warehouse Keeper counts only Super Admin requests.
+
 ## 2026-11-16 — C-Section: one year per C-Section
 
 - Each surgery entry may carry `years` (up to 10); the dashboard fills it for C-Section, one year per C-Section, and keeps `year` as the first of them. CLINICAL_FIELDS.md updated. Tests updated.

@@ -444,4 +444,117 @@ describe('Branch stock requests, Super Admin approval and branch receipt', () =>
     expect(held.map((h: { serial: string }) => h.serial).sort()).toEqual([serials[0], serials[1]].sort());
     expect(held[0].canDecide).toBe(true);
   });
+
+  it('moves stock from one branch to another after the Super Admin approves it', async () => {
+    const isbAdmin = await createStaff(fake, { role: 'branch_admin', branchId: otherId });
+    const sources = (await as(isbAdmin, 'get', '/branch/stock-requests/sources')).body.data as {
+      id: string;
+    }[];
+    expect(sources.map((b) => b.id)).toContain(lahoreId);
+    expect(sources.map((b) => b.id)).not.toContain(otherId);
+    const catalog = await as(
+      isbAdmin,
+      'get',
+      `/branch/stock-requests/catalog?search=serum&fromBranchId=${lahoreId}`,
+    );
+    expect(catalog.status).toBe(200);
+    const lahoreSerum = catalog.body.data[0] as { id: string; available: string };
+    expect(lahoreSerum.id).not.toBe(serum);
+    const lahoreBefore = Number(await stockOf('Vitamin C Serum', lahoreId));
+    expect(Number(lahoreSerum.available)).toBe(lahoreBefore);
+    expect(
+      (
+        await as(isbAdmin, 'post', '/branch/stock-requests').send({
+          fromBranchId: otherId,
+          items: [{ productId: lahoreSerum.id, qty: '1' }],
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await as(isbAdmin, 'post', '/branch/stock-requests').send({
+          fromBranchId: lahoreId,
+          items: [{ productId: serum, qty: '1' }],
+        })
+      ).status,
+    ).toBe(400);
+    const asked = await as(isbAdmin, 'post', '/branch/stock-requests').send({
+      fromBranchId: lahoreId,
+      items: [{ productId: lahoreSerum.id, qty: '2' }],
+    });
+    expect(asked.status).toBe(201);
+    expect(asked.body.data).toMatchObject({
+      requestNo: 'ISB-SR-000001',
+      status: 'pending',
+      branch: { id: otherId },
+      fromBranch: { id: lahoreId, code: 'LHR' },
+    });
+    const requestId = asked.body.data.id as string;
+    const seen = (await as(lahoreAdmin, 'get', '/branch/stock-requests')).body.data as { id: string }[];
+    expect(seen.map((r) => r.id)).toContain(requestId);
+    expect((await as(lahoreAdmin, 'get', `/branch/stock-requests/${requestId}`)).status).toBe(200);
+    const early = await as(lahoreAdmin, 'post', '/branch/stock-outs').send({
+      date: '2026-10-10',
+      toBranchId: otherId,
+      stockRequestId: requestId,
+      items: [{ productId: lahoreSerum.id, qty: '2' }],
+    });
+    expect(early.status).toBe(409);
+    expect((await as(superAdmin, 'post', `/admin/stock-requests/${requestId}/approve`).send({})).status).toBe(
+      200,
+    );
+    expect((await as(lahoreAdmin, 'get', '/branch/badges')).body.data.stockRequests).toBeGreaterThan(0);
+    const byKeeper = await as(keeper, 'post', '/branch/stock-outs').send({
+      date: '2026-10-10',
+      toBranchId: otherId,
+      stockRequestId: requestId,
+      items: [{ productId: serum, qty: '2' }],
+    });
+    expect(byKeeper.status).toBe(403);
+    const byDesk = await as(lahoreDesk, 'post', '/branch/stock-outs').send({
+      date: '2026-10-10',
+      toBranchId: otherId,
+      stockRequestId: requestId,
+      items: [{ productId: lahoreSerum.id, qty: '2' }],
+    });
+    expect(byDesk.status).toBe(403);
+    const tooMany = await as(lahoreAdmin, 'post', '/branch/stock-outs').send({
+      date: '2026-10-10',
+      toBranchId: otherId,
+      stockRequestId: requestId,
+      items: [{ productId: lahoreSerum.id, qty: '3' }],
+    });
+    expect(tooMany.status).toBe(422);
+    const sent = await as(lahoreAdmin, 'post', '/branch/stock-outs').send({
+      date: '2026-10-10',
+      toBranchId: otherId,
+      stockRequestId: requestId,
+      items: [{ productId: lahoreSerum.id, qty: '2' }],
+    });
+    expect(sent.status).toBe(201);
+    const transferNo = sent.body.data[0].transferNo as string;
+    expect(transferNo).toBe('LHR-TR-000001');
+    expect(Number(await stockOf('Vitamin C Serum', lahoreId))).toBe(lahoreBefore - 2);
+    const incoming = (await as(isbAdmin, 'get', '/branch/incoming-stock?status=waiting')).body.data;
+    expect(incoming).toEqual([
+      expect.objectContaining({
+        transferNo,
+        fromBranch: expect.objectContaining({ id: lahoreId }),
+        request: { id: requestId, requestNo: 'ISB-SR-000001' },
+      }),
+    ]);
+    expect(
+      (await as(lahoreAdmin, 'post', `/branch/incoming-stock/${transferNo}/receive`).send({})).status,
+    ).toBe(404);
+    const got = await as(isbAdmin, 'post', `/branch/incoming-stock/${transferNo}/receive`).send({
+      date: '2026-10-11',
+    });
+    expect(got.status).toBe(200);
+    expect(await stockOf('Vitamin C Serum', otherId)).toBe('2.000');
+    expect((await as(isbAdmin, 'get', `/branch/stock-requests/${requestId}`)).body.data.status).toBe(
+      'received',
+    );
+    const fromWarehouse = await as(isbAdmin, 'get', '/branch/stock-requests/catalog?search=serum');
+    expect(fromWarehouse.body.data).toEqual([expect.objectContaining({ id: serum })]);
+  });
 });
