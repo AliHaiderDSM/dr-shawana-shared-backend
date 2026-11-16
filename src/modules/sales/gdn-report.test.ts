@@ -104,6 +104,7 @@ describe('GDN day-end report', () => {
       total: '1000.00',
       received: '600.00',
       remaining: '400.00',
+      returned: false,
     });
   });
 

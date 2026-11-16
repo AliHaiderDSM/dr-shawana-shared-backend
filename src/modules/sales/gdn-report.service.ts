@@ -18,6 +18,7 @@ interface OrderRow {
   total: string;
   received: string;
   remaining: string;
+  returned: boolean;
   city: string | null;
   customerName: string | null;
   customerPhone: string | null;
@@ -57,7 +58,9 @@ export const gdnReportService = {
     const select = `SELECT s.id, s.sale_type AS "saleType", s.invoice_no AS "invoiceNo", s.gdn_no AS "gdnNo", s.date::text AS date,
               s.dispatched_on::text AS "dispatchedOn", s.cancelled_on::text AS "cancelledOn",
               s.delivery_status AS "deliveryStatus", s.payment_status AS "paymentStatus",
-              s.total::text AS total, s.received::text AS received, s.remaining::text AS remaining, COALESCE(s.patient_city, s.city) AS city,
+              s.total::text AS total, s.received::text AS received, s.remaining::text AS remaining,
+              EXISTS (SELECT 1 FROM sale_returns rt WHERE rt.sale_id = s.id AND rt.deleted_at IS NULL) AS returned,
+              COALESCE(s.patient_city, s.city) AS city,
               p.name AS "customerName", p.phone AS "customerPhone",
               b.code AS "bookedCode", b.name AS "bookedName"
          FROM sales s
@@ -118,6 +121,7 @@ export const gdnReportService = {
         total: Number(r.total).toFixed(2),
         received: Number(r.received).toFixed(2),
         remaining: Number(r.remaining).toFixed(2),
+        returned: r.returned,
         city: r.city,
         customer: { name: r.customerName, phone: r.customerPhone },
         bookedAt: r.bookedCode ? { code: r.bookedCode, name: r.bookedName } : null,
