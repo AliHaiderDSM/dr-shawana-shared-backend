@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-16 — C-Section: one year per C-Section
+
+- Each surgery entry may carry `years` (up to 10); the dashboard fills it for C-Section, one year per C-Section, and keeps `year` as the first of them. CLINICAL_FIELDS.md updated. Tests updated.
+
 ## 2026-11-16 — GDN report marks returned orders
 
 - Each GDN order carries `returned` (the sale has a return). Test updated.

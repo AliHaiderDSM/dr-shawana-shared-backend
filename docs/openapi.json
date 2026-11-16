@@ -10984,6 +10984,19 @@
                   "minimum": 1900,
                   "maximum": 2100,
                   "default": null
+                },
+                "years": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1900,
+                    "maximum": 2100
+                  },
+                  "maxItems": 10,
+                  "default": []
                 }
               },
               "required": [

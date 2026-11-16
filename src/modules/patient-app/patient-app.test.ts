@@ -488,7 +488,7 @@ describe('patient app', () => {
     const saved = history.body.data.sections.medical_history;
     expect(saved.majorComplaint).toBe('Hot flushes and poor sleep');
     expect([...saved.conditions].sort()).toEqual(['hypothyroidism', 'no_cancer', 'std']);
-    expect(saved.surgeries).toEqual([{ type: 'hysterectomy', date: null, year: 2019 }]);
+    expect(saved.surgeries).toEqual([{ type: 'hysterectomy', date: null, year: 2019, years: [] }]);
     expect(saved).toMatchObject({
       lastPeriodDate: '2026-10-05',
       dub: true,

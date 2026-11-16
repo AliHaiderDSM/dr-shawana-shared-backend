@@ -225,6 +225,7 @@ export const medicalHistorySchema = z
           type: z.enum(SURGERIES),
           date,
           year: z.coerce.number().int().min(1900).max(2100).nullable().default(null),
+          years: z.array(z.coerce.number().int().min(1900).max(2100).nullable()).max(10).default([]),
         }),
       )
       .max(SURGERIES.length)

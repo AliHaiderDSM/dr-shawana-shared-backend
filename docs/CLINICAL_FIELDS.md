@@ -140,7 +140,7 @@ Stored as `conditions: string[]`, one value per ticked box. posSoft column = `hi
 
 ### 3.4 Surgical History
 
-Stored as `surgeries: { type, date | null }[]`, one entry per ticked surgery. posSoft keeps a checkbox plus a date per surgery: `hist_<Name>Val` and `hist_<Name>Date`.
+Stored as `surgeries: { type, date | null, year | null, years }[]`, one entry per ticked surgery. For C-Section the form asks how many there were and keeps one year per C-Section in `years` (`year` is the first of them, for older readers). posSoft keeps a checkbox plus a date per surgery: `hist_<Name>Val` and `hist_<Name>Date`.
 
 | Label                 | `type` value                                           |
 | --------------------- | ------------------------------------------------------ |

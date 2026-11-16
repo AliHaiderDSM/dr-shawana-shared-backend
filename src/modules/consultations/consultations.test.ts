@@ -151,7 +151,9 @@ describe('consultations and clinical records', () => {
         surgeries: [{ type: 'no_surgery' }],
       });
       expect(none.status).toBe(200);
-      expect(none.body.data.section.data.surgeries).toEqual([{ type: 'no_surgery', date: null, year: null }]);
+      expect(none.body.data.section.data.surgeries).toEqual([
+        { type: 'no_surgery', date: null, year: null, years: [] },
+      ]);
       const res = await section('medical_history', {
         majorComplaint: 'Hot flushes',
         havingPeriods: 'no',
@@ -159,7 +161,7 @@ describe('consultations and clinical records', () => {
         dub: true,
         conditions: ['hypertension', 'hypertension', 'pcos', 'no_cancer'],
         surgeries: [
-          { type: 'c_section', date: '2015-05-01' },
+          { type: 'c_section', date: '2015-05-01', years: [2015, 2018] },
           { type: 'hysterectomy', year: '2019' },
         ],
         hasAllergies: 'no',
@@ -176,7 +178,7 @@ describe('consultations and clinical records', () => {
         dub: false,
         conditions: ['hypertension', 'pcos', 'no_cancer'],
         surgeries: [
-          { type: 'c_section', date: '2015-05-01', year: null },
+          { type: 'c_section', date: '2015-05-01', year: null, years: [2015, 2018] },
           { type: 'hysterectomy', date: null, year: 2019 },
         ],
         allergies: null,
