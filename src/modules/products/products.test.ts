@@ -213,6 +213,15 @@ describe('products and purchase entries', () => {
     expect(res.body.data.imagePath).toMatch(new RegExp(`^LHR/products/${product.id}/[0-9a-f-]+\\.png$`));
     expect(res.body.data.imageUrl).toContain('product-images');
 
+    const replaced = await request(app)
+      .post(`/api/v1/branch/products/${product.id}/image`)
+      .query({ branchId: lahoreId })
+      .set(bearer(superAdmin))
+      .attach('image', Buffer.from('new-png'), { filename: 'soap2.png', contentType: 'image/png' });
+    expect(replaced.status).toBe(200);
+    expect(replaced.body.data.imagePath).not.toBe(res.body.data.imagePath);
+    expect(fake.objects.has(`product-images/${res.body.data.imagePath}`)).toBe(true);
+
     const bad = await request(app)
       .post(`/api/v1/branch/products/${product.id}/image`)
       .query({ branchId: lahoreId })

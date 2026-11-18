@@ -5,7 +5,7 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
 import { type ListQuery } from '../../lib/pagination';
-import { BUCKETS, publicUrl, replaceFile } from '../../lib/storage';
+import { BUCKETS, publicUrl, uploadFile } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { productsRepository } from '../products/products.repository';
 import { type Category } from './category.entity';
@@ -55,16 +55,13 @@ export const categoriesService = {
 
   async uploadImage(actor: Actor, branchId: string, id: string, file: Express.Multer.File) {
     const category = await getCategory(branchId, id);
-    const { path } = await replaceFile(
-      {
-        bucket: BUCKETS.productImages,
-        prefix: `${await branchFolder(branchId)}/categories/${id}`,
-        originalName: file.originalname,
-        buffer: file.buffer,
-        contentType: file.mimetype,
-      },
-      category.imagePath,
-    );
+    const { path } = await uploadFile({
+      bucket: BUCKETS.productImages,
+      prefix: `${await branchFolder(branchId)}/categories/${id}`,
+      originalName: file.originalname,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+    });
     category.imagePath = path;
     category.updatedBy = actor.userId;
     return toCategoryDto(await categoriesRepository.save(category));

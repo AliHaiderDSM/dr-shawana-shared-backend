@@ -181,12 +181,3 @@ export function publicUrl(bucket: BucketName, objectPath: string | null): string
   if (usesR2()) return `${env.PUBLIC_API_URL ?? ''}/api/v1/files/${bucket}/${objectPath}`;
   return getSupabaseAdmin().storage.from(bucket).getPublicUrl(objectPath).data.publicUrl;
 }
-
-export async function replaceFile(
-  input: UploadInput,
-  previousPath: string | null,
-): Promise<{ bucket: BucketName; path: string }> {
-  const uploaded = await uploadFile(input);
-  if (previousPath) await removeFiles(input.bucket, [previousPath]).catch(() => undefined);
-  return uploaded;
-}

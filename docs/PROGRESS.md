@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-18 — Stored files are never deleted
+
+- Replacing a product, category or bundle image or a doctor signature, replacing or removing an appointment or sale payment screenshot, and switching a payment to cash no longer delete the old file from storage; the rows are soft deleted or point at the new file and the old file stays in R2. Only uploads whose save fails are cleaned up. `replaceFile` is removed; callers use `uploadFile`.
+
 ## 2026-11-18 — Old files into branch code folders
 
 - `npm run storage:branch-folders` moves files saved before branch code folders (`<branch id>/...`, `voice/...`, `chat/...`) to `<CODE>/...` in R2 and updates the stored paths in every file column, `lab_report_summaries.files` and `chat_messages`. Product images go to `<CODE>/products/...`. Files missing from R2 are reported and left unchanged. It is safe to run again.

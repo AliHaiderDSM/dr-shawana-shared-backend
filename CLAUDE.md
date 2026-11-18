@@ -135,6 +135,7 @@ docs/                        BUSINESS_FLOW, PROGRESS, API, POSSOFT_ANALYSIS, ope
   - `product-images` is the only public bucket.
   - Object paths start with the branch code from `branchFolder(branchId)` (src/lib/branch-folder.ts): `<CODE>/<kind>/<uuid>.<ext>`.
   - Downloads go through the backend, which checks access and returns a short-lived signed URL.
+  - Never delete a stored file when a record or attachment is replaced or removed; only clean up uploads whose save failed.
 - Seeds must be idempotent.
 - **Branch-owned repositories:** build them with `branchScopedRepository(Entity, alias)` (src/database/branch-scoped.repository.ts). Its `create`/`save` reload the row, so numeric columns are real `Decimal` values; plain TypeORM `save()` returns the raw input.
 - **Standard CRUD:** use `mountBranchCrud` (src/lib/crud.ts) for routes and `registerCrudDocs` (src/lib/openapi-crud.ts) for OpenAPI. Shared input helpers are in src/lib/validation.ts (`moneyInput`, `quantityInput`, `dateInput`, …).

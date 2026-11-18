@@ -6,7 +6,7 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
 import { type ListQuery } from '../../lib/pagination';
-import { BUCKETS, publicUrl, replaceFile } from '../../lib/storage';
+import { BUCKETS, publicUrl, uploadFile } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { categoriesRepository } from '../categories/categories.repository';
 import { inventoryItemsService } from '../inventory/inventory-items.service';
@@ -259,16 +259,13 @@ export const productsService = {
 
   async uploadImage(actor: Actor, branchId: string, id: string, file: Express.Multer.File) {
     const product = await getProduct(branchId, id);
-    const { path } = await replaceFile(
-      {
-        bucket: BUCKETS.productImages,
-        prefix: `${await branchFolder(branchId)}/products/${id}`,
-        originalName: file.originalname,
-        buffer: file.buffer,
-        contentType: file.mimetype,
-      },
-      product.imagePath,
-    );
+    const { path } = await uploadFile({
+      bucket: BUCKETS.productImages,
+      prefix: `${await branchFolder(branchId)}/products/${id}`,
+      originalName: file.originalname,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+    });
     product.imagePath = path;
     product.updatedBy = actor.userId;
     return toProductDto(await productsRepository.save(product));
