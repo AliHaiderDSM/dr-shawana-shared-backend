@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getSupabaseAdmin } from './supabase';
+import { getR2, r2Bucket, r2Configured } from './r2';
 import { AppError } from './errors';
 
 export const BUCKETS = {
@@ -65,22 +68,53 @@ export function buildObjectPath(prefix: string, originalName: string): string {
   return `${cleanPrefix}/${randomUUID()}${ext}`;
 }
 
-export async function uploadFile(input: UploadInput): Promise<{ bucket: BucketName; path: string }> {
-  const objectPath = buildObjectPath(input.prefix, input.originalName);
+export const usesR2 = (bucket: BucketName) => r2Configured() && !BUCKET_SETTINGS[bucket].public;
+
+export const r2Key = (bucket: BucketName, objectPath: string) => `${bucket}/${objectPath}`;
+
+export async function putObject(bucket: BucketName, objectPath: string, buffer: Buffer, contentType: string) {
+  if (usesR2(bucket)) {
+    await getR2()
+      .send(
+        new PutObjectCommand({
+          Bucket: r2Bucket(),
+          Key: r2Key(bucket, objectPath),
+          Body: buffer,
+          ContentType: contentType,
+        }),
+      )
+      .catch((err: unknown) => {
+        throw AppError.badGateway(`File upload failed: ${(err as Error).message}`);
+      });
+    return;
+  }
   const upload = () =>
-    getSupabaseAdmin()
-      .storage.from(input.bucket)
-      .upload(objectPath, input.buffer, { contentType: input.contentType, upsert: false });
+    getSupabaseAdmin().storage.from(bucket).upload(objectPath, buffer, { contentType, upsert: false });
   let { error } = await upload();
   if (error && isMissingBucket(error.message)) {
-    await createBucket(input.bucket);
+    await createBucket(bucket);
     ({ error } = await upload());
   }
   if (error) throw AppError.badGateway(`File upload failed: ${error.message}`);
+}
+
+export async function uploadFile(input: UploadInput): Promise<{ bucket: BucketName; path: string }> {
+  const objectPath = buildObjectPath(input.prefix, input.originalName);
+  await putObject(input.bucket, objectPath, input.buffer, input.contentType);
   return { bucket: input.bucket, path: objectPath };
 }
 
 export async function createSignedUrl(bucket: BucketName, objectPath: string, expiresInSeconds = 300) {
+  if (usesR2(bucket)) {
+    const url = await getSignedUrl(
+      getR2(),
+      new GetObjectCommand({ Bucket: r2Bucket(), Key: r2Key(bucket, objectPath) }),
+      { expiresIn: expiresInSeconds },
+    ).catch(() => {
+      throw AppError.badGateway('Could not create download link');
+    });
+    return { url, expiresIn: expiresInSeconds };
+  }
   const { data, error } = await getSupabaseAdmin()
     .storage.from(bucket)
     .createSignedUrl(objectPath, expiresInSeconds);
@@ -89,6 +123,17 @@ export async function createSignedUrl(bucket: BucketName, objectPath: string, ex
 }
 
 export async function downloadFile(bucket: BucketName, objectPath: string): Promise<Buffer> {
+  if (usesR2(bucket)) {
+    try {
+      const { Body } = await getR2().send(
+        new GetObjectCommand({ Bucket: r2Bucket(), Key: r2Key(bucket, objectPath) }),
+      );
+      if (!Body) throw new Error('empty');
+      return Buffer.from(await Body.transformToByteArray());
+    } catch {
+      throw AppError.badGateway('Could not open a saved file. Try again.');
+    }
+  }
   const { data, error } = await getSupabaseAdmin().storage.from(bucket).download(objectPath);
   if (error || !data) throw AppError.badGateway('Could not open a saved file. Try again.');
   return Buffer.from(await data.arrayBuffer());
@@ -96,6 +141,19 @@ export async function downloadFile(bucket: BucketName, objectPath: string): Prom
 
 export async function removeFiles(bucket: BucketName, paths: string[]): Promise<void> {
   if (paths.length === 0) return;
+  if (usesR2(bucket)) {
+    for (let i = 0; i < paths.length; i += 1000) {
+      const objects = paths.slice(i, i + 1000).map((p) => ({ Key: r2Key(bucket, p) }));
+      const result = await getR2()
+        .send(new DeleteObjectsCommand({ Bucket: r2Bucket(), Delete: { Objects: objects, Quiet: true } }))
+        .catch((err: unknown) => {
+          throw AppError.badGateway(`File delete failed: ${(err as Error).message}`);
+        });
+      if (result.Errors?.length)
+        throw AppError.badGateway(`File delete failed: ${result.Errors[0]?.Message ?? ''}`);
+    }
+    return;
+  }
   const { error } = await getSupabaseAdmin().storage.from(bucket).remove(paths);
   if (error) throw AppError.badGateway(`File delete failed: ${error.message}`);
 }

@@ -25,10 +25,13 @@
     "openapi:export": "ts-node scripts/export-openapi.ts",
     "seed:super-admin": "ts-node src/database/seeds/super-admin.ts",
     "storage:setup": "ts-node scripts/storage-setup.ts",
+    "storage:copy-to-r2": "ts-node scripts/storage-copy-to-r2.ts",
     "webpush:keys": "web-push generate-vapid-keys"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
+    "@aws-sdk/client-s3": "^3.1171.0",
+    "@aws-sdk/s3-request-presigner": "^3.1171.0",
     "@supabase/supabase-js": "^2.117.2",
     "@vercel/functions": "^3.9.11",
     "bcryptjs": "^3.0.3",

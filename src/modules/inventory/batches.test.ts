@@ -300,7 +300,7 @@ describe('product batches: stock in, FEFO sales, expiry and returns', () => {
   it('keeps one batch per number when the same batch is received at the same time', async () => {
     const results = await Promise.all(
       Array.from({ length: 5 }, () =>
-        stockIn([{ productId: cream, qty: '1', batch: 'RUSH', expiryDate: '2027-01-01' }]),
+        stockIn([{ productId: cream, qty: '1', batch: 'RUSH', expiryDate: '2028-01-01' }]),
       ),
     );
     expect(results.map((r) => r.status)).toEqual([201, 201, 201, 201, 201]);

@@ -131,7 +131,7 @@ docs/                        BUSINESS_FLOW, PROGRESS, API, POSSOFT_ANALYSIS, ope
 
 - Controllers build the actor with `actorFrom(req)` (userId, role, branchId, ip) and pass it to services for audit logs.
 - Soft delete everywhere: use `softDelete` and set `deletedBy`. This replaces posSoft's `close`/`del_by`/`del_date`. Set `createdBy`/`updatedBy` from `req.auth.userId`.
-- Files go to Supabase Storage through `lib/storage`.
+- Files go through `lib/storage`: private buckets live in Cloudflare R2 (`<bucket>/<path>` keys) when the `R2_*` env vars are set, otherwise in Supabase Storage.
   - `product-images` is the only public bucket.
   - Object paths are `<branchId>/<ownerId>/<uuid>.<ext>`.
   - Downloads go through the backend, which checks access and returns a short-lived signed URL.

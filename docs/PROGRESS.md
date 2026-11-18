@@ -22,6 +22,13 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-18 — Private files on Cloudflare R2
+
+- `lib/storage` keeps every private bucket (payment-proofs, medical-records, stock-files, doctor-signatures, chat-voice) in one Cloudflare R2 bucket under `<bucket>/<path>` when `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` are set. Signed download links are R2 presigned URLs. `product-images` stays in Supabase because it is public. Without the R2 vars everything stays on Supabase, so nothing changes until the keys are added.
+- Stored paths in the database do not change. `npm run storage:copy-to-r2` copies existing Supabase files of the private buckets into R2 and skips files already there, so it can run again after the switch.
+- Tests never touch R2 (`NODE_ENV=test`); `src/lib/storage.test.ts` covers R2 and the Supabase fallback with a fake client.
+- Switch-over: add the 4 vars to the server `.env`, run `npm run storage:copy-to-r2`, restart the API, then run the copy once more for files uploaded in between.
+
 ## 2026-11-16 — Branch to branch stock requests
 
 - `stock_requests.from_branch_id` (migration `1795600000000-BranchToBranchRequests`): a branch can ask another active branch instead of the Super Admin stock. `POST /branch/stock-requests` takes `fromBranchId`; `GET /branch/stock-requests/sources` lists the branches; the catalog takes `?fromBranchId=`.

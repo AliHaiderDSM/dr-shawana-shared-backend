@@ -41,6 +41,13 @@ const envSchema = z
     SUPABASE_URL: isProd ? z.url() : z.url().optional(),
     SUPABASE_SERVICE_ROLE_KEY: supabaseVar,
     SUPABASE_ANON_KEY: supabaseVar,
+    R2_ACCOUNT_ID: z
+      .string()
+      .regex(/^[a-f0-9]{32}$/, 'must be the 32 character Cloudflare account ID')
+      .optional(),
+    R2_ACCESS_KEY_ID: z.string().optional(),
+    R2_SECRET_ACCESS_KEY: z.string().optional(),
+    R2_BUCKET: z.string().optional(),
     PATIENT_LINK_SECRET: isProd ? z.string().min(32) : z.string().min(32).optional(),
 
     JWT_SECRET: isProd ? z.string().min(32) : z.string().min(32).optional(),
