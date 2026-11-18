@@ -2,7 +2,7 @@ import { Router, type Response } from 'express';
 import { companyService } from '../company/company.service';
 
 const EFFECTIVE_DATE = '11 November 2026';
-const APP_NAME = 'DSM Clinic';
+const APP_NAME = 'DSM Nexus';
 
 const escape = (value: string) =>
   value.replace(
