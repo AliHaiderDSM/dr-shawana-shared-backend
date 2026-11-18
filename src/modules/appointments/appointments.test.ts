@@ -138,7 +138,7 @@ describe('appointments and payments', () => {
       frontDesk,
     );
     expect(proof.status).toBe(200);
-    expect(proof.body.data.url).toContain('payment-proofs/');
+    expect(proof.body.data.url).toContain('payment-proofs/LHR/appointments/');
 
     const file = await api(
       'get',

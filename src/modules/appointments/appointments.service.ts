@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { Decimal, toMoney } from '../../database/transformers';
 import {
   appointmentRefundsService,
@@ -464,7 +465,11 @@ export const appointmentsService = {
     files: Express.Multer.File[] = [],
   ) {
     await getAppointmentRecord(viewer, id);
-    const uploaded = await uploadMany(BUCKETS.medicalRecords, `${viewer.branchId}/appointments/${id}`, files);
+    const uploaded = await uploadMany(
+      BUCKETS.medicalRecords,
+      `${await branchFolder(viewer.branchId)}/appointments/${id}`,
+      files,
+    );
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
         const record = await getAppointmentRecord(viewer, id, em);

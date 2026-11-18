@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import Decimal from 'decimal.js';
 import { type EntityManager } from 'typeorm';
 import { withTransaction } from '../../database/transaction';
@@ -124,7 +125,7 @@ export const bundlesService = {
     const { path } = await replaceFile(
       {
         bucket: BUCKETS.productImages,
-        prefix: `${branchId}/bundles/${id}`,
+        prefix: `${await branchFolder(branchId)}/bundles/${id}`,
         originalName: file.originalname,
         buffer: file.buffer,
         contentType: file.mimetype,

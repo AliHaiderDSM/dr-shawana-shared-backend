@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { withTransaction } from '../../database/transaction';
@@ -145,7 +146,9 @@ export const expensesService = {
 
   async create(actor: Actor, branchId: string, input: CreateExpenseInput, file?: Express.Multer.File) {
     await getCategory(branchId, input.categoryId);
-    const uploaded = file ? await uploadMany(BUCKETS.stockFiles, `${branchId}/expenses`, [file]) : [];
+    const uploaded = file
+      ? await uploadMany(BUCKETS.stockFiles, `${await branchFolder(branchId)}/expenses`, [file])
+      : [];
     return withUploads(uploaded, () =>
       withTransaction(async (em) => {
         const category = await getCategory(branchId, input.categoryId, em);

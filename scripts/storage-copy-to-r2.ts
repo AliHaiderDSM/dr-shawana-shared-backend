@@ -61,11 +61,8 @@ async function copyBucket(bucket: BucketName) {
 async function main() {
   if (!r2Configured())
     throw new Error('Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY and R2_BUCKET first');
-  const privateBuckets = (Object.keys(BUCKET_SETTINGS) as BucketName[]).filter(
-    (b) => !BUCKET_SETTINGS[b].public,
-  );
   let failed = 0;
-  for (const bucket of privateBuckets) failed += await copyBucket(bucket);
+  for (const bucket of Object.keys(BUCKET_SETTINGS) as BucketName[]) failed += await copyBucket(bucket);
   if (failed) process.exit(1);
 }
 

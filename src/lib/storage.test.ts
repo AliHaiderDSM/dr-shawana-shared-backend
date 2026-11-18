@@ -6,12 +6,15 @@ import {
   type DeleteObjectsCommandInput,
   type PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
+import request from 'supertest';
 import { installFakeSupabase } from '../../tests/helpers/supabase-fake';
+import { createApp } from '../app';
 import { setR2ClientForTests } from './r2';
 import { BUCKETS, createSignedUrl, downloadFile, publicUrl, removeFiles, uploadFile } from './storage';
 
 function fakeR2() {
   const objects = new Map<string, Buffer>();
+  const types = new Map<string, string>();
   const client = new S3Client({
     region: 'auto',
     endpoint: 'https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com',
@@ -21,12 +24,16 @@ function fakeR2() {
     if (command instanceof PutObjectCommand) {
       const input = command.input as PutObjectCommandInput;
       objects.set(input.Key ?? '', input.Body as Buffer);
+      types.set(input.Key ?? '', input.ContentType ?? '');
       return {};
     }
     if (command instanceof GetObjectCommand) {
       const body = objects.get(command.input.Key ?? '');
       if (!body) throw new Error('NoSuchKey');
-      return { Body: { transformToByteArray: async () => new Uint8Array(body) } };
+      return {
+        Body: { transformToByteArray: async () => new Uint8Array(body) },
+        ContentType: types.get(command.input.Key ?? ''),
+      };
     }
     if (command instanceof DeleteObjectsCommand) {
       const input = command.input as DeleteObjectsCommandInput;
@@ -41,7 +48,7 @@ function fakeR2() {
 describe('storage with Cloudflare R2', () => {
   afterEach(() => setR2ClientForTests(undefined));
 
-  it('keeps private files in R2 under the bucket name and product images in Supabase', async () => {
+  it('keeps every file in R2 under the bucket name and serves product images publicly', async () => {
     const supabase = installFakeSupabase();
     const r2 = fakeR2();
     setR2ClientForTests(r2.client);
@@ -73,8 +80,20 @@ describe('storage with Cloudflare R2', () => {
       buffer: Buffer.from('image'),
       contentType: 'image/jpeg',
     });
-    expect(supabase.objects.has(`product-images/${image.path}`)).toBe(true);
-    expect(publicUrl(BUCKETS.productImages, image.path)).toContain('storage.test/public');
+    expect(r2.objects.has(`product-images/${image.path}`)).toBe(true);
+    expect(supabase.objects.size).toBe(0);
+    const link = publicUrl(BUCKETS.productImages, image.path) ?? '';
+    expect(link).toBe(`/api/v1/files/product-images/${image.path}`);
+    const served = await request(createApp()).get(link);
+    expect(served.status).toBe(200);
+    expect(served.headers['content-type']).toBe('image/jpeg');
+    expect(served.headers['cache-control']).toContain('immutable');
+    expect(served.headers['cross-origin-resource-policy']).toBe('cross-origin');
+    expect(Buffer.from(served.body as Buffer).toString()).toBe('image');
+    expect((await request(createApp()).get('/api/v1/files/product-images/branch/missing.jpg')).status).toBe(
+      404,
+    );
+    expect((await request(createApp()).get('/api/v1/files/product-images/../secret')).status).toBe(404);
   });
 
   it('uses Supabase for every bucket when R2 is not configured', async () => {

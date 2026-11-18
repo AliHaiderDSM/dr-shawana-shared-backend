@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-18 — All files on R2, branch code folders
+
+- With the `R2_*` vars set, product images move to R2 too, so Supabase holds no files. `publicUrl` returns `PUBLIC_API_URL/api/v1/files/product-images/<path>`, served by the new public `GET /api/v1/files/product-images/*` (cached for a year, cross-origin allowed). Set `PUBLIC_API_URL` (e.g. `https://api.dsmclinics.com`). `storage:copy-to-r2` now copies every bucket.
+- New uploads are stored under the branch code instead of the branch id: `payment-proofs/LHR/appointments/...`, `medical-records/LHR/...`, `stock-files/LHR/...`, `doctor-signatures/LHR/...`, `product-images/LHR/products/...`. Chat files use the doctor's branch code (`chat-voice/LHR/<conversation>/...`, `medical-records/LHR/chat/...`); the voice bucket is picked from the file type, and old `voice/...` paths still work. Old files keep their stored paths.
+
 ## 2026-11-18 — Private files on Cloudflare R2
 
 - `lib/storage` keeps every private bucket (payment-proofs, medical-records, stock-files, doctor-signatures, chat-voice) in one Cloudflare R2 bucket under `<bucket>/<path>` when `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` are set. Signed download links are R2 presigned URLs. `product-images` stays in Supabase because it is public. Without the R2 vars everything stays on Supabase, so nothing changes until the keys are added.

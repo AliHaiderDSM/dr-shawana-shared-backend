@@ -20,6 +20,7 @@ import { stockOutReportRouter } from './modules/inventory/stock-out-report';
 import { doctorsRouter } from './modules/doctors/doctors.routes';
 import { expensesRouter } from './modules/expenses/expenses.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { filesRouter } from './modules/files/files.routes';
 import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { journalRouter } from './modules/journal/journal.routes';
 import { stockDocumentsRouter } from './modules/inventory/stock-documents.routes';
@@ -45,6 +46,7 @@ export const apiRouter = Router();
 apiRouter.use(notifyStaffOnChange);
 
 apiRouter.use(healthRouter);
+apiRouter.use(filesRouter);
 apiRouter.use(authRouter);
 apiRouter.use(badgesRouter);
 apiRouter.use(traceRouter);

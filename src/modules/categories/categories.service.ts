@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager } from 'typeorm';
 import { withTransaction } from '../../database/transaction';
 import { type Actor } from '../../lib/actor';
@@ -57,7 +58,7 @@ export const categoriesService = {
     const { path } = await replaceFile(
       {
         bucket: BUCKETS.productImages,
-        prefix: `${branchId}/categories/${id}`,
+        prefix: `${await branchFolder(branchId)}/categories/${id}`,
         originalName: file.originalname,
         buffer: file.buffer,
         contentType: file.mimetype,

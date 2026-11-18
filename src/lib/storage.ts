@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DeleteObjectsCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getSupabaseAdmin } from './supabase';
+import { env } from '../config/env';
 import { getR2, r2Bucket, r2Configured } from './r2';
 import { AppError } from './errors';
 
@@ -68,12 +69,12 @@ export function buildObjectPath(prefix: string, originalName: string): string {
   return `${cleanPrefix}/${randomUUID()}${ext}`;
 }
 
-export const usesR2 = (bucket: BucketName) => r2Configured() && !BUCKET_SETTINGS[bucket].public;
+export const usesR2 = () => r2Configured();
 
 export const r2Key = (bucket: BucketName, objectPath: string) => `${bucket}/${objectPath}`;
 
 export async function putObject(bucket: BucketName, objectPath: string, buffer: Buffer, contentType: string) {
-  if (usesR2(bucket)) {
+  if (usesR2()) {
     await getR2()
       .send(
         new PutObjectCommand({
@@ -105,7 +106,7 @@ export async function uploadFile(input: UploadInput): Promise<{ bucket: BucketNa
 }
 
 export async function createSignedUrl(bucket: BucketName, objectPath: string, expiresInSeconds = 300) {
-  if (usesR2(bucket)) {
+  if (usesR2()) {
     const url = await getSignedUrl(
       getR2(),
       new GetObjectCommand({ Bucket: r2Bucket(), Key: r2Key(bucket, objectPath) }),
@@ -122,26 +123,43 @@ export async function createSignedUrl(bucket: BucketName, objectPath: string, ex
   return { url: data.signedUrl, expiresIn: expiresInSeconds };
 }
 
-export async function downloadFile(bucket: BucketName, objectPath: string): Promise<Buffer> {
-  if (usesR2(bucket)) {
+export async function downloadObject(
+  bucket: BucketName,
+  objectPath: string,
+): Promise<{ body: Buffer; contentType: string }> {
+  if (usesR2()) {
     try {
-      const { Body } = await getR2().send(
+      const { Body, ContentType } = await getR2().send(
         new GetObjectCommand({ Bucket: r2Bucket(), Key: r2Key(bucket, objectPath) }),
       );
       if (!Body) throw new Error('empty');
-      return Buffer.from(await Body.transformToByteArray());
+      return {
+        body: Buffer.from(await Body.transformToByteArray()),
+        contentType: ContentType ?? 'application/octet-stream',
+      };
     } catch {
-      throw AppError.badGateway('Could not open a saved file. Try again.');
+      throw AppError.notFound('File');
     }
   }
   const { data, error } = await getSupabaseAdmin().storage.from(bucket).download(objectPath);
-  if (error || !data) throw AppError.badGateway('Could not open a saved file. Try again.');
-  return Buffer.from(await data.arrayBuffer());
+  if (error || !data) throw AppError.notFound('File');
+  return {
+    body: Buffer.from(await data.arrayBuffer()),
+    contentType: data.type || 'application/octet-stream',
+  };
+}
+
+export async function downloadFile(bucket: BucketName, objectPath: string): Promise<Buffer> {
+  try {
+    return (await downloadObject(bucket, objectPath)).body;
+  } catch {
+    throw AppError.badGateway('Could not open a saved file. Try again.');
+  }
 }
 
 export async function removeFiles(bucket: BucketName, paths: string[]): Promise<void> {
   if (paths.length === 0) return;
-  if (usesR2(bucket)) {
+  if (usesR2()) {
     for (let i = 0; i < paths.length; i += 1000) {
       const objects = paths.slice(i, i + 1000).map((p) => ({ Key: r2Key(bucket, p) }));
       const result = await getR2()
@@ -160,6 +178,7 @@ export async function removeFiles(bucket: BucketName, paths: string[]): Promise<
 
 export function publicUrl(bucket: BucketName, objectPath: string | null): string | null {
   if (!objectPath) return null;
+  if (usesR2()) return `${env.PUBLIC_API_URL ?? ''}/api/v1/files/${bucket}/${objectPath}`;
   return getSupabaseAdmin().storage.from(bucket).getPublicUrl(objectPath).data.publicUrl;
 }
 

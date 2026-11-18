@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
@@ -121,8 +122,8 @@ async function saveFiles(
 
 const READABLE_RECORD_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
-export const uploadMedicalFiles = (branchId: string, files: Express.Multer.File[]) =>
-  uploadMany(BUCKETS.medicalRecords, `${branchId}/medical-records`, files);
+export const uploadMedicalFiles = async (branchId: string, files: Express.Multer.File[]) =>
+  uploadMany(BUCKETS.medicalRecords, `${await branchFolder(branchId)}/medical-records`, files);
 
 export const bloodWorkService = {
   async list(branchId: string, patientId: string) {
@@ -570,7 +571,11 @@ export const medicalRecordsService = {
 
   async storeReadUploads(branchId: string, files: Express.Multer.File[]) {
     const storable = files.filter((file) => READABLE_RECORD_TYPES.includes(file.mimetype));
-    const uploaded = await uploadMany(BUCKETS.medicalRecords, `${branchId}/lab-reports`, storable);
+    const uploaded = await uploadMany(
+      BUCKETS.medicalRecords,
+      `${await branchFolder(branchId)}/lab-reports`,
+      storable,
+    );
     const refs: SummaryFile[] = files.map((file) => {
       const stored = uploaded[storable.indexOf(file)];
       return {

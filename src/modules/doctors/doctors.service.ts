@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
@@ -158,7 +159,7 @@ export const doctorsService = {
     const { path } = await replaceFile(
       {
         bucket: BUCKETS.doctorSignatures,
-        prefix: `${branchId}/${id}`,
+        prefix: `${await branchFolder(branchId)}/${id}`,
         originalName: file.originalname,
         buffer: file.buffer,
         contentType: file.mimetype,

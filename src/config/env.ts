@@ -48,6 +48,10 @@ const envSchema = z
     R2_ACCESS_KEY_ID: z.string().optional(),
     R2_SECRET_ACCESS_KEY: z.string().optional(),
     R2_BUCKET: z.string().optional(),
+    PUBLIC_API_URL: z
+      .url()
+      .transform((v) => v.replace(/\/+$/, ''))
+      .optional(),
     PATIENT_LINK_SECRET: isProd ? z.string().min(32) : z.string().min(32).optional(),
 
     JWT_SECRET: isProd ? z.string().min(32) : z.string().min(32).optional(),

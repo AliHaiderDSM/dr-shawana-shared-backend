@@ -210,9 +210,7 @@ describe('products and purchase entries', () => {
       .set(bearer(superAdmin))
       .attach('image', Buffer.from('fake-png'), { filename: 'soap.png', contentType: 'image/png' });
     expect(res.status).toBe(200);
-    expect(res.body.data.imagePath).toMatch(
-      new RegExp(`^${product.branchId}/${product.id}/[0-9a-f-]+\\.png$`),
-    );
+    expect(res.body.data.imagePath).toMatch(new RegExp(`^LHR/products/${product.id}/[0-9a-f-]+\\.png$`));
     expect(res.body.data.imageUrl).toContain('product-images');
 
     const bad = await request(app)

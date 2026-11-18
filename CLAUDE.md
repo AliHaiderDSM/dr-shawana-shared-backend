@@ -131,9 +131,9 @@ docs/                        BUSINESS_FLOW, PROGRESS, API, POSSOFT_ANALYSIS, ope
 
 - Controllers build the actor with `actorFrom(req)` (userId, role, branchId, ip) and pass it to services for audit logs.
 - Soft delete everywhere: use `softDelete` and set `deletedBy`. This replaces posSoft's `close`/`del_by`/`del_date`. Set `createdBy`/`updatedBy` from `req.auth.userId`.
-- Files go through `lib/storage`: private buckets live in Cloudflare R2 (`<bucket>/<path>` keys) when the `R2_*` env vars are set, otherwise in Supabase Storage.
+- Files go through `lib/storage`: every bucket lives in Cloudflare R2 (`<bucket>/<path>` keys) when the `R2_*` env vars are set, otherwise in Supabase Storage. Product images are served by `GET /api/v1/files/product-images/*` at `PUBLIC_API_URL`.
   - `product-images` is the only public bucket.
-  - Object paths are `<branchId>/<ownerId>/<uuid>.<ext>`.
+  - Object paths start with the branch code from `branchFolder(branchId)` (src/lib/branch-folder.ts): `<CODE>/<kind>/<uuid>.<ext>`.
   - Downloads go through the backend, which checks access and returns a short-lived signed URL.
 - Seeds must be idempotent.
 - **Branch-owned repositories:** build them with `branchScopedRepository(Entity, alias)` (src/database/branch-scoped.repository.ts). Its `create`/`save` reload the row, so numeric columns are real `Decimal` values; plain TypeORM `save()` returns the raw input.

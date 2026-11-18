@@ -1,3 +1,4 @@
+import { doctorBranchFolder } from '../../lib/branch-folder';
 import { AppDataSource } from '../../database/data-source';
 import { withTransaction } from '../../database/transaction';
 import { AppError } from '../../lib/errors';
@@ -135,8 +136,14 @@ async function send(
   const uploaded = !file
     ? []
     : isVoice(file.mimetype)
-      ? await uploadMany(BUCKETS.chatVoice, `${VOICE_PREFIX}${conversationId}`, [file])
-      : await uploadMany(BUCKETS.medicalRecords, `chat/${conversationId}`, [file]);
+      ? await uploadMany(BUCKETS.chatVoice, `${await doctorBranchFolder(conversationId)}/${conversationId}`, [
+          file,
+        ])
+      : await uploadMany(
+          BUCKETS.medicalRecords,
+          `${await doctorBranchFolder(conversationId)}/chat/${conversationId}`,
+          [file],
+        );
   const stored = uploaded[0];
   try {
     const row = await withTransaction(async (em) => {
@@ -175,11 +182,14 @@ async function send(
 
 async function fileUrl(conversationId: string, messageId: string) {
   const [row] = (await AppDataSource.query(
-    `SELECT file_path AS "filePath" FROM chat_messages WHERE id = $1 AND conversation_id = $2`,
+    `SELECT file_path AS "filePath", file_type AS "fileType" FROM chat_messages WHERE id = $1 AND conversation_id = $2`,
     [messageId, conversationId],
-  )) as { filePath: string | null }[];
+  )) as { filePath: string | null; fileType: string | null }[];
   if (!row?.filePath) throw AppError.notFound('File');
-  const bucket = row.filePath.startsWith(VOICE_PREFIX) ? BUCKETS.chatVoice : BUCKETS.medicalRecords;
+  const bucket =
+    row.filePath.startsWith(VOICE_PREFIX) || isVoice(row.fileType)
+      ? BUCKETS.chatVoice
+      : BUCKETS.medicalRecords;
   return createSignedUrl(bucket, row.filePath, 600);
 }
 

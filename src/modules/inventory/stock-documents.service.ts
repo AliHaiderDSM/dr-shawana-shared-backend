@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import Decimal from 'decimal.js';
 import { type EntityManager, type EntityTarget } from 'typeorm';
 import { AppDataSource } from '../../database/data-source';
@@ -81,8 +82,8 @@ function toAttachmentDto(a: StockAttachment) {
   };
 }
 
-const uploadAll = (branchId: string, kind: StockDocumentType, files: Express.Multer.File[]) =>
-  uploadMany(BUCKETS.stockFiles, `${branchId}/${kind}`, files);
+const uploadAll = async (branchId: string, kind: StockDocumentType, files: Express.Multer.File[]) =>
+  uploadMany(BUCKETS.stockFiles, `${await branchFolder(branchId)}/${kind}`, files);
 
 export function createStockDocumentService<T extends StockDocument>(config: DocumentConfig<T>) {
   const base = branchScopedRepository(config.entity, 'd');

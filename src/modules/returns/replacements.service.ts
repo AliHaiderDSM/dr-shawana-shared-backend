@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
@@ -384,8 +385,8 @@ async function insert(
   return dto;
 }
 
-const upload = (branchId: string, files: Express.Multer.File[]) =>
-  files.length ? uploadMany(BUCKETS.stockFiles, `${branchId}/replacements`, files) : Promise.resolve([]);
+const upload = async (branchId: string, files: Express.Multer.File[]) =>
+  files.length ? uploadMany(BUCKETS.stockFiles, `${await branchFolder(branchId)}/replacements`, files) : [];
 
 export const replacementsService = {
   async list(branchId: string | null, query: ReplacementListQuery) {

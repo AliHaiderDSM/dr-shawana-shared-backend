@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { assertRefundsCovered } from './appointment-refunds.service';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
@@ -36,8 +37,8 @@ export function toPaymentDto(payment: AppointmentPayment) {
   };
 }
 
-export const uploadProofs = (branchId: string, files: Express.Multer.File[]) =>
-  uploadMany(BUCKETS.paymentProofs, `${branchId}/appointments`, files);
+export const uploadProofs = async (branchId: string, files: Express.Multer.File[]) =>
+  uploadMany(BUCKETS.paymentProofs, `${await branchFolder(branchId)}/appointments`, files);
 
 const CASH_CLEARED = {
   senderBank: null,

@@ -1,3 +1,4 @@
+import { branchFolder } from '../../lib/branch-folder';
 import { In, type EntityManager, type SelectQueryBuilder } from 'typeorm';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
@@ -329,8 +330,8 @@ async function dropProofs(manager: EntityManager, actor: Actor, branchId: string
   return proofs.map((p) => p.filePath);
 }
 
-const uploadProofs = (branchId: string, files: Express.Multer.File[]) =>
-  uploadMany(BUCKETS.paymentProofs, `${branchId}/sales`, files);
+const uploadProofs = async (branchId: string, files: Express.Multer.File[]) =>
+  uploadMany(BUCKETS.paymentProofs, `${await branchFolder(branchId)}/sales`, files);
 
 async function insertPayment(
   manager: EntityManager,
