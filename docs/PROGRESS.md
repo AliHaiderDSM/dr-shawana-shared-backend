@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-18 — Old files into branch code folders
+
+- `npm run storage:branch-folders` moves files saved before branch code folders (`<branch id>/...`, `voice/...`, `chat/...`) to `<CODE>/...` in R2 and updates the stored paths in every file column, `lab_report_summaries.files` and `chat_messages`. Product images go to `<CODE>/products/...`. Files missing from R2 are reported and left unchanged. It is safe to run again.
+- Old copies are kept unless `--delete-old` is passed. Staging and live share the bucket, so run it on both databases first and use `--delete-old` only on the last run.
+
 ## 2026-11-18 — All files on R2, branch code folders
 
 - With the `R2_*` vars set, product images move to R2 too, so Supabase holds no files. `publicUrl` returns `PUBLIC_API_URL/api/v1/files/product-images/<path>`, served by the new public `GET /api/v1/files/product-images/*` (cached for a year, cross-origin allowed). Set `PUBLIC_API_URL` (e.g. `https://api.dsmclinics.com`). `storage:copy-to-r2` now copies every bucket.

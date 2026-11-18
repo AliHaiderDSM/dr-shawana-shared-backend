@@ -26,6 +26,7 @@
     "seed:super-admin": "ts-node src/database/seeds/super-admin.ts",
     "storage:setup": "ts-node scripts/storage-setup.ts",
     "storage:copy-to-r2": "ts-node scripts/storage-copy-to-r2.ts",
+    "storage:branch-folders": "ts-node scripts/storage-branch-folders.ts",
     "webpush:keys": "web-push generate-vapid-keys"
   },
   "dependencies": {
