@@ -1,7 +1,7 @@
 import { Router, type Response } from 'express';
 import { companyService } from '../company/company.service';
 
-const EFFECTIVE_DATE = '11 November 2026';
+const EFFECTIVE_DATE = '18 November 2026';
 const APP_NAME = 'DSM Nexus';
 
 const escape = (value: string) =>
@@ -102,7 +102,7 @@ function privacyPolicy(c: Clinic) {
 <h2>Who can see your information</h2>
 <ul>
   <li>Doctors and authorised staff of the clinic who need it to care for you. Doctors see only the patients they treat.</li>
-  <li>Service providers that run the app for the clinic: cloud hosting and database (Vercel and Supabase), secure file storage (Supabase), push notifications (Expo and Google Firebase Cloud Messaging), and the AI services above. They process data only to provide their service.</li>
+  <li>Service providers that run the app for the clinic: a private cloud server for the app and its database, Vercel for the clinic's web dashboard, secure file storage (Cloudflare R2), live chat updates (Supabase), push notifications (Expo and Google Firebase Cloud Messaging), and the AI services above. They process data only to provide their service.</li>
   <li>Authorities, when the law requires it.</li>
 </ul>
 <p>Other patients can never see your information.</p>
@@ -137,6 +137,74 @@ function privacyPolicy(c: Clinic) {
   );
 }
 
+function termsOfService(c: Clinic) {
+  return page(
+    'Terms of service',
+    `<h1>Terms of service</h1>
+<p class="muted">${APP_NAME} app · Effective ${EFFECTIVE_DATE}</p>
+<p>These terms apply when you use the ${APP_NAME} mobile app, provided by ${escape(c.name)} ("the clinic", "we"). By using the app you agree to them. If you do not agree, please do not use the app.</p>
+
+<div class="box"><p><strong>Not for emergencies.</strong> The app is not an emergency service. If you have a medical emergency, call your local emergency number or go to the nearest hospital straight away. Do not wait for a reply in the app.</p></div>
+
+<h2>Who can use the app</h2>
+<ul>
+  <li>Patients registered with the clinic, aged 18 or over. A parent or guardian manages the care of a child.</li>
+  <li>Doctors and staff of the clinic, with the account the clinic gives them.</li>
+</ul>
+
+<h2>Your account</h2>
+<ul>
+  <li>The clinic creates your account. You activate it with the code the clinic gives you and may then set a password.</li>
+  <li>Keep your code and password private and do not let anyone else use your account. Tell the clinic at once if you think someone else has used it.</li>
+  <li>Keep your details correct. You can ask the clinic to correct them from the app.</li>
+</ul>
+
+<h2>Medical information</h2>
+<ul>
+  <li>The app shows the appointments, prescriptions, reports and notes the clinic keeps for you. It helps you follow your care but does not replace a visit to your doctor.</li>
+  <li>Take medicines only as your doctor prescribed. Ask your doctor before changing or stopping a treatment.</li>
+  <li>Summaries of lab reports may be prepared automatically and are reviewed by your doctor. Always rely on your doctor's advice.</li>
+</ul>
+
+<h2>Messages with your doctor</h2>
+<ul>
+  <li>You can message a doctor you have had an appointment with. Doctors reply when they can; there is no promised reply time.</li>
+  <li>Send only information about your own care. Do not send content that is unlawful, abusive, or that belongs to someone else.</li>
+  <li>The clinic may limit or close the chat if it is misused.</li>
+</ul>
+
+<h2>Fees and payments</h2>
+<p>The app is free to download and use. Consultation fees, medicines and other services are paid to the clinic as agreed with the clinic, not through the app. Payment details shown in the app are for your information.</p>
+
+<h2>Acceptable use</h2>
+<ul>
+  <li>Do not try to reach other people's information, break the app's security, or overload or copy the service.</li>
+  <li>Do not use the app for any unlawful purpose.</li>
+</ul>
+
+<h2>Availability</h2>
+<p>We work to keep the app available and correct, but it may sometimes be unavailable, for example during maintenance or because of network problems. We may change or improve features at any time.</p>
+
+<h2>Privacy</h2>
+<p>How we collect and protect your information is explained in our <a href="/privacy">privacy policy</a>. You can ask us to <a href="/account-deletion">delete your account</a> at any time.</p>
+
+<h2>Ending your use</h2>
+<p>You can stop using the app and ask us to delete your account at any time. The clinic may suspend or close an account that breaks these terms or is no longer linked to a patient of the clinic.</p>
+
+<h2>Limitation of liability</h2>
+<p>To the extent the law allows, the clinic is not responsible for loss caused by relying on the app instead of medical advice, by delays in messages, or by the app being unavailable. Nothing in these terms limits the clinic's responsibility for the medical care it provides or any right you have under the law.</p>
+
+<h2>Law</h2>
+<p>These terms are governed by the laws of Pakistan.</p>
+
+<h2>Changes to these terms</h2>
+<p>If we change these terms we will update this page and the date above. Important changes will also be shown in the app.</p>
+
+<h2>Contact us</h2>
+<ul>${contactList(c)}</ul>`,
+  );
+}
+
 function accountDeletion(c: Clinic) {
   return page(
     'Delete your account',
@@ -161,7 +229,7 @@ function accountDeletion(c: Clinic) {
 <p><strong>Kept:</strong> your medical records (appointments, consultation notes, prescriptions, test results, reports and messages with your doctor) that the clinic must keep for medical record keeping and legal reasons. They are kept securely and are no longer available through the app.</p>
 </div>
 <p>We confirm and complete deletion requests within 30 days.</p>
-<p>Read our <a href="/privacy">privacy policy</a>.</p>`,
+<p>Read our <a href="/privacy">privacy policy</a> and <a href="/terms">terms of service</a>.</p>`,
   );
 }
 
@@ -169,6 +237,10 @@ export const legalRouter = Router();
 
 legalRouter.get(['/privacy', '/privacy-policy'], async (_req, res) => {
   send(res, privacyPolicy(await clinic()));
+});
+
+legalRouter.get(['/terms', '/terms-of-service'], async (_req, res) => {
+  send(res, termsOfService(await clinic()));
 });
 
 legalRouter.get(['/account-deletion', '/delete-account'], async (_req, res) => {
