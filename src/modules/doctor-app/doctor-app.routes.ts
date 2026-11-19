@@ -2,7 +2,14 @@ import { type RequestHandler, Router } from 'express';
 import { z } from 'zod';
 import { actorFrom } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
-import { dataEnvelope, errorResponses, jsonContent, sendNoContent, sendOk } from '../../lib/http';
+import {
+  dataEnvelope,
+  errorResponses,
+  jsonContent,
+  sendCreated,
+  sendNoContent,
+  sendOk,
+} from '../../lib/http';
 import { registry } from '../../lib/openapi';
 import { securedDocs } from '../../lib/openapi-crud';
 import { authenticate } from '../../middleware/auth';
@@ -16,6 +23,17 @@ const patientParams = z.object({ patientId: z.uuid() });
 const fileParams = z.object({ patientId: z.uuid(), fileId: z.uuid() });
 const consultationParams = z.object({ consultationId: z.uuid() });
 const prescriptionParams = z.object({ prescriptionId: z.uuid() });
+const treatmentPlanParams = z.object({ planId: z.uuid() });
+const treatmentPlanBody = registry.register(
+  'DoctorTreatmentPlan',
+  z.object({
+    plan: z
+      .string()
+      .min(1)
+      .max(50000)
+      .openapi({ description: 'Plan of treatment as HTML (bold, italic, lists)' }),
+  }),
+);
 const patientsQuery = z.object({ search: z.string().trim().max(100).optional() });
 const appointmentsQuery = z.object({
   when: z.enum(['upcoming', 'past']).default('upcoming'),
@@ -166,6 +184,38 @@ doctorAppRouter.put(
   },
 );
 
+doctorAppRouter.post(
+  '/doctor/patients/:patientId/plans',
+  validate({ params: patientParams, body: treatmentPlanBody }),
+  async (req, res) => {
+    sendCreated(
+      res,
+      await doctorAppService.addPlan(
+        actorFrom(req),
+        req.auth!.userId,
+        validParams(req, patientParams).patientId,
+        validBody(req, treatmentPlanBody).plan,
+      ),
+    );
+  },
+);
+
+doctorAppRouter.put(
+  '/doctor/plans/:planId',
+  validate({ params: treatmentPlanParams, body: treatmentPlanBody }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await doctorAppService.updatePlan(
+        actorFrom(req),
+        req.auth!.userId,
+        validParams(req, treatmentPlanParams).planId,
+        validBody(req, treatmentPlanBody).plan,
+      ),
+    );
+  },
+);
+
 doctorAppRouter.put(
   '/doctor/prescriptions/:prescriptionId/plan',
   validate({ params: prescriptionParams, body: planBody }),
@@ -264,6 +314,26 @@ registry.registerPath({
   summary:
     'Write the plan of treatment of the doctor’s own prescription; it shows on the printed prescription and in the patient app',
   request: { params: prescriptionParams, ...json(planBody) },
+  responses: ok('Saved'),
+});
+registry.registerPath({
+  ...docs,
+  method: 'post',
+  path: '/doctor/patients/{patientId}/plans',
+  summary:
+    'Add a new plan of treatment for the doctor’s own patient, dated today, not linked to a prescription; it shows in the patient file plans',
+  request: { params: patientParams, ...json(treatmentPlanBody) },
+  responses: {
+    201: { description: 'Added', ...jsonContent(dataEnvelope(z.unknown())) },
+    ...errorResponses,
+  },
+});
+registry.registerPath({
+  ...docs,
+  method: 'put',
+  path: '/doctor/plans/{planId}',
+  summary: 'Edit a plan of treatment the doctor added',
+  request: { params: treatmentPlanParams, ...json(treatmentPlanBody) },
   responses: ok('Saved'),
 });
 registry.registerPath({

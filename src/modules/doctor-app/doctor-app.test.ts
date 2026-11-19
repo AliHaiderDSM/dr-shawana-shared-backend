@@ -179,6 +179,41 @@ describe('doctor app', () => {
     await request(app).delete(`/api/v1/branch/prescriptions/${prescriptionId}`).set(bearer(admin));
   });
 
+  it('adds and edits separate plans of treatment for the doctor’s own patients', async () => {
+    const add = (who: { id: string }, id: string, plan: unknown) =>
+      staff('post', `/doctor/patients/${id}/plans`, who).send({ plan });
+    const created = await add(doctorUser, patientId, '<p>Lose <strong>4 kg</strong></p>');
+    expect(created.status).toBe(201);
+    const planId = created.body.data.id;
+    expect(created.body.data.plan).toBe('<p>Lose <strong>4 kg</strong></p>');
+
+    expect((await add(doctorUser, strangerId, '<p>x</p>')).status).toBe(404);
+    expect((await add(otherDoctorUser, patientId, '<p>x</p>')).status).toBe(404);
+    expect((await add(frontDesk, patientId, '<p>x</p>')).status).toBe(403);
+    expect((await add(doctorUser, patientId, '<p> </p>')).status).toBe(400);
+    expect((await add(doctorUser, patientId, '')).status).toBe(400);
+
+    const edited = await staff('put', `/doctor/plans/${planId}`, doctorUser).send({
+      plan: '<p>Lose 5 kg</p>',
+    });
+    expect(edited.status).toBe(200);
+    expect(
+      (await staff('put', `/doctor/plans/${planId}`, otherDoctorUser).send({ plan: '<p>x</p>' })).status,
+    ).toBe(404);
+
+    const file = (await staff('get', `/doctor/patients/${patientId}`, doctorUser)).body.data;
+    expect(file.plans).toEqual([
+      expect.objectContaining({
+        id: planId,
+        plan: '<p>Lose 5 kg</p>',
+        doctor: 'Dr. Shawana',
+        editable: true,
+        branch: expect.any(String),
+        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    ]);
+  });
+
   it('shows blood work for the chart and table', async () => {
     const added = await staff('post', `/branch/patients/${patientId}/blood-work`, doctorUser).send({
       results: [

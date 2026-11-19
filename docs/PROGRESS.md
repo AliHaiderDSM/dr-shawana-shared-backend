@@ -22,6 +22,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Separate plans of treatment
+
+- New table `treatment_plans` (migration `1795700000000-TreatmentPlans`, RLS on): a plan of treatment a doctor adds for a patient without a prescription (branch, patient, doctor, date, HTML plan). The plan text is required.
+- Doctor app: `POST /doctor/patients/{patientId}/plans` adds one dated today for the doctor's own patient; `PUT /doctor/plans/{planId}` edits the doctor's own. Both audited. The patient file returns `plans` (newest first, `editable`) and each prescription item now carries `category` so the app can group items like the printed prescription.
+- These plans are not printed on a prescription and are not shown on the dashboard yet.
+
 ## 2026-11-19 — Doctor app: plan of treatment
 
 - `PUT /doctor/prescriptions/{prescriptionId}/plan` lets a doctor write the plan of treatment of their own prescription (HTML, blank clears it). It goes through `prescriptionsService.update`, so it is audited and shows on the printed prescription and in the patient app. Other doctors get 404, other roles 403.

@@ -11,6 +11,9 @@ import { consultationsService } from '../consultations/consultations.service';
 import { doctorsService } from '../doctors/doctors.service';
 import { patientIntakeService } from '../patient-app/patient-intake.service';
 import { prescriptionsService } from '../prescriptions/prescriptions.service';
+import { auditService } from '../audit/audit.service';
+import { TreatmentPlan } from '../treatment-plans/treatment-plan.entity';
+import { repo, withTransaction } from '../../database/transaction';
 
 interface DoctorRow {
   id: string;
@@ -29,6 +32,12 @@ async function doctorOf(staffId: string) {
   )) as DoctorRow[];
   if (!row) throw AppError.forbidden('No doctor profile is linked to your account');
   return row;
+}
+
+function requiredPlan(plan: string) {
+  const text = plan.trim();
+  if (!text || !text.replace(/<[^>]*>/g, '').trim()) throw AppError.badRequest('Write the plan of treatment');
+  return text;
 }
 
 async function assertOwnPatient(doctorId: string, patientId: string) {
@@ -289,9 +298,10 @@ export const doctorAppService = {
          FROM patients WHERE id = $1`,
       [patientId],
     )) as Record<string, unknown>[];
-    const [appointments, prescriptions, items, remarks, records, conversation, blood] = await Promise.all([
-      AppDataSource.query(
-        `SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", a.date::text AS date, a.time_from::text AS "timeFrom",
+    const [appointments, prescriptions, items, remarks, records, conversation, blood, plans] =
+      await Promise.all([
+        AppDataSource.query(
+          `SELECT a.id, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo", a.date::text AS date, a.time_from::text AS "timeFrom",
                 a.time_to::text AS "timeTo", a.status, a.visit_type AS "visitType", a.mode, a.issues, a.remark,
                 d.display_name AS doctor, b.name AS branch, (a.doctor_id = $2) AS mine
            FROM appointments a
@@ -299,10 +309,10 @@ export const doctorAppService = {
            LEFT JOIN doctors d ON d.id = a.doctor_id
           WHERE a.patient_id = $1 AND a.deleted_at IS NULL
           ORDER BY a.date DESC, a.time_from DESC`,
-        [patientId, doctor.id],
-      ) as Promise<Record<string, unknown>[]>,
-      AppDataSource.query(
-        `SELECT p.id, p.prescription_no AS "prescriptionNo", p.date::text AS date, p.diagnosis,
+          [patientId, doctor.id],
+        ) as Promise<Record<string, unknown>[]>,
+        AppDataSource.query(
+          `SELECT p.id, p.prescription_no AS "prescriptionNo", p.date::text AS date, p.diagnosis,
                 p.followup_date::text AS "followupDate", p.plan_treatment AS "planTreatment",
                 p.consultation_id AS "consultationId", d.display_name AS doctor, b.name AS branch,
                 (p.doctor_id = $2) AS editable
@@ -311,17 +321,17 @@ export const doctorAppService = {
            LEFT JOIN branches b ON b.id = p.branch_id
           WHERE p.patient_id = $1 AND p.deleted_at IS NULL
           ORDER BY p.date DESC, p.prescription_no DESC`,
-        [patientId, doctor.id],
-      ) as Promise<{ id: string } & Record<string, unknown>[]>,
-      AppDataSource.query(
-        `SELECT i.prescription_id AS "prescriptionId", i.group_name AS "groupName", i.name, i.dose, i.instructions
+          [patientId, doctor.id],
+        ) as Promise<{ id: string } & Record<string, unknown>[]>,
+        AppDataSource.query(
+          `SELECT i.prescription_id AS "prescriptionId", i.category, i.group_name AS "groupName", i.name, i.dose, i.instructions
            FROM prescription_items i JOIN prescriptions p ON p.id = i.prescription_id
           WHERE p.patient_id = $1 AND p.deleted_at IS NULL AND i.deleted_at IS NULL
           ORDER BY i.sort_order`,
-        [patientId],
-      ) as Promise<{ prescriptionId: string } & Record<string, unknown>[]>,
-      AppDataSource.query(
-        `SELECT c.id AS "consultationId", a.date::text AS date, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo",
+          [patientId],
+        ) as Promise<{ prescriptionId: string } & Record<string, unknown>[]>,
+        AppDataSource.query(
+          `SELECT c.id AS "consultationId", a.date::text AS date, a.appointment_no AS "appointmentNo", a.repeat_no AS "repeatNo",
                 d.display_name AS doctor, b.name AS branch, NULLIF(TRIM(cs.data->>'plan'), '') AS remarks,
                 cs.updated_at AS "updatedAt", (c.doctor_id = $2) AS editable
            FROM consultations c
@@ -333,20 +343,30 @@ export const doctorAppService = {
           WHERE c.patient_id = $1 AND c.deleted_at IS NULL
             AND (c.doctor_id = $2 OR NULLIF(TRIM(cs.data->>'plan'), '') IS NOT NULL)
           ORDER BY a.date DESC, a.time_from DESC`,
-        [patientId, doctor.id],
-      ) as Promise<Record<string, unknown>[]>,
-      medicalRecordsService.timeline(null, patientId),
-      AppDataSource.query(`SELECT id FROM chat_conversations WHERE patient_id = $1 AND doctor_id = $2`, [
-        patientId,
-        doctor.id,
-      ]) as Promise<{ id: string }[]>,
-      AppDataSource.query(
-        `SELECT test, test_date::text AS date, value::text AS value, unit FROM blood_work_results
+          [patientId, doctor.id],
+        ) as Promise<Record<string, unknown>[]>,
+        medicalRecordsService.timeline(null, patientId),
+        AppDataSource.query(`SELECT id FROM chat_conversations WHERE patient_id = $1 AND doctor_id = $2`, [
+          patientId,
+          doctor.id,
+        ]) as Promise<{ id: string }[]>,
+        AppDataSource.query(
+          `SELECT test, test_date::text AS date, value::text AS value, unit FROM blood_work_results
           WHERE patient_id = $1 AND deleted_at IS NULL
           ORDER BY test_date, created_at`,
-        [patientId],
-      ) as Promise<{ test: string; date: string; value: string; unit: string }[]>,
-    ]);
+          [patientId],
+        ) as Promise<{ test: string; date: string; value: string; unit: string }[]>,
+        AppDataSource.query(
+          `SELECT t.id, t.date::text AS date, t.plan, t.created_at AS "createdAt",
+                d.display_name AS doctor, b.name AS branch, (t.doctor_id = $2) AS editable
+           FROM treatment_plans t
+           LEFT JOIN doctors d ON d.id = t.doctor_id
+           LEFT JOIN branches b ON b.id = t.branch_id
+          WHERE t.patient_id = $1 AND t.deleted_at IS NULL
+          ORDER BY t.date DESC, t.created_at DESC`,
+          [patientId, doctor.id],
+        ) as Promise<Record<string, unknown>[]>,
+      ]);
     const branchIds = [...new Set(records.map((r) => r.branchId))];
     const branchNames = new Map(
       (
@@ -370,6 +390,11 @@ export const doctorAppService = {
         items: (items as unknown as Record<string, unknown>[])
           .filter((i) => i.prescriptionId === p.id)
           .map(({ prescriptionId: _id, ...i }) => i),
+      })),
+      plans: plans.map((t) => ({
+        ...t,
+        createdAt: iso(t.createdAt as Date | null),
+        editable: t.editable === true,
       })),
       remarks: remarks.map((r) => ({
         ...r,
@@ -483,6 +508,63 @@ export const doctorAppService = {
       { planTreatment: plan },
     );
     return { prescriptionId, planTreatment: plan };
+  },
+
+  async addPlan(actor: Actor, staffId: string, patientId: string, plan: string) {
+    const doctor = await doctorOf(staffId);
+    await assertOwnPatient(doctor.id, patientId);
+    return withTransaction(async (em) => {
+      const plans = repo(TreatmentPlan, em);
+      const saved = await plans.save(
+        plans.create({
+          branchId: doctor.branchId,
+          patientId,
+          doctorId: doctor.id,
+          date: today(),
+          plan: requiredPlan(plan),
+          createdBy: actor.userId,
+          updatedBy: actor.userId,
+        }),
+      );
+      await auditService.record(
+        {
+          actor,
+          branchId: doctor.branchId,
+          action: 'create',
+          entity: 'treatment_plan',
+          entityId: saved.id,
+          after: { patientId, plan: saved.plan },
+        },
+        em,
+      );
+      return { id: saved.id, date: saved.date, plan: saved.plan };
+    });
+  },
+
+  async updatePlan(actor: Actor, staffId: string, planId: string, plan: string) {
+    const doctor = await doctorOf(staffId);
+    return withTransaction(async (em) => {
+      const plans = repo(TreatmentPlan, em);
+      const existing = await plans.findOneBy({ id: planId, doctorId: doctor.id });
+      if (!existing) throw AppError.notFound('Plan of treatment');
+      const before = existing.plan;
+      existing.plan = requiredPlan(plan);
+      existing.updatedBy = actor.userId;
+      await plans.save(existing);
+      await auditService.record(
+        {
+          actor,
+          branchId: existing.branchId,
+          action: 'update',
+          entity: 'treatment_plan',
+          entityId: existing.id,
+          before: { plan: before },
+          after: { plan: existing.plan },
+        },
+        em,
+      );
+      return { id: existing.id, date: existing.date, plan: existing.plan };
+    });
   },
 
   async savePushToken(staffId: string, token: string, platform: string | null) {
