@@ -246,6 +246,20 @@ describe('doctor app', () => {
     });
   });
 
+  it('shows the patient their own plans with medicines and blood tests', async () => {
+    const res = await request(app)
+      .get('/api/v1/patient/treatment-plans')
+      .set({ Authorization: 'Bearer ' + patientToken });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    const withText = res.body.data.find((p: { plan: string | null }) => p.plan);
+    expect(withText).toMatchObject({ plan: '<p>Lose 5 kg</p>', doctor: 'Dr. Shawana', medicines: [] });
+    expect(withText.bloodWork).toHaveLength(1);
+    expect(withText.bloodWork[0]).toEqual({ name: expect.any(String), groupName: expect.any(String) });
+    expect(withText).not.toHaveProperty('items');
+    expect((await request(app).get('/api/v1/patient/treatment-plans')).status).toBe(401);
+  });
+
   it('shows blood work for the chart and table', async () => {
     const added = await staff('post', `/branch/patients/${patientId}/blood-work`, doctorUser).send({
       results: [

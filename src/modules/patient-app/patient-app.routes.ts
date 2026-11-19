@@ -138,6 +138,10 @@ patientAppRouter.get('/patient/prescriptions', async (req, res) => {
   sendOk(res, await patientAppService.prescriptions(patientId(req)));
 });
 
+patientAppRouter.get('/patient/treatment-plans', async (req, res) => {
+  sendOk(res, await patientAppService.treatmentPlans(patientId(req)));
+});
+
 patientAppRouter.get('/patient/prescriptions/:id', byId, async (req, res) => {
   sendOk(res, await patientAppService.prescription(patientId(req), idOf(req)));
 });

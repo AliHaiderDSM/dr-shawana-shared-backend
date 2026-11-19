@@ -282,6 +282,38 @@ export const patientAppService = {
     );
   },
 
+  async treatmentPlans(patientId: string) {
+    const rows = (await AppDataSource.query(
+      `SELECT t.id, t.date::text AS date, t.plan, t.items, d.display_name AS doctor, b.name AS branch
+         FROM treatment_plans t
+         LEFT JOIN doctors d ON d.id = t.doctor_id
+         LEFT JOIN branches b ON b.id = t.branch_id
+        WHERE t.patient_id = $1 AND t.deleted_at IS NULL
+        ORDER BY t.date DESC, t.created_at DESC`,
+      [patientId],
+    )) as {
+      id: string;
+      date: string;
+      plan: string | null;
+      items: { kind: string; name: string; dose: string | null; groupName: string }[];
+      doctor: string | null;
+      branch: string | null;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      date: r.date,
+      plan: r.plan,
+      doctor: r.doctor,
+      branch: r.branch,
+      medicines: r.items
+        .filter((i) => i.kind === 'medicine')
+        .map((i) => ({ name: i.name, dose: i.dose, groupName: i.groupName })),
+      bloodWork: r.items
+        .filter((i) => i.kind === 'blood_work')
+        .map((i) => ({ name: i.name, groupName: i.groupName })),
+    }));
+  },
+
   async prescription(patientId: string, id: string) {
     const rx = await repo(Prescription).findOne({
       where: { id, patientId },

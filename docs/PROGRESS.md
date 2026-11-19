@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Patient app: plans of treatment
+
+- `GET /patient/treatment-plans` returns the patient's own plans (doctor, branch, date, plan text, medicines with dose, blood tests), newest first, read only.
+
 ## 2026-11-19 — Medicines and blood tests on plans of treatment
 
 - Migration `1795800000000-TreatmentPlanItems`: `treatment_plans.plan` is optional and `items` (jsonb) holds ticked catalog items with their kind, category, group, name and dose at the time.

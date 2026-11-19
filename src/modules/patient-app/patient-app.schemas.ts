@@ -232,6 +232,10 @@ for (const [path, summary] of [
   ['/patient/appointments', 'Own appointments in every branch, newest first'],
   ['/patient/history', 'Past visits with their prescriptions and document counts'],
   ['/patient/prescriptions', 'Own prescriptions, newest first'],
+  [
+    '/patient/treatment-plans',
+    'Own plans of treatment written by the doctors, with their medicines and blood tests, newest first',
+  ],
   ['/patient/documents', 'Own medical records and their files'],
   ['/patient/requests', 'Own requests to clinic management'],
 ] as const) {
