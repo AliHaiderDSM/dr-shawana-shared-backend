@@ -7728,6 +7728,92 @@
           "createdAt"
         ]
       },
+      "TreatmentPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string"
+          },
+          "plan": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Plan of treatment as HTML"
+          },
+          "doctor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "medicines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "dose": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "groupName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "dose",
+                "groupName"
+              ]
+            }
+          },
+          "bloodWork": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "groupName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "groupName"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "plan",
+          "doctor",
+          "createdAt",
+          "updatedAt",
+          "medicines",
+          "bloodWork"
+        ]
+      },
       "LabReportSummary": {
         "type": "object",
         "properties": {
@@ -39358,6 +39444,112 @@
                       "required": [
                         "id"
                       ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/branch/patients/{id}/treatment-plans": {
+      "get": {
+        "tags": [
+          "Plans of treatment"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Plans of treatment the doctors wrote in the doctor app for this patient in this branch, with medicines and blood tests, newest first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "branchId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plans of treatment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TreatmentPlan"
+                      }
                     }
                   },
                   "required": [

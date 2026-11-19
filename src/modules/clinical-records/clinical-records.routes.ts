@@ -29,6 +29,7 @@ import {
 } from './clinical-records.schemas';
 import { bhrtService, bloodWorkService, medicalRecordsService } from './clinical-records.service';
 import { recordScanService } from './record-scan.service';
+import { treatmentPlansService } from '../treatment-plans/treatment-plans.service';
 
 export const clinicalRecordsRouter = Router();
 
@@ -41,6 +42,10 @@ const byPatient = validate({ params: idParamsSchema });
 const canView = requirePermission('consultations.view');
 const canCreate = requirePermission('consultations.create');
 const canUpdate = requirePermission('consultations.update');
+
+clinicalRecordsRouter.get(`${base}/treatment-plans`, ...scoped, canView, byPatient, async (req, res) => {
+  sendOk(res, await treatmentPlansService.list(branchIdOf(req), idOf(req)));
+});
 
 clinicalRecordsRouter.get(`${base}/blood-work`, ...scoped, canView, byPatient, async (req, res) => {
   sendOk(res, await bloodWorkService.list(branchIdOf(req), idOf(req)));

@@ -323,6 +323,27 @@ describe('doctor app', () => {
     }
   });
 
+  it('shows the plans on the dashboard for the branch only', async () => {
+    const res = await staff('get', `/branch/patients/${patientId}/treatment-plans`, admin);
+    expect(res.status).toBe(200);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(2);
+    expect(res.body.data[0]).toEqual(
+      expect.objectContaining({
+        doctor: 'Dr. Shawana',
+        medicines: expect.any(Array),
+        bloodWork: expect.any(Array),
+        createdAt: expect.any(String),
+      }),
+    );
+    expect(res.body.data[0]).not.toHaveProperty('items');
+
+    const elsewhere = (await createBranch({ code: 'KH2' })).id;
+    const otherAdmin = await createStaff(fake, { role: 'branch_admin', branchId: elsewhere });
+    const other = await staff('get', `/branch/patients/${patientId}/treatment-plans`, otherAdmin);
+    expect(other.status).toBe(200);
+    expect(other.body.data).toEqual([]);
+  });
+
   it('shows blood work for the chart and table', async () => {
     const added = await staff('post', `/branch/patients/${patientId}/blood-work`, doctorUser).send({
       results: [

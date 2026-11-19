@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Plans of treatment on the dashboard
+
+- `GET /branch/patients/{id}/treatment-plans` (`consultations.view`) lists the plans of treatment written in the doctor app for this patient in the current branch, with medicines, blood tests and created/updated times. Read only.
+
 ## 2026-11-19 — Patient is told about plan changes
 
 - Adding or editing a plan of treatment in the doctor app sends the patient a push from the doctor (`data: { type: "treatment_plan", planId }`). The text says what changed: "Added medicines to your plan.", "Updated your blood tests.", "Updated your plan of treatment." and so on. An edit that changes nothing sends nothing. Expired tokens are removed.

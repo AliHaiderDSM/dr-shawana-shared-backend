@@ -86,14 +86,10 @@ export const resultParamsSchema = z.object({ id: z.uuid(), resultId: z.uuid() })
 export const recordParamsSchema = z.object({ id: z.uuid(), recordId: z.uuid() });
 
 export const scanRecordBodySchema = z.object({
-  fileIds: z
-    .array(z.uuid())
-    .max(10)
-    .optional()
-    .openapi({
-      description:
-        'Only these files of the record (for example the ones just added). All of them when left out.',
-    }),
+  fileIds: z.array(z.uuid()).max(10).optional().openapi({
+    description:
+      'Only these files of the record (for example the ones just added). All of them when left out.',
+  }),
 });
 
 export const recordScanSchema = registry.register(
@@ -182,6 +178,7 @@ const medicalRecordSchema = registry.register(
 );
 
 const bloodDocs = securedDocs('Blood work');
+const planDocs = securedDocs('Plans of treatment');
 const bhrtDocs = securedDocs('BHRT');
 const recordDocs = securedDocs('Medical records');
 const byPatient = { params: idParamsSchema, query: branchQuerySchema };
@@ -190,6 +187,28 @@ const ok = (description: string, schema: z.ZodType) => ({
   ...jsonContent(dataEnvelope(schema)),
 });
 
+const treatmentPlanSchema = registry.register(
+  'TreatmentPlan',
+  z.object({
+    id: z.uuid(),
+    date: z.string(),
+    plan: z.string().nullable().openapi({ description: 'Plan of treatment as HTML' }),
+    doctor: z.string().nullable(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+    medicines: z.array(z.object({ name: z.string(), dose: z.string().nullable(), groupName: z.string() })),
+    bloodWork: z.array(z.object({ name: z.string(), groupName: z.string() })),
+  }),
+);
+registry.registerPath({
+  ...planDocs,
+  method: 'get',
+  path: '/branch/patients/{id}/treatment-plans',
+  summary:
+    'Plans of treatment the doctors wrote in the doctor app for this patient in this branch, with medicines and blood tests, newest first',
+  request: byPatient,
+  responses: { 200: ok('Plans of treatment', z.array(treatmentPlanSchema)), ...errorResponses },
+});
 registry.registerPath({
   ...bloodDocs,
   method: 'get',
