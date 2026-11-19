@@ -6,7 +6,7 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
 import { paginate } from '../../lib/pagination';
-import { BUCKETS, createSignedUrl, replaceFile } from '../../lib/storage';
+import { BUCKETS, createSignedUrl, uploadFile } from '../../lib/storage';
 import { Appointment } from '../appointments/appointment.entity';
 import { auditService } from '../audit/audit.service';
 import { type StaffProfile } from '../staff/staff-profile.entity';
@@ -156,16 +156,13 @@ export const doctorsService = {
 
   async setSignature(actor: Actor, branchId: string, id: string, file: Express.Multer.File) {
     const doctor = await getDoctor(branchId, id);
-    const { path } = await replaceFile(
-      {
-        bucket: BUCKETS.doctorSignatures,
-        prefix: `${await branchFolder(branchId)}/${id}`,
-        originalName: file.originalname,
-        buffer: file.buffer,
-        contentType: file.mimetype,
-      },
-      doctor.signaturePath,
-    );
+    const { path } = await uploadFile({
+      bucket: BUCKETS.doctorSignatures,
+      prefix: `${await branchFolder(branchId)}/${id}`,
+      originalName: file.originalname,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+    });
     doctor.signaturePath = path;
     doctor.updatedBy = actor.userId;
     delete doctor.staff;

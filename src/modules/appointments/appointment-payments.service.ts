@@ -6,7 +6,7 @@ import { repo, withTransaction } from '../../database/transaction';
 import { Decimal, toMoney } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
-import { removeQuietly, uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
+import { uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
 import { withoutInternals } from '../../lib/http';
 import { escapeLike, pageMeta } from '../../lib/pagination';
 import { BUCKETS, createSignedUrl } from '../../lib/storage';
@@ -273,7 +273,6 @@ export const appointmentPaymentsService = {
     paymentId: string,
     input: UpdatePaymentInput,
   ) {
-    let removedProof: string | null = null;
     const dto = await withTransaction(async (em) => {
       await getAppointmentRecord(viewer, appointmentId, em);
       const payment = await getPayment(viewer.branchId, appointmentId, paymentId, em);
@@ -283,7 +282,6 @@ export const appointmentPaymentsService = {
       if (input.method || input.accountSheetId)
         await assertAccountSheet(viewer.branchId, payment.accountSheetId, em, payment.method);
       if (payment.method === 'cash') {
-        removedProof = payment.proofFilePath;
         Object.assign(payment, CASH_CLEARED);
       }
       delete payment.accountSheet;
@@ -304,7 +302,6 @@ export const appointmentPaymentsService = {
       );
       return after;
     });
-    if (removedProof) await removeQuietly(BUCKETS.paymentProofs, [removedProof]);
     return dto;
   },
 
@@ -319,7 +316,6 @@ export const appointmentPaymentsService = {
     const existing = await getPayment(viewer.branchId, appointmentId, paymentId);
     if (existing.method !== 'online') throw AppError.badRequest('Only online payments take a screenshot');
     const uploaded = await uploadProofs(viewer.branchId, [file]);
-    const previous = existing.proofFilePath;
     const dto = await withUploads(uploaded, () =>
       withTransaction(async (em) => {
         const payment = await getPayment(viewer.branchId, appointmentId, paymentId, em);
@@ -339,7 +335,6 @@ export const appointmentPaymentsService = {
         return reloadDto(viewer.branchId, appointmentId, paymentId, em);
       }),
     );
-    if (previous) await removeQuietly(BUCKETS.paymentProofs, [previous]);
     return dto;
   },
 

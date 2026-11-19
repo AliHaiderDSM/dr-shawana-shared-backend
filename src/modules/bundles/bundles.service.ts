@@ -7,7 +7,7 @@ import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
 import { type ListQuery } from '../../lib/pagination';
-import { BUCKETS, publicUrl, replaceFile } from '../../lib/storage';
+import { BUCKETS, publicUrl, uploadFile } from '../../lib/storage';
 import { auditService } from '../audit/audit.service';
 import { productsRepository } from '../products/products.repository';
 import { type Bundle } from './bundle.entity';
@@ -122,16 +122,13 @@ export const bundlesService = {
 
   async uploadImage(actor: Actor, branchId: string, id: string, file: Express.Multer.File) {
     const bundle = await getBundle(branchId, id);
-    const { path } = await replaceFile(
-      {
-        bucket: BUCKETS.productImages,
-        prefix: `${await branchFolder(branchId)}/bundles/${id}`,
-        originalName: file.originalname,
-        buffer: file.buffer,
-        contentType: file.mimetype,
-      },
-      bundle.imagePath,
-    );
+    const { path } = await uploadFile({
+      bucket: BUCKETS.productImages,
+      prefix: `${await branchFolder(branchId)}/bundles/${id}`,
+      originalName: file.originalname,
+      buffer: file.buffer,
+      contentType: file.mimetype,
+    });
     bundle.imagePath = path;
     bundle.updatedBy = actor.userId;
     delete bundle.items;

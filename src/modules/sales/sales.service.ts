@@ -6,7 +6,7 @@ import { AppDataSource } from '../../database/data-source';
 import { Decimal, toMoney, toQuantity, type DecimalInput } from '../../database/transformers';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
-import { removeQuietly, uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
+import { uploadMany, withUploads, type UploadedFile } from '../../lib/file-uploads';
 import { withoutInternals } from '../../lib/http';
 import { applyListQuery, escapeLike, pageMeta } from '../../lib/pagination';
 import { BUCKETS, createSignedUrl, publicUrl } from '../../lib/storage';
@@ -327,7 +327,6 @@ async function dropProofs(manager: EntityManager, actor: Actor, branchId: string
     .andWhere('proof.paymentId = :paymentId', { paymentId })
     .getMany();
   for (const proof of proofs) await paymentProofs.softDelete(proof, actor.userId, manager);
-  return proofs.map((p) => p.filePath);
 }
 
 const uploadProofs = async (branchId: string, files: Express.Multer.File[]) =>
@@ -1437,7 +1436,6 @@ export const salesService = {
     paymentId: string,
     input: UpdateSalePaymentInput,
   ) {
-    let removedProofs: string[] = [];
     const dto = await withTransaction(async (em) => {
       const sale = await getSale(branchId, id, em);
       assertCanChange(actor, sale);
@@ -1459,7 +1457,7 @@ export const salesService = {
             : { approvedAt: null, approvedBy: null },
         );
       if (payment.method === 'cash') {
-        removedProofs = await dropProofs(em, actor, branchId, payment.id);
+        await dropProofs(em, actor, branchId, payment.id);
         Object.assign(payment, CASH_CLEARED);
       }
       await salePayments.save(payment, em);
@@ -1467,7 +1465,6 @@ export const salesService = {
       await audit(actor, sale, 'update_payment', em, before, input);
       return toSaleDto(await getSale(branchId, id, em));
     });
-    if (removedProofs.length) await removeQuietly(BUCKETS.paymentProofs, removedProofs);
     return dto;
   },
 
@@ -1507,7 +1504,6 @@ export const salesService = {
       await audit(actor, sale, 'remove_payment_proof', em, { paymentId, proof: proof.originalName });
       return toSaleDto(await getSale(branchId, id, em));
     });
-    await removeQuietly(BUCKETS.paymentProofs, [proof.filePath]);
     return dto;
   },
 

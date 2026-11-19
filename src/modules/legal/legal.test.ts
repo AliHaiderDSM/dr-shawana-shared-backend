@@ -6,8 +6,8 @@ import { createApp } from '../../app';
 const fake = installFakeSupabase();
 const app = createApp();
 
-describe('public privacy and account deletion pages', () => {
-  it('serves both pages without login, with the clinic contact details escaped', async () => {
+describe('public privacy, terms and account deletion pages', () => {
+  it('serves every page without login, with the clinic contact details escaped', async () => {
     const owner = await createStaff(fake, { role: 'super_admin', branchId: null });
     await request(app)
       .put('/api/v1/admin/company-info')
@@ -35,5 +35,14 @@ describe('public privacy and account deletion pages', () => {
     expect(deletion.text).toContain('042-1234567');
     expect((await request(app).get('/delete-account')).status).toBe(200);
     expect((await request(app).get('/privacy-policy')).status).toBe(200);
+
+    const terms = await request(app).get('/terms');
+    expect(terms.status).toBe(200);
+    expect(terms.text).toContain('Terms of service');
+    expect(terms.text).toContain('Not for emergencies');
+    expect(terms.text).toContain('DSM &lt;Clinic&gt;');
+    expect(terms.text).toContain('care@dsm.test');
+    expect((await request(app).get('/terms-of-service')).status).toBe(200);
+    expect(privacy.text).toContain('Cloudflare R2');
   });
 });
