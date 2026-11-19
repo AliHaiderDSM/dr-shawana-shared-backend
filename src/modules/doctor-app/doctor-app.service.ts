@@ -122,14 +122,72 @@ function planMessage(created: boolean, parts: PlanPart[]) {
   return created ? ADDED.plan : UPDATED.plan;
 }
 
+type PlanState = { plan: string | null; items: TreatmentPlanItem[] };
+
+const namesOf = (items: TreatmentPlanItem[], kind: TreatmentPlanItem['kind']) =>
+  items.filter((i) => i.kind === kind).map((i) => i.name);
+
+const plainText = (html: string | null) =>
+  (html ?? '')
+    .replace(/<\/(p|li|h\d)>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const shorten = (text: string, max = 160) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
+function itemLines(label: string, before: string[], after: string[], created: boolean) {
+  if (created) return after.length ? [`${label}: ${after.join(', ')}`] : [];
+  const added = after.filter((name) => !before.includes(name));
+  const removed = before.filter((name) => !after.includes(name));
+  return [
+    ...(added.length ? [`${label} added: ${added.join(', ')}`] : []),
+    ...(removed.length ? [`${label} removed: ${removed.join(', ')}`] : []),
+  ];
+}
+
+function planDetails(before: PlanState | null, after: PlanState, parts: PlanPart[]) {
+  const created = before === null;
+  const lines: string[] = [];
+  if (parts.includes('plan')) {
+    const text = shorten(plainText(after.plan));
+    lines.push(text ? `Plan of treatment: ${text}` : 'Plan of treatment removed');
+  }
+  if (parts.includes('medicines')) {
+    lines.push(
+      ...itemLines(
+        'Medicines',
+        namesOf(before?.items ?? [], 'medicine'),
+        namesOf(after.items, 'medicine'),
+        created,
+      ),
+    );
+  }
+  if (parts.includes('blood_work')) {
+    lines.push(
+      ...itemLines(
+        'Blood tests',
+        namesOf(before?.items ?? [], 'blood_work'),
+        namesOf(after.items, 'blood_work'),
+        created,
+      ),
+    );
+  }
+  return lines;
+}
+
 async function notifyPlan(
   patientId: string,
   doctor: { id: string; name: string },
   staffId: string,
   planId: string,
   body: string,
+  details: string[],
 ) {
-  await postPlanMessage(patientId, doctor.id, staffId, planId, body);
+  await postPlanMessage(patientId, doctor.id, staffId, planId, [body, ...details].join('\n'));
   const doctorName = doctor.name;
   const tokens = (await AppDataSource.query(`SELECT token FROM patient_push_tokens WHERE patient_id = $1`, [
     patientId,
@@ -661,7 +719,15 @@ export const doctorAppService = {
       );
       return { id: saved.id, date: saved.date, plan: saved.plan, items: saved.items };
     });
-    await notifyPlan(patientId, doctor, staffId, result.id, planMessage(true, changedParts(null, result)));
+    const parts = changedParts(null, result);
+    await notifyPlan(
+      patientId,
+      doctor,
+      staffId,
+      result.id,
+      planMessage(true, parts),
+      planDetails(null, result, parts),
+    );
     return result;
   },
 
@@ -701,7 +767,14 @@ export const doctorAppService = {
     });
     const parts = changedParts(previous, result);
     if (parts.length)
-      await notifyPlan(result.patientId, doctor, staffId, result.id, planMessage(false, parts));
+      await notifyPlan(
+        result.patientId,
+        doctor,
+        staffId,
+        result.id,
+        planMessage(false, parts),
+        planDetails(previous, result, parts),
+      );
     const { patientId: _patientId, ...saved } = result;
     return saved;
   },

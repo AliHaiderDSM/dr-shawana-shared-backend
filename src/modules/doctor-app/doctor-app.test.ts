@@ -316,11 +316,13 @@ describe('doctor app', () => {
         .set({ Authorization: `Bearer ${patientToken}` });
       expect(chat.status).toBe(200);
       const planMessages = chat.body.data.items.filter((m: { planId: string | null }) => m.planId === planId);
+      const medicine = options.medicines[0].name;
+      const test = options.bloodWork[0].name;
       expect(planMessages.map((m: { body: string }) => m.body).sort()).toEqual(
         [
-          'Added medicines to your plan.',
-          'Updated your blood tests.',
-          'Updated your plan of treatment.',
+          `Added medicines to your plan.\nMedicines: ${medicine}`,
+          `Updated your blood tests.\nBlood tests added: ${test}`,
+          `Updated your plan of treatment.\nPlan of treatment: Walk daily\nMedicines removed: ${medicine}\nBlood tests removed: ${test}`,
         ].sort(),
       );
       expect(planMessages[0]).toMatchObject({ sender: 'doctor', planId });

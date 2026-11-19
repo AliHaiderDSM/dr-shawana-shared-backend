@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Plan chat messages say what changed
+
+- The chat message for a plan change starts with the short line (same as the push) and lists the details on the next lines: "Medicines: …" for a new plan, "Medicines added: …" / "Blood tests removed: …" for edits, and a short plain-text preview of the plan text.
+
 ## 2026-11-19 — Plan changes in the patient chat
 
 - Migration `1795900000000-ChatPlanLink`: `chat_messages.treatment_plan_id` (FK to `treatment_plans`, set null on delete).
