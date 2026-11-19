@@ -22,6 +22,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Demo visits for testing the apps
+
+- `npm run seed:demo-visits -- --phone <patient phone>` adds two completed visits (60 and 30 days ago) for a demo patient with the doctor of their latest appointment: consultation, clinical remarks and a prescription with catalog medicines, BHRT and blood tests, plus three plans (text, medicines, blood work). It goes through the normal services, so it is audited. Each run adds more; use it only for demo patients.
+
 ## 2026-11-19 — Patient app: plans of treatment
 
 - `GET /patient/treatment-plans` returns the patient's own plans (doctor, branch, date, plan text, medicines with dose, blood tests), newest first, read only.
