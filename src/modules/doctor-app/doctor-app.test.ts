@@ -3,6 +3,7 @@ import { bearer, createBranch, createStaff, TEST_PASSWORD } from '../../../tests
 import { AppDataSource } from '../../database/data-source';
 import { installFakeSupabase } from '../../../tests/helpers/supabase-fake';
 import { createApp } from '../../app';
+import { catalogService } from '../prescriptions/prescriptions.service';
 
 const fake = installFakeSupabase();
 const app = createApp();
@@ -24,6 +25,7 @@ describe('doctor app', () => {
 
   beforeAll(async () => {
     const lahore = (await createBranch({ code: 'LHD' })).id;
+    await catalogService.seedBranch(lahore);
     const karachi = (await createBranch({ code: 'KHD' })).id;
     admin = await createStaff(fake, { role: 'branch_admin', branchId: lahore });
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore });
@@ -179,39 +181,69 @@ describe('doctor app', () => {
     await request(app).delete(`/api/v1/branch/prescriptions/${prescriptionId}`).set(bearer(admin));
   });
 
-  it('adds and edits separate plans of treatment for the doctor’s own patients', async () => {
-    const add = (who: { id: string }, id: string, plan: unknown) =>
-      staff('post', `/doctor/patients/${id}/plans`, who).send({ plan });
-    const created = await add(doctorUser, patientId, '<p>Lose <strong>4 kg</strong></p>');
+  it('adds and edits separate plans of treatment with ticked medicines and blood tests', async () => {
+    const options = (await staff('get', '/doctor/plan-options', doctorUser)).body.data;
+    expect(options.medicines.length).toBeGreaterThan(0);
+    expect(options.bloodWork.length).toBeGreaterThan(0);
+    expect(options.bloodWork.every((o: { category: string }) => o.category === 'lab')).toBe(true);
+    expect(
+      options.medicines.every((o: { category: string }) =>
+        ['supplement', 'medicine', 'glp', 'bhrt'].includes(o.category),
+      ),
+    ).toBe(true);
+    expect((await staff('get', '/doctor/plan-options', frontDesk)).status).toBe(403);
+    const medicine = options.medicines[0];
+    const test = options.bloodWork[0];
+
+    const add = (who: { id: string }, id: string, body: object) =>
+      staff('post', `/doctor/patients/${id}/plans`, who).send(body);
+    const created = await add(doctorUser, patientId, {
+      plan: '<p>Lose <strong>4 kg</strong></p>',
+      catalogItemIds: [medicine.id, test.id],
+    });
     expect(created.status).toBe(201);
     const planId = created.body.data.id;
-    expect(created.body.data.plan).toBe('<p>Lose <strong>4 kg</strong></p>');
+    expect(created.body.data.items).toEqual([
+      expect.objectContaining({ catalogItemId: medicine.id, kind: 'medicine', name: medicine.name }),
+      expect.objectContaining({ catalogItemId: test.id, kind: 'blood_work', name: test.name }),
+    ]);
 
-    expect((await add(doctorUser, strangerId, '<p>x</p>')).status).toBe(404);
-    expect((await add(otherDoctorUser, patientId, '<p>x</p>')).status).toBe(404);
-    expect((await add(frontDesk, patientId, '<p>x</p>')).status).toBe(403);
-    expect((await add(doctorUser, patientId, '<p> </p>')).status).toBe(400);
-    expect((await add(doctorUser, patientId, '')).status).toBe(400);
+    const onlyTests = await add(doctorUser, patientId, { plan: null, catalogItemIds: [test.id] });
+    expect(onlyTests.status).toBe(201);
+    expect(onlyTests.body.data.plan).toBeNull();
+
+    const body = { plan: '<p>x</p>', catalogItemIds: [] };
+    expect((await add(doctorUser, strangerId, body)).status).toBe(404);
+    expect((await add(otherDoctorUser, patientId, body)).status).toBe(404);
+    expect((await add(frontDesk, patientId, body)).status).toBe(403);
+    expect((await add(doctorUser, patientId, { plan: '<p> </p>', catalogItemIds: [] })).status).toBe(400);
+    expect((await add(doctorUser, patientId, { plan: 'x' })).status).toBe(400);
+    expect(
+      (
+        await add(doctorUser, patientId, {
+          plan: null,
+          catalogItemIds: ['00000000-0000-4000-8000-000000000000'],
+        })
+      ).status,
+    ).toBe(400);
 
     const edited = await staff('put', `/doctor/plans/${planId}`, doctorUser).send({
       plan: '<p>Lose 5 kg</p>',
+      catalogItemIds: [test.id],
     });
     expect(edited.status).toBe(200);
-    expect(
-      (await staff('put', `/doctor/plans/${planId}`, otherDoctorUser).send({ plan: '<p>x</p>' })).status,
-    ).toBe(404);
+    expect((await staff('put', `/doctor/plans/${planId}`, otherDoctorUser).send(body)).status).toBe(404);
 
     const file = (await staff('get', `/doctor/patients/${patientId}`, doctorUser)).body.data;
-    expect(file.plans).toEqual([
-      expect.objectContaining({
-        id: planId,
-        plan: '<p>Lose 5 kg</p>',
-        doctor: 'Dr. Shawana',
-        editable: true,
-        branch: expect.any(String),
-        date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-      }),
-    ]);
+    expect(file.plans).toHaveLength(2);
+    expect(file.plans.find((p: { id: string }) => p.id === planId)).toMatchObject({
+      plan: '<p>Lose 5 kg</p>',
+      items: [expect.objectContaining({ catalogItemId: test.id, kind: 'blood_work' })],
+      doctor: 'Dr. Shawana',
+      editable: true,
+      branch: expect.any(String),
+      date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
   });
 
   it('shows blood work for the chart and table', async () => {

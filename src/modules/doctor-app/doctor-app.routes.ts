@@ -29,9 +29,15 @@ const treatmentPlanBody = registry.register(
   z.object({
     plan: z
       .string()
-      .min(1)
       .max(50000)
-      .openapi({ description: 'Plan of treatment as HTML (bold, italic, lists)' }),
+      .nullable()
+      .openapi({
+        description: 'Plan of treatment as HTML (bold, italic, lists); may be empty when items are ticked',
+      }),
+    catalogItemIds: z.array(z.uuid()).max(200).openapi({
+      description:
+        'Ticked medicines and blood tests from GET /doctor/plan-options; the whole list is replaced',
+    }),
   }),
 );
 const patientsQuery = z.object({ search: z.string().trim().max(100).optional() });
@@ -129,6 +135,10 @@ doctorAppRouter.get('/doctor/appointments', validate({ query: appointmentsQuery 
   sendOk(res, await doctorAppService.appointments(req.auth!.userId, when, page, month));
 });
 
+doctorAppRouter.get('/doctor/plan-options', async (req, res) => {
+  sendOk(res, await doctorAppService.planOptions(req.auth!.userId));
+});
+
 doctorAppRouter.get('/doctor/patients', validate({ query: patientsQuery }), async (req, res) => {
   sendOk(res, await doctorAppService.patients(req.auth!.userId, validQuery(req, patientsQuery).search));
 });
@@ -194,7 +204,7 @@ doctorAppRouter.post(
         actorFrom(req),
         req.auth!.userId,
         validParams(req, patientParams).patientId,
-        validBody(req, treatmentPlanBody).plan,
+        validBody(req, treatmentPlanBody),
       ),
     );
   },
@@ -210,7 +220,7 @@ doctorAppRouter.put(
         actorFrom(req),
         req.auth!.userId,
         validParams(req, treatmentPlanParams).planId,
-        validBody(req, treatmentPlanBody).plan,
+        validBody(req, treatmentPlanBody),
       ),
     );
   },
@@ -335,6 +345,14 @@ registry.registerPath({
   summary: 'Edit a plan of treatment the doctor added',
   request: { params: treatmentPlanParams, ...json(treatmentPlanBody) },
   responses: ok('Saved'),
+});
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/doctor/plan-options',
+  summary:
+    'Active medicines (supplements, medicines, GLP, BHRT) and blood tests of the doctor’s branch that can be ticked on a plan of treatment',
+  responses: ok('Medicines and blood tests'),
 });
 registry.registerPath({
   ...docs,

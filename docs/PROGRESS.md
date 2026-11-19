@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Medicines and blood tests on plans of treatment
+
+- Migration `1795800000000-TreatmentPlanItems`: `treatment_plans.plan` is optional and `items` (jsonb) holds ticked catalog items with their kind, category, group, name and dose at the time.
+- `GET /doctor/plan-options` lists the active medicines (supplement, medicine, GLP, BHRT) and blood tests (lab) of the doctor's branch. Plan create/edit takes `{ plan, catalogItemIds }`; at least the text or one item is required, and every item must be active in the plan's branch.
+
 ## 2026-11-19 — Separate plans of treatment
 
 - New table `treatment_plans` (migration `1795700000000-TreatmentPlans`, RLS on): a plan of treatment a doctor adds for a patient without a prescription (branch, patient, doctor, date, HTML plan). The plan text is required.

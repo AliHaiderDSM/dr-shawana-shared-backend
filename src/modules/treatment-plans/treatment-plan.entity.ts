@@ -3,6 +3,18 @@ import { BranchScopedEntity } from '../../database/branch-scoped.entity';
 import { Doctor } from '../doctors/doctor.entity';
 import { Patient } from '../patients/patient.entity';
 
+export const PLAN_MEDICINE_CATEGORIES = ['supplement', 'medicine', 'glp', 'bhrt'] as const;
+export const PLAN_BLOOD_WORK_CATEGORIES = ['lab'] as const;
+
+export interface TreatmentPlanItem {
+  catalogItemId: string;
+  kind: 'medicine' | 'blood_work';
+  category: string;
+  groupName: string;
+  name: string;
+  dose: string | null;
+}
+
 @Entity('treatment_plans')
 export class TreatmentPlan extends BranchScopedEntity {
   @Index()
@@ -24,6 +36,9 @@ export class TreatmentPlan extends BranchScopedEntity {
   @Column({ type: 'date' })
   date: string;
 
-  @Column({ type: 'text' })
-  plan: string;
+  @Column({ type: 'text', nullable: true })
+  plan: string | null;
+
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  items: TreatmentPlanItem[];
 }

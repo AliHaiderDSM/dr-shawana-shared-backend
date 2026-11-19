@@ -12,7 +12,12 @@ import { doctorsService } from '../doctors/doctors.service';
 import { patientIntakeService } from '../patient-app/patient-intake.service';
 import { prescriptionsService } from '../prescriptions/prescriptions.service';
 import { auditService } from '../audit/audit.service';
-import { TreatmentPlan } from '../treatment-plans/treatment-plan.entity';
+import {
+  PLAN_BLOOD_WORK_CATEGORIES,
+  PLAN_MEDICINE_CATEGORIES,
+  TreatmentPlan,
+  type TreatmentPlanItem,
+} from '../treatment-plans/treatment-plan.entity';
 import { repo, withTransaction } from '../../database/transaction';
 
 interface DoctorRow {
@@ -34,10 +39,47 @@ async function doctorOf(staffId: string) {
   return row;
 }
 
-function requiredPlan(plan: string) {
-  const text = plan.trim();
-  if (!text || !text.replace(/<[^>]*>/g, '').trim()) throw AppError.badRequest('Write the plan of treatment');
-  return text;
+export interface TreatmentPlanInput {
+  plan: string | null;
+  catalogItemIds: string[];
+}
+
+function planText(plan: string | null, items: TreatmentPlanItem[]) {
+  const text = plan?.trim() ?? '';
+  const written = Boolean(text.replace(/<[^>]*>/g, '').trim());
+  if (!written && items.length === 0) {
+    throw AppError.badRequest('Write the plan of treatment or tick a medicine or blood test');
+  }
+  return written ? text : null;
+}
+
+async function planItems(branchId: string, ids: string[]): Promise<TreatmentPlanItem[]> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return [];
+  const rows = (await AppDataSource.query(
+    `SELECT id, category::text AS category, group_name AS "groupName", name, default_dose AS dose
+       FROM prescription_items_catalog
+      WHERE branch_id = $1 AND id = ANY($2::uuid[]) AND deleted_at IS NULL AND is_active
+        AND category::text = ANY($3::text[])`,
+    [branchId, unique, [...PLAN_MEDICINE_CATEGORIES, ...PLAN_BLOOD_WORK_CATEGORIES]],
+  )) as { id: string; category: string; groupName: string; name: string; dose: string | null }[];
+  if (rows.length !== unique.length) {
+    throw AppError.badRequest('A medicine or blood test is not offered in this branch');
+  }
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return unique.map((id) => {
+    const row = byId.get(id)!;
+    return {
+      catalogItemId: row.id,
+      kind: (PLAN_BLOOD_WORK_CATEGORIES as readonly string[]).includes(row.category)
+        ? 'blood_work'
+        : 'medicine',
+      category: row.category,
+      groupName: row.groupName,
+      name: row.name,
+      dose: row.dose,
+    };
+  });
 }
 
 async function assertOwnPatient(doctorId: string, patientId: string) {
@@ -357,7 +399,7 @@ export const doctorAppService = {
           [patientId],
         ) as Promise<{ test: string; date: string; value: string; unit: string }[]>,
         AppDataSource.query(
-          `SELECT t.id, t.date::text AS date, t.plan, t.created_at AS "createdAt",
+          `SELECT t.id, t.date::text AS date, t.plan, t.items, t.created_at AS "createdAt",
                 d.display_name AS doctor, b.name AS branch, (t.doctor_id = $2) AS editable
            FROM treatment_plans t
            LEFT JOIN doctors d ON d.id = t.doctor_id
@@ -510,10 +552,28 @@ export const doctorAppService = {
     return { prescriptionId, planTreatment: plan };
   },
 
-  async addPlan(actor: Actor, staffId: string, patientId: string, plan: string) {
+  async planOptions(staffId: string) {
+    const doctor = await doctorOf(staffId);
+    const rows = (await AppDataSource.query(
+      `SELECT id, category, group_name AS "groupName", name, default_dose AS dose
+         FROM prescription_items_catalog
+        WHERE branch_id = $1 AND deleted_at IS NULL AND is_active
+          AND category::text = ANY($2::text[])
+        ORDER BY category, sort_order, name`,
+      [doctor.branchId, [...PLAN_MEDICINE_CATEGORIES, ...PLAN_BLOOD_WORK_CATEGORIES]],
+    )) as { id: string; category: string; groupName: string; name: string; dose: string | null }[];
+    const isBlood = (c: string) => (PLAN_BLOOD_WORK_CATEGORIES as readonly string[]).includes(c);
+    return {
+      medicines: rows.filter((r) => !isBlood(r.category)),
+      bloodWork: rows.filter((r) => isBlood(r.category)),
+    };
+  },
+
+  async addPlan(actor: Actor, staffId: string, patientId: string, input: TreatmentPlanInput) {
     const doctor = await doctorOf(staffId);
     await assertOwnPatient(doctor.id, patientId);
     return withTransaction(async (em) => {
+      const items = await planItems(doctor.branchId, input.catalogItemIds);
       const plans = repo(TreatmentPlan, em);
       const saved = await plans.save(
         plans.create({
@@ -521,7 +581,8 @@ export const doctorAppService = {
           patientId,
           doctorId: doctor.id,
           date: today(),
-          plan: requiredPlan(plan),
+          plan: planText(input.plan, items),
+          items,
           createdBy: actor.userId,
           updatedBy: actor.userId,
         }),
@@ -533,22 +594,24 @@ export const doctorAppService = {
           action: 'create',
           entity: 'treatment_plan',
           entityId: saved.id,
-          after: { patientId, plan: saved.plan },
+          after: { patientId, plan: saved.plan, items: saved.items.map((i) => i.name) },
         },
         em,
       );
-      return { id: saved.id, date: saved.date, plan: saved.plan };
+      return { id: saved.id, date: saved.date, plan: saved.plan, items: saved.items };
     });
   },
 
-  async updatePlan(actor: Actor, staffId: string, planId: string, plan: string) {
+  async updatePlan(actor: Actor, staffId: string, planId: string, input: TreatmentPlanInput) {
     const doctor = await doctorOf(staffId);
     return withTransaction(async (em) => {
       const plans = repo(TreatmentPlan, em);
       const existing = await plans.findOneBy({ id: planId, doctorId: doctor.id });
       if (!existing) throw AppError.notFound('Plan of treatment');
-      const before = existing.plan;
-      existing.plan = requiredPlan(plan);
+      const before = { plan: existing.plan, items: existing.items.map((i) => i.name) };
+      const items = await planItems(existing.branchId, input.catalogItemIds);
+      existing.plan = planText(input.plan, items);
+      existing.items = items;
       existing.updatedBy = actor.userId;
       await plans.save(existing);
       await auditService.record(
@@ -558,12 +621,12 @@ export const doctorAppService = {
           action: 'update',
           entity: 'treatment_plan',
           entityId: existing.id,
-          before: { plan: before },
-          after: { plan: existing.plan },
+          before,
+          after: { plan: existing.plan, items: items.map((i) => i.name) },
         },
         em,
       );
-      return { id: existing.id, date: existing.date, plan: existing.plan };
+      return { id: existing.id, date: existing.date, plan: existing.plan, items };
     });
   },
 

@@ -9476,14 +9476,26 @@
         "type": "object",
         "properties": {
           "plan": {
-            "type": "string",
-            "minLength": 1,
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 50000,
-            "description": "Plan of treatment as HTML (bold, italic, lists)"
+            "description": "Plan of treatment as HTML (bold, italic, lists); may be empty when items are ticked"
+          },
+          "catalogItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 200,
+            "description": "Ticked medicines and blood tests from GET /doctor/plan-options; the whole list is replaced"
           }
         },
         "required": [
-          "plan"
+          "plan",
+          "catalogItemIds"
         ]
       },
       "DoctorRemarks": {
@@ -47730,6 +47742,84 @@
         "responses": {
           "200": {
             "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/plan-options": {
+      "get": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Active medicines (supplements, medicines, GLP, BHRT) and blood tests of the doctor’s branch that can be ticked on a plan of treatment",
+        "responses": {
+          "200": {
+            "description": "Medicines and blood tests",
             "content": {
               "application/json": {
                 "schema": {
