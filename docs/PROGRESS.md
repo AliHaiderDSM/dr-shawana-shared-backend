@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Patient is told about plan changes
+
+- Adding or editing a plan of treatment in the doctor app sends the patient a push from the doctor (`data: { type: "treatment_plan", planId }`). The text says what changed: "Added medicines to your plan.", "Updated your blood tests.", "Updated your plan of treatment." and so on. An edit that changes nothing sends nothing. Expired tokens are removed.
+- `GET /patient/treatment-plans` also returns `createdAt` and `updatedAt`.
+
 ## 2026-11-19 — Demo visits for testing the apps
 
 - `npm run seed:demo-visits -- --phone <patient phone>` adds two completed visits (60 and 30 days ago) for a demo patient with the doctor of their latest appointment: consultation, clinical remarks and a prescription with catalog medicines, BHRT and blood tests, plus three plans (text, medicines, blood work). It goes through the normal services, so it is audited. Each run adds more; use it only for demo patients.

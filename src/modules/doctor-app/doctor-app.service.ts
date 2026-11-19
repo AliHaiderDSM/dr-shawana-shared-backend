@@ -1,6 +1,7 @@
 import { AppDataSource } from '../../database/data-source';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
+import { sendExpoPush } from '../../lib/push';
 import { BUCKETS, createSignedUrl } from '../../lib/storage';
 import { today } from '../../lib/validation';
 import { authService } from '../auth/auth.service';
@@ -80,6 +81,57 @@ async function planItems(branchId: string, ids: string[]): Promise<TreatmentPlan
       dose: row.dose,
     };
   });
+}
+
+type PlanPart = 'plan' | 'medicines' | 'blood_work';
+
+const idsOf = (items: TreatmentPlanItem[], kind: TreatmentPlanItem['kind']) =>
+  items
+    .filter((i) => i.kind === kind)
+    .map((i) => i.catalogItemId)
+    .sort()
+    .join(',');
+
+function changedParts(
+  before: { plan: string | null; items: TreatmentPlanItem[] } | null,
+  after: { plan: string | null; items: TreatmentPlanItem[] },
+): PlanPart[] {
+  const parts: PlanPart[] = [];
+  if ((before?.plan ?? null) !== after.plan && (before?.plan || after.plan)) parts.push('plan');
+  if (idsOf(before?.items ?? [], 'medicine') !== idsOf(after.items, 'medicine')) parts.push('medicines');
+  if (idsOf(before?.items ?? [], 'blood_work') !== idsOf(after.items, 'blood_work')) parts.push('blood_work');
+  return parts;
+}
+
+const ADDED: Record<PlanPart, string> = {
+  plan: 'Added a new plan of treatment for you.',
+  medicines: 'Added medicines to your plan.',
+  blood_work: 'Added blood tests to your plan.',
+};
+
+const UPDATED: Record<PlanPart, string> = {
+  plan: 'Updated your plan of treatment.',
+  medicines: 'Updated your medicines.',
+  blood_work: 'Updated your blood tests.',
+};
+
+function planMessage(created: boolean, parts: PlanPart[]) {
+  const [only] = parts;
+  if (parts.length === 1 && only) return (created ? ADDED : UPDATED)[only];
+  return created ? ADDED.plan : UPDATED.plan;
+}
+
+async function notifyPlan(patientId: string, doctorName: string, planId: string, body: string) {
+  const tokens = (await AppDataSource.query(`SELECT token FROM patient_push_tokens WHERE patient_id = $1`, [
+    patientId,
+  ])) as { token: string }[];
+  const gone = await sendExpoPush(
+    tokens.map((t) => t.token),
+    { title: doctorName, body, data: { type: 'treatment_plan', planId } },
+  );
+  if (gone.length) {
+    await AppDataSource.query(`DELETE FROM patient_push_tokens WHERE token = ANY($1::text[])`, [gone]);
+  }
 }
 
 async function assertOwnPatient(doctorId: string, patientId: string) {
@@ -572,7 +624,7 @@ export const doctorAppService = {
   async addPlan(actor: Actor, staffId: string, patientId: string, input: TreatmentPlanInput) {
     const doctor = await doctorOf(staffId);
     await assertOwnPatient(doctor.id, patientId);
-    return withTransaction(async (em) => {
+    const result = await withTransaction(async (em) => {
       const items = await planItems(doctor.branchId, input.catalogItemIds);
       const plans = repo(TreatmentPlan, em);
       const saved = await plans.save(
@@ -600,14 +652,18 @@ export const doctorAppService = {
       );
       return { id: saved.id, date: saved.date, plan: saved.plan, items: saved.items };
     });
+    await notifyPlan(patientId, doctor.name, result.id, planMessage(true, changedParts(null, result)));
+    return result;
   },
 
   async updatePlan(actor: Actor, staffId: string, planId: string, input: TreatmentPlanInput) {
     const doctor = await doctorOf(staffId);
-    return withTransaction(async (em) => {
+    let previous: { plan: string | null; items: TreatmentPlanItem[] } | null = null;
+    const result = await withTransaction(async (em) => {
       const plans = repo(TreatmentPlan, em);
       const existing = await plans.findOneBy({ id: planId, doctorId: doctor.id });
       if (!existing) throw AppError.notFound('Plan of treatment');
+      previous = { plan: existing.plan, items: existing.items };
       const before = { plan: existing.plan, items: existing.items.map((i) => i.name) };
       const items = await planItems(existing.branchId, input.catalogItemIds);
       existing.plan = planText(input.plan, items);
@@ -626,8 +682,18 @@ export const doctorAppService = {
         },
         em,
       );
-      return { id: existing.id, date: existing.date, plan: existing.plan, items };
+      return {
+        id: existing.id,
+        date: existing.date,
+        plan: existing.plan,
+        items,
+        patientId: existing.patientId,
+      };
     });
+    const parts = changedParts(previous, result);
+    if (parts.length) await notifyPlan(result.patientId, doctor.name, result.id, planMessage(false, parts));
+    const { patientId: _patientId, ...saved } = result;
+    return saved;
   },
 
   async savePushToken(staffId: string, token: string, platform: string | null) {

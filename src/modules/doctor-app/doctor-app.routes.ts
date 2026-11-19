@@ -27,13 +27,9 @@ const treatmentPlanParams = z.object({ planId: z.uuid() });
 const treatmentPlanBody = registry.register(
   'DoctorTreatmentPlan',
   z.object({
-    plan: z
-      .string()
-      .max(50000)
-      .nullable()
-      .openapi({
-        description: 'Plan of treatment as HTML (bold, italic, lists); may be empty when items are ticked',
-      }),
+    plan: z.string().max(50000).nullable().openapi({
+      description: 'Plan of treatment as HTML (bold, italic, lists); may be empty when items are ticked',
+    }),
     catalogItemIds: z.array(z.uuid()).max(200).openapi({
       description:
         'Ticked medicines and blood tests from GET /doctor/plan-options; the whole list is replaced',

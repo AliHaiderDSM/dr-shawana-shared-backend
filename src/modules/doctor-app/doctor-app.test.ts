@@ -260,6 +260,69 @@ describe('doctor app', () => {
     expect((await request(app).get('/api/v1/patient/treatment-plans')).status).toBe(401);
   });
 
+  it('tells the patient when a plan is added or changed', async () => {
+    const patientCall = (method: 'post', url: string) =>
+      request(app)
+        [method](`/api/v1${url}`)
+        .set({ Authorization: `Bearer ${patientToken}` });
+    expect(
+      (
+        await patientCall('post', '/patient/push-token').send({
+          token: 'ExponentPushToken[plan1]',
+          platform: 'android',
+        })
+      ).status,
+    ).toBe(204);
+    const options = (await staff('get', '/doctor/plan-options', doctorUser)).body.data;
+    const pushed = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(async () => new Response('{}', { status: 200 }));
+    const sent = () =>
+      pushed.mock.calls.map(([, init]) => JSON.parse(String(init?.body))[0] as Record<string, unknown>);
+    try {
+      const created = await staff('post', `/doctor/patients/${patientId}/plans`, doctorUser).send({
+        plan: null,
+        catalogItemIds: [options.medicines[0].id],
+      });
+      expect(created.status).toBe(201);
+      const planId = created.body.data.id;
+      expect(sent()[0]).toMatchObject({
+        to: 'ExponentPushToken[plan1]',
+        title: 'Dr. Shawana',
+        body: 'Added medicines to your plan.',
+        data: { type: 'treatment_plan', planId },
+      });
+
+      await staff('put', `/doctor/plans/${planId}`, doctorUser).send({
+        plan: null,
+        catalogItemIds: [options.medicines[0].id, options.bloodWork[0].id],
+      });
+      expect(sent()[1]).toMatchObject({ body: 'Updated your blood tests.', data: { planId } });
+
+      await staff('put', `/doctor/plans/${planId}`, doctorUser).send({
+        plan: null,
+        catalogItemIds: [options.bloodWork[0].id, options.medicines[0].id],
+      });
+      expect(pushed).toHaveBeenCalledTimes(2);
+
+      await staff('put', `/doctor/plans/${planId}`, doctorUser).send({
+        plan: '<p>Walk daily</p>',
+        catalogItemIds: [],
+      });
+      expect(sent()[2]).toMatchObject({ body: 'Updated your plan of treatment.' });
+
+      const mine = await request(app)
+        .get('/api/v1/patient/treatment-plans')
+        .set({ Authorization: `Bearer ${patientToken}` });
+      const edited = mine.body.data.find((p: { id: string }) => p.id === planId);
+      expect(new Date(edited.updatedAt).getTime()).toBeGreaterThanOrEqual(
+        new Date(edited.createdAt).getTime(),
+      );
+    } finally {
+      pushed.mockRestore();
+    }
+  });
+
   it('shows blood work for the chart and table', async () => {
     const added = await staff('post', `/branch/patients/${patientId}/blood-work`, doctorUser).send({
       results: [

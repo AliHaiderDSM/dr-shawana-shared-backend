@@ -284,7 +284,8 @@ export const patientAppService = {
 
   async treatmentPlans(patientId: string) {
     const rows = (await AppDataSource.query(
-      `SELECT t.id, t.date::text AS date, t.plan, t.items, d.display_name AS doctor, b.name AS branch
+      `SELECT t.id, t.date::text AS date, t.plan, t.items, d.display_name AS doctor, b.name AS branch,
+              t.created_at AS "createdAt", t.updated_at AS "updatedAt"
          FROM treatment_plans t
          LEFT JOIN doctors d ON d.id = t.doctor_id
          LEFT JOIN branches b ON b.id = t.branch_id
@@ -298,6 +299,8 @@ export const patientAppService = {
       items: { kind: string; name: string; dose: string | null; groupName: string }[];
       doctor: string | null;
       branch: string | null;
+      createdAt: Date;
+      updatedAt: Date;
     }[];
     return rows.map((r) => ({
       id: r.id,
@@ -305,6 +308,8 @@ export const patientAppService = {
       plan: r.plan,
       doctor: r.doctor,
       branch: r.branch,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
       medicines: r.items
         .filter((i) => i.kind === 'medicine')
         .map((i) => ({ name: i.name, dose: i.dose, groupName: i.groupName })),
