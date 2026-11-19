@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Plan changes in the patient chat
+
+- Migration `1795900000000-ChatPlanLink`: `chat_messages.treatment_plan_id` (FK to `treatment_plans`, set null on delete).
+- When a doctor adds or changes a plan in the doctor app, a doctor message with the same text as the push ("Added medicines to your plan." …) is posted in their chat with the patient, linked to the plan. Chat messages carry `planId`; the patient app opens My plan from it. The push still goes once and opens the plan.
+
 ## 2026-11-19 — Plans of treatment on the dashboard
 
 - `GET /branch/patients/{id}/treatment-plans` (`consultations.view`) lists the plans of treatment written in the doctor app for this patient in the current branch, with medicines, blood tests and created/updated times. Read only.

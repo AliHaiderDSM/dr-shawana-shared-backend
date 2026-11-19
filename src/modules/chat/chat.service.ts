@@ -25,11 +25,13 @@ interface MessageRow {
   replyBody: string | null;
   replyFileName: string | null;
   replyFileType: string | null;
+  planId: string | null;
 }
 
 const MESSAGE_SELECT = `SELECT m.id, m.sender, m.body, m.file_name AS "fileName", m.file_type AS "fileType",
   m.file_size AS "fileSize", m.duration_ms AS "durationMs", m.created_at AS "createdAt", r.id AS "replyId", r.sender AS "replySender",
-  LEFT(r.body, 200) AS "replyBody", r.file_name AS "replyFileName", r.file_type AS "replyFileType"
+  LEFT(r.body, 200) AS "replyBody", r.file_name AS "replyFileName", r.file_type AS "replyFileType",
+  m.treatment_plan_id AS "planId"
   FROM chat_messages m LEFT JOIN chat_messages r ON r.id = m.reply_to_id`;
 
 const toMessage = (m: MessageRow) => ({
@@ -47,6 +49,7 @@ const toMessage = (m: MessageRow) => ({
         file: m.replyFileName ? { name: m.replyFileName, type: m.replyFileType ?? '' } : null,
       }
     : null,
+  planId: m.planId ?? null,
   createdAt: m.createdAt.toISOString(),
 });
 
@@ -123,6 +126,7 @@ async function send(
   file: Express.Multer.File | undefined,
   replyToId: string | null = null,
   durationMs: number | null = null,
+  planId: string | null = null,
 ) {
   const text = body?.trim() || null;
   if (!text && !file) throw AppError.badRequest('Write a message or attach a file');
@@ -148,8 +152,8 @@ async function send(
   try {
     const row = await withTransaction(async (em) => {
       const [created] = (await em.query(
-        `INSERT INTO chat_messages (conversation_id, sender, sender_staff_id, body, file_path, file_name, file_type, file_size, reply_to_id, duration_ms)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO chat_messages (conversation_id, sender, sender_staff_id, body, file_path, file_name, file_type, file_size, reply_to_id, duration_ms, treatment_plan_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id`,
         [
           conversationId,
@@ -162,6 +166,7 @@ async function send(
           stored?.sizeBytes ?? null,
           replyToId,
           file && isVoice(file.mimetype) ? durationMs : null,
+          planId,
         ],
       )) as { id: string }[];
       await em.query(
@@ -318,6 +323,19 @@ export const patientChat = {
     );
   },
 };
+
+export async function postPlanMessage(
+  patientId: string,
+  doctorId: string,
+  staffId: string,
+  planId: string,
+  text: string,
+) {
+  const conversationId = await conversationFor(patientId, doctorId);
+  const message = await send(conversationId, 'doctor', staffId, text, undefined, null, null, planId);
+  await realtime.publish('patient', patientId, 'message', { doctorId });
+  return message;
+}
 
 export const doctorChat = {
   async conversations(staffId: string) {

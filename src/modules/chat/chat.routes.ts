@@ -65,6 +65,12 @@ const message = registry.register(
       })
       .nullable()
       .openapi({ description: 'The quoted message when this one is a reply' }),
+    planId: z
+      .uuid()
+      .nullable()
+      .openapi({
+        description: 'Set when the doctor app added or changed a plan of treatment; open it in My plan',
+      }),
     createdAt: z.string(),
   }),
 );

@@ -311,6 +311,20 @@ describe('doctor app', () => {
       });
       expect(sent()[2]).toMatchObject({ body: 'Updated your plan of treatment.' });
 
+      const chat = await request(app)
+        .get(`/api/v1/patient/chats/${doctorId}/messages`)
+        .set({ Authorization: `Bearer ${patientToken}` });
+      expect(chat.status).toBe(200);
+      const planMessages = chat.body.data.items.filter((m: { planId: string | null }) => m.planId === planId);
+      expect(planMessages.map((m: { body: string }) => m.body).sort()).toEqual(
+        [
+          'Added medicines to your plan.',
+          'Updated your blood tests.',
+          'Updated your plan of treatment.',
+        ].sort(),
+      );
+      expect(planMessages[0]).toMatchObject({ sender: 'doctor', planId });
+
       const mine = await request(app)
         .get('/api/v1/patient/treatment-plans')
         .set({ Authorization: `Bearer ${patientToken}` });

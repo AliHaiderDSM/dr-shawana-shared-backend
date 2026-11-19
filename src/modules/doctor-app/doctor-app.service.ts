@@ -2,6 +2,7 @@ import { AppDataSource } from '../../database/data-source';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { sendExpoPush } from '../../lib/push';
+import { postPlanMessage } from '../chat/chat.service';
 import { BUCKETS, createSignedUrl } from '../../lib/storage';
 import { today } from '../../lib/validation';
 import { authService } from '../auth/auth.service';
@@ -121,7 +122,15 @@ function planMessage(created: boolean, parts: PlanPart[]) {
   return created ? ADDED.plan : UPDATED.plan;
 }
 
-async function notifyPlan(patientId: string, doctorName: string, planId: string, body: string) {
+async function notifyPlan(
+  patientId: string,
+  doctor: { id: string; name: string },
+  staffId: string,
+  planId: string,
+  body: string,
+) {
+  await postPlanMessage(patientId, doctor.id, staffId, planId, body);
+  const doctorName = doctor.name;
   const tokens = (await AppDataSource.query(`SELECT token FROM patient_push_tokens WHERE patient_id = $1`, [
     patientId,
   ])) as { token: string }[];
@@ -652,7 +661,7 @@ export const doctorAppService = {
       );
       return { id: saved.id, date: saved.date, plan: saved.plan, items: saved.items };
     });
-    await notifyPlan(patientId, doctor.name, result.id, planMessage(true, changedParts(null, result)));
+    await notifyPlan(patientId, doctor, staffId, result.id, planMessage(true, changedParts(null, result)));
     return result;
   },
 
@@ -691,7 +700,8 @@ export const doctorAppService = {
       };
     });
     const parts = changedParts(previous, result);
-    if (parts.length) await notifyPlan(result.patientId, doctor.name, result.id, planMessage(false, parts));
+    if (parts.length)
+      await notifyPlan(result.patientId, doctor, staffId, result.id, planMessage(false, parts));
     const { patientId: _patientId, ...saved } = result;
     return saved;
   },
