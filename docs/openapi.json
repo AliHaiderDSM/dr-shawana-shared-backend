@@ -9488,6 +9488,22 @@
           "remarks"
         ]
       },
+      "DoctorPlanOfTreatment": {
+        "type": "object",
+        "properties": {
+          "planTreatment": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 50000,
+            "description": "Plan of treatment as HTML (bold, italic, lists), the same as the dashboard"
+          }
+        },
+        "required": [
+          "planTreatment"
+        ]
+      },
       "DoctorPushToken": {
         "type": "object",
         "properties": {
@@ -47399,6 +47415,104 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/DoctorRemarks"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {}
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/doctor/prescriptions/{prescriptionId}/plan": {
+      "put": {
+        "tags": [
+          "Doctor app"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Write the plan of treatment of the doctor’s own prescription; it shows on the printed prescription and in the patient app",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "prescriptionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DoctorPlanOfTreatment"
               }
             }
           }

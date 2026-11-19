@@ -22,6 +22,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+## 2026-11-19 — Doctor app: plan of treatment
+
+- `PUT /doctor/prescriptions/{prescriptionId}/plan` lets a doctor write the plan of treatment of their own prescription (HTML, blank clears it). It goes through `prescriptionsService.update`, so it is audited and shows on the printed prescription and in the patient app. Other doctors get 404, other roles 403.
+- The doctor patient file marks each prescription `editable` when it belongs to the doctor.
+
 ## 2026-11-18 — Old files into branch code folders
 
 - `npm run storage:branch-folders` moves files saved before branch code folders (`<branch id>/...`, `voice/...`, `chat/...`) to `<CODE>/...` in R2 and updates the stored paths in every file column, `lab_report_summaries.files` and `chat_messages`. Product images go to `<CODE>/products/...`. Files missing from R2 are reported and left unchanged. It is safe to run again.

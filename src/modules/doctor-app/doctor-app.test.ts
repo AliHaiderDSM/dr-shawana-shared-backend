@@ -149,6 +149,36 @@ describe('doctor app', () => {
     expect(file.bloodWork).toEqual({ dates: [], tests: [] });
   });
 
+  it('writes the plan of treatment on the doctor’s own prescription only', async () => {
+    const prescriptionId = (
+      await staff('post', '/branch/prescriptions', doctorUser).send({
+        consultationId,
+        diagnosis: 'Follow-up',
+      })
+    ).body.data.id;
+    const path = `/doctor/prescriptions/${prescriptionId}/plan`;
+    const saved = await staff('put', path, doctorUser).send({ planTreatment: '<p>Start <em>BHRT</em></p>' });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data).toEqual({ prescriptionId, planTreatment: '<p>Start <em>BHRT</em></p>' });
+    expect((await staff('put', path, otherDoctorUser).send({ planTreatment: 'x' })).status).toBe(404);
+    expect((await staff('put', path, frontDesk).send({ planTreatment: 'x' })).status).toBe(403);
+    expect((await staff('put', path, doctorUser).send({})).status).toBe(400);
+
+    const file = (await staff('get', `/doctor/patients/${patientId}`, doctorUser)).body.data;
+    expect(file.prescriptions[0]).toMatchObject({
+      id: prescriptionId,
+      planTreatment: '<p>Start <em>BHRT</em></p>',
+      editable: true,
+    });
+    const printed = (await staff('get', `/branch/prescriptions/${prescriptionId}`, doctorUser)).body.data;
+    expect(printed.planTreatment).toBe('<p>Start <em>BHRT</em></p>');
+
+    await staff('put', path, doctorUser).send({ planTreatment: '   ' });
+    const cleared = (await staff('get', `/doctor/patients/${patientId}`, doctorUser)).body.data;
+    expect(cleared.prescriptions[0].planTreatment).toBeNull();
+    await request(app).delete(`/api/v1/branch/prescriptions/${prescriptionId}`).set(bearer(admin));
+  });
+
   it('shows blood work for the chart and table', async () => {
     const added = await staff('post', `/branch/patients/${patientId}/blood-work`, doctorUser).send({
       results: [

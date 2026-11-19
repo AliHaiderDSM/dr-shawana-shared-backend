@@ -15,6 +15,7 @@ const doctorOnly: RequestHandler = (req, _res, next) =>
 const patientParams = z.object({ patientId: z.uuid() });
 const fileParams = z.object({ patientId: z.uuid(), fileId: z.uuid() });
 const consultationParams = z.object({ consultationId: z.uuid() });
+const prescriptionParams = z.object({ prescriptionId: z.uuid() });
 const patientsQuery = z.object({ search: z.string().trim().max(100).optional() });
 const appointmentsQuery = z.object({
   when: z.enum(['upcoming', 'past']).default('upcoming'),
@@ -35,6 +36,16 @@ const remarksBody = registry.register(
       .max(50000)
       .nullable()
       .openapi({ description: 'Clinical remarks as HTML (bold, italic, lists), the same as the dashboard' }),
+  }),
+);
+const planBody = registry.register(
+  'DoctorPlanOfTreatment',
+  z.object({
+    planTreatment: z
+      .string()
+      .max(50000)
+      .nullable()
+      .openapi({ description: 'Plan of treatment as HTML (bold, italic, lists), the same as the dashboard' }),
   }),
 );
 const pushTokenBody = registry.register(
@@ -155,6 +166,22 @@ doctorAppRouter.put(
   },
 );
 
+doctorAppRouter.put(
+  '/doctor/prescriptions/:prescriptionId/plan',
+  validate({ params: prescriptionParams, body: planBody }),
+  async (req, res) => {
+    sendOk(
+      res,
+      await doctorAppService.savePlan(
+        actorFrom(req),
+        req.auth!.userId,
+        validParams(req, prescriptionParams).prescriptionId,
+        validBody(req, planBody).planTreatment,
+      ),
+    );
+  },
+);
+
 doctorAppRouter.post('/doctor/push-token', validate({ body: pushTokenBody }), async (req, res) => {
   const { token, platform } = validBody(req, pushTokenBody);
   await doctorAppService.savePushToken(req.auth!.userId, token, platform ?? null);
@@ -228,6 +255,15 @@ registry.registerPath({
   path: '/doctor/consultations/{consultationId}/remarks',
   summary: 'Write the clinical remarks of the doctor’s own consultation (other clinical fields stay)',
   request: { params: consultationParams, ...json(remarksBody) },
+  responses: ok('Saved'),
+});
+registry.registerPath({
+  ...docs,
+  method: 'put',
+  path: '/doctor/prescriptions/{prescriptionId}/plan',
+  summary:
+    'Write the plan of treatment of the doctor’s own prescription; it shows on the printed prescription and in the patient app',
+  request: { params: prescriptionParams, ...json(planBody) },
   responses: ok('Saved'),
 });
 registry.registerPath({

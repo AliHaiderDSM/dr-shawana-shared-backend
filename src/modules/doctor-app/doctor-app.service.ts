@@ -10,6 +10,7 @@ import { medicalRecordsService } from '../clinical-records/clinical-records.serv
 import { consultationsService } from '../consultations/consultations.service';
 import { doctorsService } from '../doctors/doctors.service';
 import { patientIntakeService } from '../patient-app/patient-intake.service';
+import { prescriptionsService } from '../prescriptions/prescriptions.service';
 
 interface DoctorRow {
   id: string;
@@ -303,13 +304,14 @@ export const doctorAppService = {
       AppDataSource.query(
         `SELECT p.id, p.prescription_no AS "prescriptionNo", p.date::text AS date, p.diagnosis,
                 p.followup_date::text AS "followupDate", p.plan_treatment AS "planTreatment",
-                p.consultation_id AS "consultationId", d.display_name AS doctor, b.name AS branch
+                p.consultation_id AS "consultationId", d.display_name AS doctor, b.name AS branch,
+                (p.doctor_id = $2) AS editable
            FROM prescriptions p
            LEFT JOIN doctors d ON d.id = p.doctor_id
            LEFT JOIN branches b ON b.id = p.branch_id
           WHERE p.patient_id = $1 AND p.deleted_at IS NULL
           ORDER BY p.date DESC, p.prescription_no DESC`,
-        [patientId],
+        [patientId, doctor.id],
       ) as Promise<{ id: string } & Record<string, unknown>[]>,
       AppDataSource.query(
         `SELECT i.prescription_id AS "prescriptionId", i.group_name AS "groupName", i.name, i.dose, i.instructions
@@ -364,6 +366,7 @@ export const doctorAppService = {
       })),
       prescriptions: (prescriptions as unknown as Record<string, unknown>[]).map((p) => ({
         ...p,
+        editable: p.editable === true,
         items: (items as unknown as Record<string, unknown>[])
           .filter((i) => i.prescriptionId === p.id)
           .map(({ prescriptionId: _id, ...i }) => i),
@@ -462,6 +465,24 @@ export const doctorAppService = {
       { ...(consultation.data ?? {}), plan: remarks },
     );
     return { consultationId, remarks };
+  },
+
+  async savePlan(actor: Actor, staffId: string, prescriptionId: string, planTreatment: string | null) {
+    const doctor = await doctorOf(staffId);
+    const [prescription] = (await AppDataSource.query(
+      `SELECT branch_id AS "branchId" FROM prescriptions
+        WHERE id = $1 AND doctor_id = $2 AND deleted_at IS NULL`,
+      [prescriptionId, doctor.id],
+    )) as { branchId: string }[];
+    if (!prescription) throw AppError.notFound('Prescription');
+    const plan = planTreatment?.trim() ? planTreatment.trim() : null;
+    await prescriptionsService.update(
+      actor,
+      { branchId: prescription.branchId, doctorId: doctor.id },
+      prescriptionId,
+      { planTreatment: plan },
+    );
+    return { prescriptionId, planTreatment: plan };
   },
 
   async savePushToken(staffId: string, token: string, platform: string | null) {
