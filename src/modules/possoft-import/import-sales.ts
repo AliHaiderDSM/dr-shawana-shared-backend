@@ -25,6 +25,8 @@ const CITY_BRANCHES = [
 
 type CityBranch = (typeof CITY_BRANCHES)[number];
 
+export const NO_ACCOUNT_CHOSEN = 'posSoft: no account chosen';
+
 export interface ImportSummary {
   branches: Record<string, { sales: number; created: boolean }>;
   patients: number;
@@ -36,6 +38,7 @@ export interface ImportSummary {
   saleItems: number;
   payments: number;
   accountSheets: number;
+  paymentsWithoutAccount: number;
   skipped: {
     deletedSales: number;
     deletedItems: number;
@@ -140,6 +143,7 @@ export async function importPossoftSales(
     saleItems: 0,
     payments: 0,
     accountSheets: 0,
+    paymentsWithoutAccount: 0,
     skipped: {
       deletedSales: 0,
       deletedItems: 0,
@@ -335,35 +339,59 @@ export async function importPossoftSales(
       const bankRows: unknown[][] = [];
       const sheetRows: unknown[][] = [];
 
-      const bankFor = (code: string, name: string) => {
-        const nameKey = `${code}:${name.toLowerCase()}`;
+      const accountsBranchId = () => branchIdOf(masterCode as string);
+
+      const bankFor = (name: string) => {
+        const nameKey = name.toLowerCase();
         const existingId = bankNames.get(nameKey);
         if (existingId) return existingId;
         const id = randomUUID();
-        bankRows.push([id, branchIdOf(code), name]);
+        bankRows.push([id, accountsBranchId(), name]);
         bankNames.set(nameKey, id);
         return id;
       };
 
-      const sheetFor = (code: string, sheetId: string, method: 'cash' | 'online', fallbackDate: string) => {
-        const sheet = sheets.get(sheetId);
-        const key = sheet ? `${code}:${sheetId}` : `${code}:fallback:${method}`;
-        const known = sheetIds.get(key);
+      const noAccountChosen = (fallbackDate: string) => {
+        const known = sheetIds.get('none');
         if (known) return known;
-        const bankName = text(banks.get(text(sheet?.as_sheet_type))?.bank_name);
-        const isCash = sheet ? !bankName || /cash/i.test(bankName) : method === 'cash';
         const id = randomUUID();
-        const bankId = isCash ? null : bankFor(code, (bankName || 'posSoft bank').slice(0, 150));
         sheetRows.push([
           id,
-          branchIdOf(code),
-          (text(sheet?.as_account_name) || (isCash ? 'posSoft cash' : 'posSoft bank')).slice(0, 150),
-          (text(sheet?.as_account_code) || '-').slice(0, 100),
+          accountsBranchId(),
+          NO_ACCOUNT_CHOSEN,
+          '-',
+          null,
+          'cash',
+          fallbackDate,
+          new Date().toISOString(),
+        ]);
+        sheetIds.set('none', id);
+        return id;
+      };
+
+      const sheetFor = (sheetId: string, fallbackDate: string) => {
+        const sheet = sheets.get(sheetId);
+        if (!sheet) {
+          summary.paymentsWithoutAccount += 1;
+          return noAccountChosen(fallbackDate);
+        }
+        const known = sheetIds.get(sheetId);
+        if (known) return known;
+        const bankName = text(banks.get(text(sheet.as_sheet_type))?.bank_name);
+        const isCash = !bankName || /\bcash\b/i.test(bankName);
+        const id = randomUUID();
+        const bankId = isCash ? null : bankFor(bankName.slice(0, 150));
+        sheetRows.push([
+          id,
+          accountsBranchId(),
+          (text(sheet.as_account_name) || bankName || 'posSoft account').slice(0, 150),
+          (text(sheet.as_account_code) || '-').slice(0, 100),
           bankId,
           isCash ? 'cash' : 'bank',
-          dateOf(sheet?.as_date, sheet?.create_at) ?? fallbackDate,
+          dateOf(sheet.as_date, sheet.create_at) ?? fallbackDate,
+          isActive(sheet) ? null : (timestampOf(sheet.del_date) ?? new Date().toISOString()),
         ]);
-        sheetIds.set(key, id);
+        sheetIds.set(sheetId, id);
         return id;
       };
 
@@ -430,7 +458,7 @@ export async function importPossoftSales(
             method,
             money(value),
             paidOn,
-            sheetFor(code, text(payment.spay_receiver_sheet_id), method, paidOn),
+            sheetFor(text(payment.spay_receiver_sheet_id), paidOn),
             method === 'online' ? text(payment.spay_sender_bank).slice(0, 150) || null : null,
             method === 'online' ? text(payment.spay_sender_account_title).slice(0, 150) || null : null,
             method === 'online' ? text(payment.spay_sender_account_no).slice(0, 100) || null : null,
@@ -483,7 +511,7 @@ export async function importPossoftSales(
       await insertMany(
         em,
         'account_sheets',
-        ['id', 'branch_id', 'account_name', 'account_code', 'bank_id', 'type', 'date'],
+        ['id', 'branch_id', 'account_name', 'account_code', 'bank_id', 'type', 'date', 'deleted_at'],
         sheetRows,
       );
       await insertMany(

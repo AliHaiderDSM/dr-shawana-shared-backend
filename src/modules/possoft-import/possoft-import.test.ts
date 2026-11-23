@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AppDataSource } from '../../database/data-source';
 import { readDump } from './dump-reader';
-import { POSSOFT_SALES_TABLES, importPossoftSales } from './import-sales';
+import { NO_ACCOUNT_CHOSEN, POSSOFT_SALES_TABLES, importPossoftSales } from './import-sales';
 import { resetDatabase } from './reset-database';
 
 const DUMP = `
@@ -66,7 +66,7 @@ CREATE TABLE \`banks\` (
   \`close\` int(2) NOT NULL
 ) ENGINE=InnoDB;
 
-INSERT INTO \`banks\` VALUES (1,'Cash',1),(2,'Meezan Bank',1);
+INSERT INTO \`banks\` VALUES (1,'Cash Bank',1),(2,'Meezan Bank',1),(3,'Jazzcash',1);
 
 CREATE TABLE \`accounts_sheet\` (
   \`as_id\` int(11) NOT NULL,
@@ -75,10 +75,11 @@ CREATE TABLE \`accounts_sheet\` (
   \`as_sheet_type\` int(11) NOT NULL,
   \`as_date\` date NOT NULL,
   \`close\` int(2) NOT NULL,
-  \`create_at\` datetime NOT NULL
+  \`create_at\` datetime NOT NULL,
+  \`del_date\` datetime NOT NULL
 ) ENGINE=InnoDB;
 
-INSERT INTO \`accounts_sheet\` VALUES (1,'Office Cash','C-1',1,'2026-01-01',1,'2026-01-01 09:00:00'),(2,'Meezan Main','0123',2,'0000-00-00',1,'2026-01-01 09:00:00');
+INSERT INTO \`accounts_sheet\` VALUES (1,'Office Cash','C-1',1,'2026-01-01',1,'2026-01-01 09:00:00','2026-01-01 09:00:00'),(2,'Meezan Main','0123',2,'0000-00-00',1,'2026-01-01 09:00:00','2026-01-01 09:00:00'),(3,'DSM Jazzcash','0328',3,'2025-10-07',1,'2025-10-07 10:55:00','2025-10-07 10:55:00'),(4,'Old Account','999',2,'2025-05-14',0,'2025-05-14 10:00:00','2025-09-01 10:00:00');
 
 CREATE TABLE \`sales\` (
   \`sale_id\` int(11) NOT NULL,
@@ -149,7 +150,11 @@ CREATE TABLE \`sale_payments\` (
 INSERT INTO \`sale_payments\` VALUES
 (1,5,1,'Cash Payment','HBL','x','1','',1,'2160','2026-02-01',1,1,1,'1','2026-02-01 11:00:00'),
 (2,6,2,'Online Payment','HBL','Patient Two','PK00123','shot.jpg',2,'1000','2026-01-15',0,1,1,'1','2026-01-15 11:00:00'),
-(3,6,2,'Cash Payment','','','','',1,'0','2026-01-15',0,1,1,'1','2026-01-15 11:00:00');
+(3,6,2,'Cash Payment','','','','',1,'0','2026-01-15',0,1,1,'1','2026-01-15 11:00:00'),
+(4,7,3,'Online Payment','','','','',3,'500','2026-02-03',1,1,1,'1','2026-02-03 11:00:00'),
+(5,7,3,'Online Payment','','','','',2,'200','2026-02-03',1,1,1,'1','2026-02-03 11:00:00'),
+(6,7,3,'Online Payment','','','','',4,'100','2026-02-03',1,1,1,'1','2026-02-03 11:00:00'),
+(7,7,3,'Cash Payment','','','','',0,'50','2026-02-03',1,1,1,'1','2026-02-03 11:00:00');
 `;
 
 describe('posSoft sales import', () => {
@@ -199,7 +204,8 @@ describe('posSoft sales import', () => {
       patientsWithoutValidPhone: 1,
       sales: 3,
       saleItems: 3,
-      payments: 2,
+      payments: 6,
+      paymentsWithoutAccount: 1,
       branches: { LHR: { sales: 2, created: true }, KHI: { sales: 1, created: true } },
       skipped: { deletedSales: 1, itemsWithoutQty: 1, paymentsWithoutAmount: 1 },
     });
@@ -214,8 +220,8 @@ describe('posSoft sales import', () => {
       expect.objectContaining({
         invoice_no: 'KHI-000001',
         sale_type: 'office',
-        payment_status: 'unpaid',
-        remaining: '1200.00',
+        payment_status: 'partial',
+        remaining: '350.00',
         patient: 'No Phone Three',
       }),
       expect.objectContaining({
@@ -255,6 +261,25 @@ describe('posSoft sales import', () => {
         ORDER BY y.amount`,
     )) as Record<string, unknown>[];
     expect(payments).toEqual([
+      expect.objectContaining({ amount: '50.00', type: 'cash', account_name: NO_ACCOUNT_CHOSEN }),
+      expect.objectContaining({
+        amount: '100.00',
+        type: 'bank',
+        account_name: 'Old Account',
+        bank: 'Meezan Bank',
+      }),
+      expect.objectContaining({
+        amount: '200.00',
+        type: 'bank',
+        account_name: 'Meezan Main',
+        bank: 'Meezan Bank',
+      }),
+      expect.objectContaining({
+        amount: '500.00',
+        type: 'bank',
+        account_name: 'DSM Jazzcash',
+        bank: 'Jazzcash',
+      }),
       {
         method: 'online',
         amount: '1000.00',
@@ -275,10 +300,25 @@ describe('posSoft sales import', () => {
       },
     ]);
 
+    const accounts = (await AppDataSource.query(
+      `SELECT a.account_name, a.type, b.code, a.deleted_at IS NOT NULL AS deleted
+         FROM account_sheets a JOIN branches b ON b.id = a.branch_id`,
+    )) as { account_name: string }[];
+    accounts.sort((a, b) => a.account_name.localeCompare(b.account_name));
+    expect(accounts).toEqual([
+      { account_name: 'DSM Jazzcash', type: 'bank', code: 'LHR', deleted: false },
+      { account_name: 'Meezan Main', type: 'bank', code: 'LHR', deleted: false },
+      { account_name: 'Office Cash', type: 'cash', code: 'LHR', deleted: false },
+      { account_name: 'Old Account', type: 'bank', code: 'LHR', deleted: true },
+      { account_name: NO_ACCOUNT_CHOSEN, type: 'cash', code: 'LHR', deleted: true },
+    ]);
+    const banks = (await AppDataSource.query(`SELECT name FROM banks ORDER BY name`)) as { name: string }[];
+    expect(banks.map((b) => b.name)).toEqual(['Jazzcash', 'Meezan Bank']);
+
     const balances = (await AppDataSource.query(
       `SELECT SUM(debit)::text AS total FROM account_movements`,
     )) as { total: string }[];
-    expect(balances[0]?.total).toBe('3160.00');
+    expect(balances[0]?.total).toBe('4010.00');
 
     const [next] = (await AppDataSource.query(
       `SELECT d.last_value FROM document_sequences d JOIN branches b ON b.id = d.branch_id WHERE b.code = 'LHR' AND d.key = 'sale'`,
