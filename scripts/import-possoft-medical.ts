@@ -23,7 +23,11 @@ async function main() {
 
   await AppDataSource.initialize();
   try {
-    const summary = await importPossoftMedical(AppDataSource, dump, { dryRun, filesDir });
+    const summary = await importPossoftMedical(AppDataSource, dump, {
+      dryRun,
+      filesDir,
+      onProgress: (message) => console.log(message),
+    });
     console.log(JSON.stringify(summary, null, 2));
     console.log(dryRun ? 'Dry run: nothing was uploaded or saved.' : 'Medical records and files saved.');
   } finally {

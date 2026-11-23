@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
@@ -41,12 +41,41 @@ function deterministicId(key: string): string {
 
 const extensionOf = (name: string) => (name.split('.').pop() ?? '').toLowerCase();
 
+interface FileTask {
+  fileId: string;
+  branchId: string;
+  recordId: string;
+  localPath: string;
+  objectPath: string;
+  name: string;
+  contentType: string;
+}
+
+async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
+  let next = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      const item = items[index];
+      if (item !== undefined) await worker(item);
+    }
+  });
+  await Promise.all(runners);
+}
+
 export async function importPossoftMedical(
   source: DataSource,
   dump: DumpTables,
-  options: { dryRun?: boolean; filesDir: string },
+  options: {
+    dryRun?: boolean;
+    filesDir: string;
+    concurrency?: number;
+    onProgress?: (message: string) => void;
+  },
 ): Promise<MedicalSummary> {
   const em = source.manager;
+  const report = options.onProgress ?? (() => {});
   const summary: MedicalSummary = {
     medicalRecords: 0,
     recordsReused: 0,
@@ -72,8 +101,16 @@ export async function importPossoftMedical(
   for (const c of dump.get('customers') ?? []) customers.set(text(c.cust_id), c);
   const patients = await PatientResolver.load(em, dump.get('customers') ?? []);
 
-  for (const record of dump.get('customers_med_record') ?? []) {
-    if (!isActive(record)) continue;
+  const existingFileIds = new Set(
+    options.dryRun
+      ? []
+      : ((await em.query(`SELECT id FROM medical_record_files`)) as { id: string }[]).map((r) => r.id),
+  );
+
+  const records = (dump.get('customers_med_record') ?? []).filter(isActive);
+  const tasks: FileTask[] = [];
+  let processed = 0;
+  for (const record of records) {
     const medId = text(record.med_record_id);
     const custId = text(record.med_record_cust_id);
     const city = text(customers.get(custId)?.cust_city) || 'Lahore';
@@ -121,22 +158,52 @@ export async function importPossoftMedical(
         continue;
       }
       const fileId = deterministicId(`medfile:${medId}:${index}`);
-      const objectPath = `${branchCode}/medical-records/${fileId}.${ext}`;
-      if (options.dryRun) {
-        summary.filesUploaded += 1;
+      if (existingFileIds.has(fileId)) {
+        summary.filesReused += 1;
         continue;
       }
-      const buffer = await readFile(localPath);
-      await putObject(BUCKETS.medicalRecords, objectPath, buffer, contentType);
-      const inserted = (await em.query(
-        `INSERT INTO medical_record_files (id, branch_id, medical_record_id, file_path, original_name, content_type, size_bytes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO NOTHING RETURNING id`,
-        [fileId, branchId, recordId, objectPath, name.slice(0, 255), contentType, statSync(localPath).size],
-      )) as { id: string }[];
-      if (inserted.length) summary.filesUploaded += 1;
-      else summary.filesReused += 1;
+      tasks.push({
+        fileId,
+        branchId,
+        recordId,
+        localPath,
+        objectPath: `${branchCode}/medical-records/${fileId}.${ext}`,
+        name,
+        contentType,
+      });
     }
+    processed += 1;
+    if (processed % 300 === 0) report(`records ${processed}/${records.length}`);
   }
   summary.patientsCreated = patients.created;
+
+  report(`uploading ${tasks.length} files…`);
+  if (options.dryRun) {
+    summary.filesUploaded = tasks.length;
+    return summary;
+  }
+
+  let done = 0;
+  await runPool(tasks, options.concurrency ?? 8, async (task) => {
+    const buffer = await readFile(task.localPath);
+    await putObject(BUCKETS.medicalRecords, task.objectPath, buffer, task.contentType);
+    await em.query(
+      `INSERT INTO medical_record_files (id, branch_id, medical_record_id, file_path, original_name, content_type, size_bytes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO NOTHING`,
+      [
+        task.fileId,
+        task.branchId,
+        task.recordId,
+        task.objectPath,
+        task.name.slice(0, 255),
+        task.contentType,
+        buffer.length,
+      ],
+    );
+    summary.filesUploaded += 1;
+    done += 1;
+    if (done % 200 === 0) report(`files ${done}/${tasks.length}`);
+  });
+  report(`files ${done}/${tasks.length}`);
   return summary;
 }
