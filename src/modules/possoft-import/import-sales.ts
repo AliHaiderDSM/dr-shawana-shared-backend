@@ -48,7 +48,12 @@ export interface ImportSummary {
   };
 }
 
-const text = (value: string | null | undefined) => (value ?? '').trim();
+const KEPT_CONTROL_CODES = new Set([9, 10, 13]);
+
+const storable = (value: string) =>
+  [...value].filter((c) => c.charCodeAt(0) >= 32 || KEPT_CONTROL_CODES.has(c.charCodeAt(0))).join('');
+
+const text = (value: string | null | undefined) => storable(value ?? '').trim();
 const isActive = (row: DumpRow) => text(row.close) !== '0';
 
 function amount(value: string | null | undefined): Decimal {
