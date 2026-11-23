@@ -7,7 +7,6 @@ import { PatientResolver } from './patient-resolver';
 import {
   amount,
   byId,
-  cityBranchOf,
   dateOf,
   groupBy,
   insertMany,
@@ -138,8 +137,6 @@ export async function importPossoftClinical(
         branchByCode.get('LHR') ?? branchRows.find((b) => b.kind === 'branch')?.id ?? branchRows[0]?.id;
       if (!doctorBranchId) throw new Error('No branch exists. Run the sales import first.');
       summary.doctorBranch = branchRows.find((b) => b.id === doctorBranchId)?.code ?? '';
-      const branchIdForCity = (city: string) =>
-        branchByCode.get(cityBranchOf(city)?.code ?? '') ?? doctorBranchId;
 
       const existingUsernames = new Set(
         ((await em.query(`SELECT username FROM staff_profiles`)) as { username: string }[]).map(
@@ -268,7 +265,7 @@ export async function importPossoftClinical(
         }
         const customer = customers.get(text(appt.app_pat_id));
         const city = text(appt.app_pat_city) || text(customer?.cust_city) || 'Lahore';
-        const branchId = branchIdForCity(city);
+        const branchId = doctorBranchId;
         const patientId = await patients.resolve(em, text(appt.app_pat_id), city, branchId);
         const id = randomUUID();
         const from = parseTime(appt.app_time_from) ?? '09:00:00';
@@ -392,7 +389,7 @@ export async function importPossoftClinical(
         const date = dateOf(pres.pres_date, pres.crt_date) ?? new Date().toISOString().slice(0, 10);
         const customer = customers.get(text(pres.pres_cust_id));
         const city = text(customer?.cust_city) || 'Lahore';
-        const branchId = branchIdForCity(city);
+        const branchId = doctorBranchId;
         const patientId = await patients.resolve(em, text(pres.pres_cust_id), city, branchId);
         const id = randomUUID();
         const notes = {

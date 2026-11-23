@@ -12,6 +12,11 @@ Two commands move posSoft's sales into this system:
 | `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` | Creates medical records and uploads their image/pdf files to storage (R2). Idempotent: a deterministic id per record and file means a re-run skips what is already there and re-uploads the same key. |
 | `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` | Adds blood-work results and BHRT status logs, linked to the patient in the patient-city branch. Idempotent (deterministic ids). |
 | `npm run import:possoft-history -- --file <dump.sql> [--dry-run]` | Adds the intake history: one consultation per matched appointment, with its structured sections. Runs after the clinical import (it matches against the imported appointments). Idempotent (deterministic ids). |
+| `npm run fix:clinical-branches [-- --dry-run]` | Moves imported clinical data to the right branch: appointments, payments, consultations and prescriptions to the doctor's branch; medical records, blood work and BHRT to the branch where the patient is treated. Run it after `fix:doctor-branches`. Idempotent. |
+
+## Why `fix:clinical-branches` exists
+
+The first clinical import put appointments and prescriptions in the **patient's city** branch (like sales). But an appointment happens at the **doctor's clinic**, so a doctor's appointments ended up scattered across branches and a branch view showed only the patients from that city. `fix:clinical-branches` corrects this: an appointment follows its doctor's branch, its payments and consultation follow the appointment, a prescription follows its doctor, and a patient's records (medical records + files, blood work, BHRT) move to the branch where that patient has the most appointments. Moving a medical record does not touch its file (the stored path already carries the old branch code and still downloads). The clinical import now assigns the doctor's branch directly, so this fix is only for data imported before the change.
 
 ## What the history import creates (`import-history.ts`, `history-mapper.ts`)
 

@@ -23,6 +23,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## Clinical data to the doctor's branch (2026-11-23)
+
+- The clinical import had placed appointments and prescriptions in the patient-city branch; an appointment belongs to the doctor's clinic branch, so a doctor's appointments were split across branches and a branch view showed too few. The import now uses the doctor's branch for appointments and prescriptions.
+- `npm run fix:clinical-branches [-- --dry-run]` (`fix-branches.ts`) re-aligns already-imported data: appointments/payments/consultations/sections/prescriptions/items to the doctor's branch, and medical records (+ files), blood work and BHRT to each patient's most-used appointment branch. Idempotent. Run after `fix:doctor-branches`. Test: `fix-branches.test.ts`.
+
 ## posSoft intake history → consultations (2026-11-23)
 
 - `npm run import:possoft-history -- --file <dump.sql> [--dry-run]` turns each `customers_history` row into a consultation on the matched appointment (matched by patient + date + time), with its structured sections. The ~300 posSoft columns map into the 9 consultation sections (`history-mapper.ts`); every section is validated through the dashboard's own `SECTION_SCHEMAS` before saving, so only renderable data is stored and invalid sections are dropped. Idempotent (deterministic ids). Real export: ~1,835 consultations, ~7,800 sections, ~93 unmatched appointments, ~35 dropped sections. Code: `import-history.ts`. Test: `possoft-history.test.ts`.
