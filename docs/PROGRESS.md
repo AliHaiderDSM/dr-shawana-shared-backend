@@ -23,6 +23,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft intake history → consultations (2026-11-23)
+
+- `npm run import:possoft-history -- --file <dump.sql> [--dry-run]` turns each `customers_history` row into a consultation on the matched appointment (matched by patient + date + time), with its structured sections. The ~300 posSoft columns map into the 9 consultation sections (`history-mapper.ts`); every section is validated through the dashboard's own `SECTION_SCHEMAS` before saving, so only renderable data is stored and invalid sections are dropped. Idempotent (deterministic ids). Real export: ~1,835 consultations, ~7,800 sections, ~93 unmatched appointments, ~35 dropped sections. Code: `import-history.ts`. Test: `possoft-history.test.ts`.
+- The whole posSoft migration is now covered: sales, catalog, doctors, appointments, prescriptions, medical records + files, blood work, BHRT, and intake history.
+
 ## posSoft blood work + BHRT (2026-11-23)
 
 - `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` adds blood-work results (9 tests, value + unit + date; a missing per-test date borrows another test's date in the same row) and BHRT status logs, per patient in the patient-city branch. Idempotent (deterministic ids). Real export: ~4,900 blood-work results, 908 BHRT logs. Code: `import-clinical-extra.ts`. Test: `possoft-clinical-extra.test.ts`.

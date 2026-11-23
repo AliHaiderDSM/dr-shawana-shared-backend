@@ -11,6 +11,14 @@ Two commands move posSoft's sales into this system:
 | `npm run possoft:collect-files -- --file <dump.sql> --source <pos-img> --dest <med-files>` | Copies only the medical-record image/pdf files out of the full `pos-img` folder into a smaller folder, so just those (~2.9 GB) need to reach the server. Runs on the machine that holds the files; needs no database. |
 | `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` | Creates medical records and uploads their image/pdf files to storage (R2). Idempotent: a deterministic id per record and file means a re-run skips what is already there and re-uploads the same key. |
 | `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` | Adds blood-work results and BHRT status logs, linked to the patient in the patient-city branch. Idempotent (deterministic ids). |
+| `npm run import:possoft-history -- --file <dump.sql> [--dry-run]` | Adds the intake history: one consultation per matched appointment, with its structured sections. Runs after the clinical import (it matches against the imported appointments). Idempotent (deterministic ids). |
+
+## What the history import creates (`import-history.ts`, `history-mapper.ts`)
+
+- Each active `customers_history` row is tied to its posSoft appointment (`hist_appoint_id`), matched to the imported appointment by patient + date + time; the consultation takes that appointment's doctor and branch. Rows whose appointment cannot be matched are skipped (`appointmentNotMatched`).
+- The consultation carries the major complaint, current medications and discussion topics. The 300-odd posSoft history columns are mapped into the structured consultation sections (basic info, medical history + conditions + surgeries + family history, MRS scale, additional symptoms, imaging results, clinical assessment, plans, referral).
+- **Safety:** every section is run through the same Zod schema the dashboard uses (`SECTION_SCHEMAS`) before it is saved. A section that does not validate is dropped (`sectionsInvalid`), so only data the UI can render reaches the database. Empty sections are not created.
+- On the real export about 1,835 consultations and 7,800 sections import; ~93 appointments do not match and ~35 sections are dropped.
 
 ## What the clinical-extras import creates (`import-clinical-extra.ts`)
 
