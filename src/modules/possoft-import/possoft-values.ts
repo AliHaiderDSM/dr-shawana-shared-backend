@@ -1,6 +1,15 @@
+import { createHash } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { Decimal } from '../../database/transformers';
 import type { DumpRow } from './dump-reader';
+
+export function deterministicId(key: string): string {
+  const hash = createHash('sha1').update(key).digest('hex').slice(0, 32).split('');
+  hash[12] = '5';
+  hash[16] = ((parseInt(hash[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
+  const hex = hash.join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 const KEPT_CONTROL_CODES = new Set([9, 10, 13]);
 

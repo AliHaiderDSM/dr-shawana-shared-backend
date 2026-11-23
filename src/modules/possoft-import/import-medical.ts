@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -6,7 +5,7 @@ import type { DataSource } from 'typeorm';
 import { BUCKETS, putObject } from '../../lib/storage';
 import type { DumpTables } from './dump-reader';
 import { PatientResolver } from './patient-resolver';
-import { cityBranchOf, dateOf, isActive, text, timestampOf } from './possoft-values';
+import { cityBranchOf, dateOf, deterministicId, isActive, text, timestampOf } from './possoft-values';
 
 export const POSSOFT_MEDICAL_TABLES = ['customers_med_record', 'customers'];
 
@@ -29,14 +28,6 @@ export interface MedicalSummary {
     filesWrongType: number;
   };
   missingSample: string[];
-}
-
-function deterministicId(key: string): string {
-  const hash = createHash('sha1').update(key).digest('hex').slice(0, 32).split('');
-  hash[12] = '5';
-  hash[16] = ((parseInt(hash[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
-  const hex = hash.join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 const extensionOf = (name: string) => (name.split('.').pop() ?? '').toLowerCase();

@@ -10,6 +10,13 @@ Two commands move posSoft's sales into this system:
 | `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` | Adds doctors (with logins), appointments, appointment payments and prescriptions. Runs after the sales import and `npm run seed`. Refuses to run when appointments or prescriptions already exist. |
 | `npm run possoft:collect-files -- --file <dump.sql> --source <pos-img> --dest <med-files>` | Copies only the medical-record image/pdf files out of the full `pos-img` folder into a smaller folder, so just those (~2.9 GB) need to reach the server. Runs on the machine that holds the files; needs no database. |
 | `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` | Creates medical records and uploads their image/pdf files to storage (R2). Idempotent: a deterministic id per record and file means a re-run skips what is already there and re-uploads the same key. |
+| `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` | Adds blood-work results and BHRT status logs, linked to the patient in the patient-city branch. Idempotent (deterministic ids). |
+
+## What the clinical-extras import creates (`import-clinical-extra.ts`)
+
+- **Blood work:** each `customers_blood_work` row holds up to nine tests (FSH, Estradiol, free/total testosterone, DHEA-S, Vit D3, TSH, Ferritin, B12). Every numeric value becomes a `blood_work_results` row for that test, with a standard unit and the test's date. A value with no date of its own borrows the date of another test in the same row; a non-numeric value, or a row with no date at all, is skipped. On the real export about 4,900 results import.
+- **BHRT:** each `customers_bhrt_details` row becomes a `bhrt_status_log` entry for the patient (status mapped to on / off / recommended / other, with the note and date). 908 rows.
+- **Not included:** the intake history (`customers_history`, ~1,900 rows, ~350 columns). It needs a consultation tied to each appointment and a large field-by-field mapping into the structured consultation sections; it is a separate, bigger task.
 
 ## What the medical import creates (`import-medical.ts`)
 

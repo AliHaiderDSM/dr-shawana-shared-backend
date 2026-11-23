@@ -23,6 +23,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft blood work + BHRT (2026-11-23)
+
+- `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` adds blood-work results (9 tests, value + unit + date; a missing per-test date borrows another test's date in the same row) and BHRT status logs, per patient in the patient-city branch. Idempotent (deterministic ids). Real export: ~4,900 blood-work results, 908 BHRT logs. Code: `import-clinical-extra.ts`. Test: `possoft-clinical-extra.test.ts`.
+- `deterministicId` moved to `possoft-values.ts` (shared with the medical import).
+- Intake history (`customers_history`, ~350 columns) still to do: needs a consultation per appointment and a large mapping into the structured consultation sections.
+
 ## Doctors across branches + branch fix (2026-11-23)
 
 - `GET /branch/doctors` now lets a super admin with no branch selected (`?branchId=` omitted) list every doctor across branches; the doctor DTO carries `branch { id, code, name }`. A selected branch, or a branch staff member, still sees only that branch. `mountBranchCrud` gained `skipList` so the module registers its own all-branches list route. Test: `doctors.test.ts`.
