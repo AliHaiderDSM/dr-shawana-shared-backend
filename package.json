@@ -30,7 +30,8 @@
     "seed:demo-visits": "ts-node scripts/seed-demo-visits.ts",
     "webpush:keys": "web-push generate-vapid-keys",
     "db:reset": "ts-node scripts/db-reset.ts",
-    "import:possoft-sales": "ts-node scripts/import-possoft-sales.ts"
+    "import:possoft-sales": "ts-node scripts/import-possoft-sales.ts",
+    "import:possoft-catalog": "ts-node scripts/import-possoft-catalog.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",

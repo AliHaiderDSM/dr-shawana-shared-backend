@@ -1,8 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import type { DataSource, EntityManager } from 'typeorm';
+import type { DataSource } from 'typeorm';
 import { Decimal } from '../../database/transformers';
 import { normalizePhone } from '../patients/phone';
-import type { DumpRow, DumpTables } from './dump-reader';
+import type { DumpTables } from './dump-reader';
+import { importPossoftCatalog } from './import-catalog';
+import {
+  amount,
+  byId,
+  dateOf,
+  groupBy,
+  insertMany,
+  isActive,
+  money,
+  text,
+  timestampOf,
+} from './possoft-values';
 
 export const POSSOFT_SALES_TABLES = [
   'sales',
@@ -32,6 +44,8 @@ export interface ImportSummary {
   patients: number;
   patientsMerged: number;
   patientsWithoutValidPhone: number;
+  warehouseCategories: number;
+  warehouseProducts: number;
   categories: number;
   products: number;
   sales: number;
@@ -51,77 +65,11 @@ export interface ImportSummary {
   };
 }
 
-const KEPT_CONTROL_CODES = new Set([9, 10, 13]);
-
-const storable = (value: string) =>
-  [...value].filter((c) => c.charCodeAt(0) >= 32 || KEPT_CONTROL_CODES.has(c.charCodeAt(0))).join('');
-
-const text = (value: string | null | undefined) => storable(value ?? '').trim();
-const isActive = (row: DumpRow) => text(row.close) !== '0';
-
-function amount(value: string | null | undefined): Decimal {
-  const cleaned = text(value).replace(/[^0-9.-]/g, '');
-  if (!cleaned || Number.isNaN(Number(cleaned))) return new Decimal(0);
-  return new Decimal(cleaned);
-}
-
-function dateOf(...values: (string | null | undefined)[]): string | null {
-  for (const value of values) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text(value));
-    if (match && match[1] !== '0000' && match[2] !== '00' && match[3] !== '00') return match[0];
-  }
-  return null;
-}
-
-function timestampOf(value: string | null | undefined): string | null {
-  const day = dateOf(value);
-  if (!day) return null;
-  const time = /\d{2}:\d{2}:\d{2}/.exec(text(value))?.[0] ?? '12:00:00';
-  return `${day}T${time}+05:00`;
-}
-
-const money = (value: Decimal) => value.toFixed(2);
 const clampPercent = (value: Decimal) => Decimal.min(Decimal.max(value, 0), 100).toFixed(2);
 
 function cityBranchOf(saleCity: string): CityBranch | null {
   const lower = saleCity.toLowerCase();
   return CITY_BRANCHES.find((b) => lower.includes(b.key)) ?? null;
-}
-
-async function insertMany(em: EntityManager, table: string, columns: string[], rows: unknown[][]) {
-  const perChunk = Math.max(1, Math.floor(60000 / columns.length));
-  for (let start = 0; start < rows.length; start += perChunk) {
-    const chunk = rows.slice(start, start + perChunk);
-    const params: unknown[] = [];
-    const tuples = chunk.map((row) => {
-      const marks = row.map((value) => {
-        params.push(value);
-        return `$${params.length}`;
-      });
-      return `(${marks.join(', ')})`;
-    });
-    await em.query(
-      `INSERT INTO ${table} (${columns.map((c) => `"${c}"`).join(', ')}) VALUES ${tuples.join(', ')}`,
-      params,
-    );
-  }
-}
-
-function byId(rows: DumpRow[], key: string) {
-  const map = new Map<string, DumpRow>();
-  for (const row of rows) map.set(text(row[key]), row);
-  return map;
-}
-
-function groupBy(rows: DumpRow[], key: string) {
-  const map = new Map<string, DumpRow[]>();
-  for (const row of rows) {
-    const id = text(row[key]);
-    const list = map.get(id) ?? [];
-    list.push(row);
-    map.set(id, list);
-  }
-  return map;
 }
 
 class DryRunRollback extends Error {}
@@ -137,6 +85,8 @@ export async function importPossoftSales(
     patients: 0,
     patientsMerged: 0,
     patientsWithoutValidPhone: 0,
+    warehouseCategories: 0,
+    warehouseProducts: 0,
     categories: 0,
     products: 0,
     sales: 0,
@@ -163,15 +113,6 @@ export async function importPossoftSales(
   const sheets = byId(rows('accounts_sheet'), 'as_id');
   const itemsBySale = groupBy(rows('sale_products'), 'sp_sale_id');
   const paymentsBySale = groupBy(rows('sale_payments'), 'spay_sale_id');
-  const latestPrice = new Map<string, { id: number; price: Decimal }>();
-  for (const detail of rows('product_details')) {
-    if (!isActive(detail)) continue;
-    const productId = text(detail.product_id);
-    const id = Number(text(detail.prod_det_id)) || 0;
-    const current = latestPrice.get(productId);
-    if (!current || id > current.id) latestPrice.set(productId, { id, price: amount(detail.prod_det_price) });
-  }
-
   const saleRows = rows('sales')
     .filter((sale) => {
       if (isActive(sale)) return true;
@@ -282,10 +223,18 @@ export async function importPossoftSales(
       );
       summary.patients = patientRows.length;
 
-      const masterCode = usedBranches[0]?.code;
+      const catalog = await importPossoftCatalog(em, dump);
+      summary.warehouseCategories = catalog.categoriesAdded;
+      summary.warehouseProducts = catalog.productsAdded;
+      const prices = new Map<string, string>();
+      const warehousePrices = (await em.query(
+        `SELECT id, sale_price::text AS price FROM products WHERE branch_id = $1`,
+        [catalog.warehouseId],
+      )) as { id: string; price: string }[];
+      for (const row of warehousePrices) prices.set(row.id, row.price);
+
       const categoryNames = new Map<string, string>();
       const productIds = new Map<string, string>();
-      const masterProductIds = new Map<string, string>();
       const categoryRows: unknown[][] = [];
       const productRows: unknown[][] = [];
 
@@ -306,40 +255,29 @@ export async function importPossoftSales(
         if (known) return known;
         const product = products.get(prodId);
         if (!product) summary.skipped.missingProduct += 1;
-        const categoryId = categoryFor(code, text(product?.prod_cat_id));
+        const origin = catalog.productIds.get(prodId) ?? null;
         const id = randomUUID();
         const active = product ? isActive(product) && text(product.status) !== '0' : false;
-        const origin = code === masterCode ? null : (masterProductIds.get(prodId) ?? null);
         productRows.push([
           id,
           branchIdOf(code),
           (text(product?.prod_name) || `posSoft product ${prodId}`).slice(0, 200),
-          categoryId,
+          categoryFor(code, text(product?.prod_cat_id)),
           text(product?.prod_batch_no).slice(0, 100) || null,
-          money(latestPrice.get(prodId)?.price ?? new Decimal(0)),
+          (origin && prices.get(origin)) ?? '0.00',
           active ? 'active' : 'inactive',
           origin,
         ]);
         productIds.set(key, id);
-        if (code === masterCode) masterProductIds.set(prodId, id);
         return id;
       };
-
-      if (masterCode) {
-        for (const { sale } of saleRows) {
-          for (const item of itemsBySale.get(text(sale.sale_id)) ?? []) {
-            if (isActive(item) && amount(item.sp_prod_qty).gt(0))
-              productFor(masterCode, text(item.sp_prod_id));
-          }
-        }
-      }
 
       const sheetIds = new Map<string, string>();
       const bankNames = new Map<string, string>();
       const bankRows: unknown[][] = [];
       const sheetRows: unknown[][] = [];
 
-      const accountsBranchId = () => branchIdOf(masterCode as string);
+      const accountsBranchId = () => catalog.warehouseId;
 
       const bankFor = (name: string) => {
         const nameKey = name.toLowerCase();

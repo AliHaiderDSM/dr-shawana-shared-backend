@@ -23,6 +23,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft catalog in the main warehouse (2026-11-23)
+
+- The sales import now puts every posSoft category and product in the main warehouse (the Super Admin catalog); deleted posSoft products are soft-deleted there. Branch products are copies linked by `origin_product_id`. Shared bank and cash accounts belong to the main warehouse.
+- `npm run import:possoft-catalog -- --file <dump.sql> [--dry-run]` adds the same catalog to a database filled by the earlier import and links the branch products. Running it again adds nothing.
+- Helpers moved to `possoft-values.ts`; catalog code in `import-catalog.ts`. Docs: `docs/POSSOFT_IMPORT.md`.
+
 ## Accounts balance order (2026-11-23)
 
 - The all-accounts view of `GET /reports/accounts-balance` lists the newest account first (opened date, then created time). The single-account ledger stays oldest first so its running balance reads top to bottom.

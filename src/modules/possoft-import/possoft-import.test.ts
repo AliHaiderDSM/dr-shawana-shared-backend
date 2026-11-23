@@ -3,6 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AppDataSource } from '../../database/data-source';
 import { readDump } from './dump-reader';
+import {
+  POSSOFT_CATALOG_TABLES,
+  importPossoftCatalog,
+  linkBranchProductsToWarehouse,
+} from './import-catalog';
 import { NO_ACCOUNT_CHOSEN, POSSOFT_SALES_TABLES, importPossoftSales } from './import-sales';
 import { resetDatabase } from './reset-database';
 
@@ -246,14 +251,61 @@ describe('posSoft sales import', () => {
     ]);
 
     const products = (await AppDataSource.query(
-      `SELECT b.code, p.name, p.sale_price, p.status, p.origin_product_id IS NOT NULL AS copy
-         FROM products p JOIN branches b ON b.id = p.branch_id ORDER BY b.code, p.name`,
+      `SELECT b.code, p.name, p.sale_price, p.status, p.deleted_at IS NOT NULL AS deleted,
+              o.name AS origin, ob.code AS "originBranch"
+         FROM products p JOIN branches b ON b.id = p.branch_id
+         LEFT JOIN products o ON o.id = p.origin_product_id LEFT JOIN branches ob ON ob.id = o.branch_id
+        ORDER BY b.code, p.name`,
     )) as Record<string, unknown>[];
+    const copy = (name: string) => ({ origin: name, originBranch: 'MAINWH' });
     expect(products).toEqual([
-      { code: 'KHI', name: 'Vitamin D3', sale_price: '1200.00', status: 'active', copy: true },
-      { code: 'LHR', name: 'Progesterone Cream', sale_price: '3500.00', status: 'inactive', copy: false },
-      { code: 'LHR', name: 'Vitamin D3', sale_price: '1200.00', status: 'active', copy: false },
+      {
+        code: 'KHI',
+        name: 'Vitamin D3',
+        sale_price: '1200.00',
+        status: 'active',
+        deleted: false,
+        ...copy('Vitamin D3'),
+      },
+      {
+        code: 'LHR',
+        name: 'Progesterone Cream',
+        sale_price: '3500.00',
+        status: 'inactive',
+        deleted: false,
+        ...copy('Progesterone Cream'),
+      },
+      {
+        code: 'LHR',
+        name: 'Vitamin D3',
+        sale_price: '1200.00',
+        status: 'active',
+        deleted: false,
+        ...copy('Vitamin D3'),
+      },
+      {
+        code: 'MAINWH',
+        name: 'Progesterone Cream',
+        sale_price: '3500.00',
+        status: 'active',
+        deleted: true,
+        origin: null,
+        originBranch: null,
+      },
+      {
+        code: 'MAINWH',
+        name: 'Vitamin D3',
+        sale_price: '1200.00',
+        status: 'active',
+        deleted: false,
+        origin: null,
+        originBranch: null,
+      },
     ]);
+    const warehouseCategories = (await AppDataSource.query(
+      `SELECT c.name FROM categories c JOIN branches b ON b.id = c.branch_id WHERE b.code = 'MAINWH' ORDER BY c.name`,
+    )) as { name: string }[];
+    expect(warehouseCategories.map((c) => c.name)).toEqual(['BHRT', 'Supplements']);
 
     const payments = (await AppDataSource.query(
       `SELECT y.method, y.amount, y.sender_bank, a.type, a.account_name, k.name AS bank, y.approved_at IS NOT NULL AS approved
@@ -306,11 +358,11 @@ describe('posSoft sales import', () => {
     )) as { account_name: string }[];
     accounts.sort((a, b) => a.account_name.localeCompare(b.account_name));
     expect(accounts).toEqual([
-      { account_name: 'DSM Jazzcash', type: 'bank', code: 'LHR', deleted: false },
-      { account_name: 'Meezan Main', type: 'bank', code: 'LHR', deleted: false },
-      { account_name: 'Office Cash', type: 'cash', code: 'LHR', deleted: false },
-      { account_name: 'Old Account', type: 'bank', code: 'LHR', deleted: true },
-      { account_name: NO_ACCOUNT_CHOSEN, type: 'cash', code: 'LHR', deleted: true },
+      { account_name: 'DSM Jazzcash', type: 'bank', code: 'MAINWH', deleted: false },
+      { account_name: 'Meezan Main', type: 'bank', code: 'MAINWH', deleted: false },
+      { account_name: 'Office Cash', type: 'cash', code: 'MAINWH', deleted: false },
+      { account_name: 'Old Account', type: 'bank', code: 'MAINWH', deleted: true },
+      { account_name: NO_ACCOUNT_CHOSEN, type: 'cash', code: 'MAINWH', deleted: true },
     ]);
     const banks = (await AppDataSource.query(`SELECT name FROM banks ORDER BY name`)) as { name: string }[];
     expect(banks.map((b) => b.name)).toEqual(['Jazzcash', 'Meezan Bank']);
@@ -326,5 +378,33 @@ describe('posSoft sales import', () => {
     expect(Number(next?.last_value)).toBe(2);
 
     await expect(importPossoftSales(AppDataSource, dump)).rejects.toThrow('not empty');
+  });
+
+  it('adds the posSoft catalog to the main warehouse of an earlier import and links branch products', async () => {
+    const [warehouse] = (await AppDataSource.query(`SELECT id FROM branches WHERE kind = 'warehouse'`)) as {
+      id: string;
+    }[];
+    await AppDataSource.query(`UPDATE products SET origin_product_id = NULL`);
+    await AppDataSource.query(`DELETE FROM products WHERE branch_id = $1`, [warehouse?.id]);
+    await AppDataSource.query(`DELETE FROM categories WHERE branch_id = $1`, [warehouse?.id]);
+
+    const dump = await readDump(file, POSSOFT_CATALOG_TABLES);
+    const first = await AppDataSource.transaction(async (em) => {
+      const catalog = await importPossoftCatalog(em, dump);
+      return { ...catalog, linked: await linkBranchProductsToWarehouse(em, catalog.warehouseId) };
+    });
+    expect(first).toMatchObject({ categoriesAdded: 2, productsAdded: 2, productsReused: 0, linked: 3 });
+
+    const again = await AppDataSource.transaction(async (em) => {
+      const catalog = await importPossoftCatalog(em, dump);
+      return { ...catalog, linked: await linkBranchProductsToWarehouse(em, catalog.warehouseId) };
+    });
+    expect(again).toMatchObject({ categoriesAdded: 0, productsAdded: 0, productsReused: 2, linked: 0 });
+
+    const unlinked = (await AppDataSource.query(
+      `SELECT COUNT(*)::int AS count FROM products WHERE branch_id <> $1 AND origin_product_id IS NULL`,
+      [warehouse?.id],
+    )) as { count: number }[];
+    expect(unlinked[0]?.count).toBe(0);
   });
 });
