@@ -5,8 +5,10 @@ import { normalizePhone } from '../patients/phone';
 import type { DumpTables } from './dump-reader';
 import { importPossoftCatalog } from './import-catalog';
 import {
+  CITY_BRANCHES,
   amount,
   byId,
+  cityBranchOf,
   dateOf,
   groupBy,
   insertMany,
@@ -27,15 +29,6 @@ export const POSSOFT_SALES_TABLES = [
   'banks',
   'accounts_sheet',
 ];
-
-const CITY_BRANCHES = [
-  { key: 'lahore', code: 'LHR', name: 'DSM Lahore', city: 'Lahore' },
-  { key: 'islamabad', code: 'ISB', name: 'DSM Islamabad', city: 'Islamabad' },
-  { key: 'multan', code: 'MUL', name: 'DSM Multan', city: 'Multan' },
-  { key: 'karachi', code: 'KHI', name: 'DSM Karachi', city: 'Karachi' },
-] as const;
-
-type CityBranch = (typeof CITY_BRANCHES)[number];
 
 export const NO_ACCOUNT_CHOSEN = 'posSoft: no account chosen';
 
@@ -66,11 +59,6 @@ export interface ImportSummary {
 }
 
 const clampPercent = (value: Decimal) => Decimal.min(Decimal.max(value, 0), 100).toFixed(2);
-
-function cityBranchOf(saleCity: string): CityBranch | null {
-  const lower = saleCity.toLowerCase();
-  return CITY_BRANCHES.find((b) => lower.includes(b.key)) ?? null;
-}
 
 class DryRunRollback extends Error {}
 

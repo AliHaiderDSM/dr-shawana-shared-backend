@@ -23,6 +23,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft clinical import (2026-11-23)
+
+- `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` adds doctors (with staff logins in LHR, must-change-password), appointments, appointment payments and prescriptions (with lab items from the branch catalog). Runs after the sales import and `npm run seed`; refuses when appointments/prescriptions already exist.
+- Missing patients (consultation-only) are created; existing patients matched by phone / `possoft-<cust_id>`. Appointments and prescriptions use the patient-city branch. Code: `import-clinical.ts`, `patient-resolver.ts`; shared city helpers moved to `possoft-values.ts`. Test: `possoft-clinical.test.ts`.
+- Still to do: medical records + files, blood work, intake history, BHRT. Steps and mapping: `docs/POSSOFT_IMPORT.md`.
+
 ## posSoft catalog in the main warehouse (2026-11-23)
 
 - The sales import now puts every posSoft category and product in the main warehouse (the Super Admin catalog); deleted posSoft products are soft-deleted there. Branch products are copies linked by `origin_product_id`. Shared bank and cash accounts belong to the main warehouse.

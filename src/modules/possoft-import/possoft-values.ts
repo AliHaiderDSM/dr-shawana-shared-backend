@@ -81,6 +81,20 @@ export function latestPrices(details: DumpRow[]) {
   return new Map([...latest].map(([productId, { price }]) => [productId, price]));
 }
 
+export const CITY_BRANCHES = [
+  { key: 'lahore', code: 'LHR', name: 'DSM Lahore', city: 'Lahore' },
+  { key: 'islamabad', code: 'ISB', name: 'DSM Islamabad', city: 'Islamabad' },
+  { key: 'multan', code: 'MUL', name: 'DSM Multan', city: 'Multan' },
+  { key: 'karachi', code: 'KHI', name: 'DSM Karachi', city: 'Karachi' },
+] as const;
+
+export type CityBranch = (typeof CITY_BRANCHES)[number];
+
+export function cityBranchOf(city: string): CityBranch | null {
+  const lower = city.toLowerCase();
+  return CITY_BRANCHES.find((b) => lower.includes(b.key)) ?? null;
+}
+
 export async function mainWarehouseId(em: EntityManager): Promise<string> {
   const [found] = (await em.query(
     `SELECT id FROM branches WHERE kind = 'warehouse' AND deleted_at IS NULL LIMIT 1`,

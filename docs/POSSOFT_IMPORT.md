@@ -7,8 +7,20 @@ Two commands move posSoft's sales into this system:
 | `npm run db:reset -- --confirm <db name>` | Empties every table except `typeorm_migrations`, then creates the main warehouse (`MAINWH`) again. Without `--confirm` it only prints the database name. |
 | `npm run import:possoft-sales -- --file <dump.sql> [--dry-run]` | Reads a posSoft MySQL data export and adds its sales. `--dry-run` does everything inside a transaction, prints the summary, then rolls it back. |
 | `npm run import:possoft-catalog -- --file <dump.sql> [--dry-run]` | Adds posSoft's categories and products to the main warehouse and links every branch product with the same name to its warehouse product. Safe to run again: existing warehouse products (same name) are reused. For databases filled by an earlier version of the sales import. |
+| `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` | Adds doctors (with logins), appointments, appointment payments and prescriptions. Runs after the sales import and `npm run seed`. Refuses to run when appointments or prescriptions already exist. |
 
 The import refuses to run when the `sales` table already has rows, so it cannot be added twice.
+
+## What the clinical import creates (`import-clinical.ts`)
+
+- **Doctors + logins:** every active posSoft doctor becomes a staff login (role `doctor`, in `LHR`) plus a doctor record. The username comes from `doc_username` (made unique and lowercase); the email from `doc_email` or `<username>@imported.dsm`. Every doctor gets the one starting password you pass and `must_change_password = true`, so they set their own on first login. Re-running reuses a doctor matched by username. All doctors sit in `LHR`; appointments in other cities still reference them, so in the doctor app a doctor sees the appointments of the branch they are viewing, while admins see all.
+- **Patients:** appointments and prescriptions reuse the patient already imported (matched by phone, or by `possoft-<cust_id>` for no-phone customers). A consultation-only customer with no earlier sale is created here (`patientsCreated`).
+- **Appointments:** `app_pat_city` picks the branch like sales. `app_status` 0→booked, 1→completed, 2→cancelled; `app_on_phy_status` Online/Physical → mode; `app_on_phy_followup` → new/followup. `fee` is the total of the appointment's payments, else `app_received_amount`. Deleted (`close = 0`) rows and ones whose doctor was not imported are skipped. Time is clamped so `time_to > time_from`.
+- **Appointment payments:** active rows with amount > 0. The account is matched to the shared account sheet by code (from the sales import); an unknown or `0` account goes to "posSoft: no account chosen". Payment screenshots and appointment remark screenshots are not imported.
+- **Prescriptions:** one per active posSoft prescription, linked to the patient and doctor, in the patient-city branch. `pres_diaganosis` → diagnosis; the five `*Note` fields → `notes`; `pres_plantreatment` → plan; `pres_followup_date` → followup. Each ticked `pres_*` lab/checkbox column becomes a prescription item, linked to the branch's prescription catalog by the same code (the catalog `code` is the posSoft column name).
+- **Not in this import:** medical records and their files, blood work, intake history and BHRT details.
+
+On the real export a `--dry-run` prints about: doctors 8, appointments 6,055, appointmentPayments 7,027, prescriptions 4,485, prescriptionItems ~75,000, patientsCreated ~2,360.
 
 ## What the import creates
 
