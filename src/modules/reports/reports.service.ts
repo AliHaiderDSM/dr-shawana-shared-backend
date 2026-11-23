@@ -810,7 +810,7 @@ export const reportsService = {
          JOIN branches b ON b.id = sh.branch_id
         ${f.where}
         GROUP BY b.code, sh.id
-        ORDER BY sh.type DESC, b.code, sh.account_name`,
+        ORDER BY sh.date DESC, sh.created_at DESC, sh.account_name`,
       params,
     );
     return build(

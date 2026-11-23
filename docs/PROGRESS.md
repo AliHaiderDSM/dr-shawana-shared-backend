@@ -23,6 +23,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## Accounts balance order (2026-11-23)
+
+- The all-accounts view of `GET /reports/accounts-balance` lists the newest account first (opened date, then created time). The single-account ledger stays oldest first so its running balance reads top to bottom.
+
 ## posSoft sales import (2026-11-23)
 
 - `npm run db:reset -- --confirm <db name>` empties every table except `typeorm_migrations` and creates the main warehouse again (`src/modules/possoft-import/reset-database.ts`).
