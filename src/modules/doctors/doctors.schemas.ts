@@ -70,6 +70,7 @@ export const doctorSchema = registry.register(
     status: z.enum(DOCTOR_STATUSES),
     hasSignature: z.boolean(),
     staff: z.object({ id: z.uuid(), username: z.string(), email: z.string(), status: z.string() }).nullable(),
+    branch: z.object({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   }),

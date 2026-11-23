@@ -1,7 +1,9 @@
 import { branchFolder } from '../../lib/branch-folder';
 import { type EntityManager } from 'typeorm';
+import { AppDataSource } from '../../database/data-source';
 import { branchScopedRepository } from '../../database/branch-scoped.repository';
 import { repo, withTransaction } from '../../database/transaction';
+import { Branch } from '../branches/branch.entity';
 import { type Actor } from '../../lib/actor';
 import { AppError } from '../../lib/errors';
 import { withoutInternals } from '../../lib/http';
@@ -22,18 +24,22 @@ export interface Viewer {
 const doctors = branchScopedRepository(Doctor, 'doc');
 
 export function toDoctorDto(doctor: Doctor) {
-  const { staff, signaturePath, ...rest } = withoutInternals(doctor);
+  const { staff, branch, signaturePath, ...rest } = withoutInternals(doctor) as Doctor;
   return {
     ...rest,
     hasSignature: signaturePath !== null,
     staff: staff
       ? { id: staff.id, username: staff.username, email: staff.email, status: staff.status }
       : null,
+    branch: branch ? { id: branch.id, code: branch.code, name: branch.name } : null,
   };
 }
 
 function withStaff(branchId: string, manager?: EntityManager) {
-  return doctors.query(branchId, manager).leftJoinAndSelect('doc.staff', 'staff');
+  return doctors
+    .query(branchId, manager)
+    .leftJoinAndSelect('doc.staff', 'staff')
+    .leftJoinAndMapOne('doc.branch', Branch, 'branch', 'branch.id = doc.branch_id');
 }
 
 async function getDoctor(branchId: string, id: string, manager?: EntityManager) {
@@ -78,8 +84,14 @@ async function insertDoctor(
 }
 
 export const doctorsService = {
-  async list(branchId: string, query: DoctorListQuery) {
-    const qb = withStaff(branchId);
+  async list(branchId: string | null, query: DoctorListQuery) {
+    const qb = branchId
+      ? withStaff(branchId)
+      : AppDataSource.getRepository(Doctor)
+          .createQueryBuilder('doc')
+          .where('doc.deleted_at IS NULL')
+          .leftJoinAndSelect('doc.staff', 'staff')
+          .leftJoinAndMapOne('doc.branch', Branch, 'branch', 'branch.id = doc.branch_id');
     if (query.status) qb.andWhere('doc.status = :status', { status: query.status });
     const { items, meta } = await paginate(qb, query, {
       searchColumns: ['doc.displayName', 'doc.phone', 'doc.email', 'staff.username'],

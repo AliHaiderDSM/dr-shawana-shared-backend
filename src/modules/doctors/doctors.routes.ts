@@ -66,9 +66,25 @@ doctorsRouter.get(
   },
 );
 
+doctorsRouter.get(
+  '/branch/doctors',
+  authenticate,
+  branchScope({ allowAllForSuperAdmin: true }),
+  requirePermission('doctors.view'),
+  validate({ query: doctorListQuerySchema }),
+  async (req, res) => {
+    const { items, meta } = await doctorsService.list(
+      req.branchId ?? null,
+      validQuery(req, doctorListQuerySchema),
+    );
+    sendOk(res, items, meta);
+  },
+);
+
 mountBranchCrud(doctorsRouter, {
   path: '/branch/doctors',
   module: 'doctors',
   service: doctorsService,
   schemas: { list: doctorListQuerySchema, create: createDoctorSchema, update: updateDoctorSchema },
+  skipList: true,
 });

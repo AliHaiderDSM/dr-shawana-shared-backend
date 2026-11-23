@@ -5459,6 +5459,29 @@
               "status"
             ]
           },
+          "branch": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name"
+            ]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -5481,6 +5504,7 @@
           "status",
           "hasSignature",
           "staff",
+          "branch",
           "createdAt",
           "updatedAt"
         ]

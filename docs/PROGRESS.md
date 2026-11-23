@@ -23,6 +23,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## Doctors across branches + branch fix (2026-11-23)
+
+- `GET /branch/doctors` now lets a super admin with no branch selected (`?branchId=` omitted) list every doctor across branches; the doctor DTO carries `branch { id, code, name }`. A selected branch, or a branch staff member, still sees only that branch. `mountBranchCrud` gained `skipList` so the module registers its own all-branches list route. Test: `doctors.test.ts`.
+- `npm run fix:doctor-branches -- --map "username:CODE,username:CODE"` moves already-imported doctors (and their logins) to the right branch; the clinical import still creates all doctors in LHR, so this is the follow-up for the real branches.
+
 ## posSoft medical records + files (2026-11-23)
 
 - `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` creates medical records and uploads their image/pdf files to the `medical-records` bucket (R2), linked to the patient in the patient-city branch. Only jpg/jpeg/png/webp/pdf; other types skipped. Idempotent (deterministic ids + ON CONFLICT + fixed R2 key), not wrapped in one transaction, so it is resumable.

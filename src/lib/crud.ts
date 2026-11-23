@@ -64,6 +64,7 @@ export function mountBranchCrud<Q, C, U>(
     schemas: CrudSchemas;
     extraItemRoutes?: (byId: RequestHandler) => void;
     optionsAlsoFor?: Permission[];
+    skipList?: boolean;
   },
 ): void {
   const { path, module, schemas } = options;
@@ -72,7 +73,7 @@ export function mountBranchCrud<Q, C, U>(
   const can = (action: 'view' | 'create' | 'update' | 'delete') => requirePermission(`${module}.${action}`);
 
   router.use(path, authenticate, branchScope());
-  router.get(path, can('view'), validate({ query: schemas.list }), controller.list);
+  if (!options.skipList) router.get(path, can('view'), validate({ query: schemas.list }), controller.list);
   router.get(
     `${path}/options`,
     requirePermission(`${module}.view`, ...(options.optionsAlsoFor ?? [])),

@@ -34,7 +34,8 @@
     "import:possoft-catalog": "ts-node scripts/import-possoft-catalog.ts",
     "import:possoft-clinical": "ts-node scripts/import-possoft-clinical.ts",
     "import:possoft-medical": "ts-node scripts/import-possoft-medical.ts",
-    "possoft:collect-files": "ts-node scripts/possoft-collect-files.ts"
+    "possoft:collect-files": "ts-node scripts/possoft-collect-files.ts",
+    "fix:doctor-branches": "ts-node scripts/fix-doctor-branches.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
