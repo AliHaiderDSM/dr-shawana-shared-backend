@@ -8,6 +8,15 @@ Two commands move posSoft's sales into this system:
 | `npm run import:possoft-sales -- --file <dump.sql> [--dry-run]` | Reads a posSoft MySQL data export and adds its sales. `--dry-run` does everything inside a transaction, prints the summary, then rolls it back. |
 | `npm run import:possoft-catalog -- --file <dump.sql> [--dry-run]` | Adds posSoft's categories and products to the main warehouse and links every branch product with the same name to its warehouse product. Safe to run again: existing warehouse products (same name) are reused. For databases filled by an earlier version of the sales import. |
 | `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` | Adds doctors (with logins), appointments, appointment payments and prescriptions. Runs after the sales import and `npm run seed`. Refuses to run when appointments or prescriptions already exist. |
+| `npm run possoft:collect-files -- --file <dump.sql> --source <pos-img> --dest <med-files>` | Copies only the medical-record image/pdf files out of the full `pos-img` folder into a smaller folder, so just those (~2.9 GB) need to reach the server. Runs on the machine that holds the files; needs no database. |
+| `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` | Creates medical records and uploads their image/pdf files to storage (R2). Idempotent: a deterministic id per record and file means a re-run skips what is already there and re-uploads the same key. |
+
+## What the medical import creates (`import-medical.ts`)
+
+- One medical record per active `customers_med_record` row, linked to the patient (matched like the clinical import; a never-seen customer is created), in the patient-city branch, with its date, status and note.
+- Each file named in `med_record_screenshot` (comma-separated for several) is uploaded to the `medical-records` bucket at `<branchCode>/medical-records/<id>.<ext>` and recorded as a medical-record file. Only `jpg/jpeg/png/webp/pdf` are taken; other types (zip, mp4, …) are skipped (`filesWrongType`). A file not found in `--files` is skipped (`filesMissing`).
+- The record and file ids are derived from the posSoft id, so running the import again adds nothing new and is safe after an interruption. It does not run inside one big transaction, so a stop midway keeps what was already done.
+- On the real export a `--dry-run` reports about: medicalRecords 2,005, filesUploaded 5,072, filesWrongType 26, filesMissing 0.
 
 The import refuses to run when the `sales` table already has rows, so it cannot be added twice.
 

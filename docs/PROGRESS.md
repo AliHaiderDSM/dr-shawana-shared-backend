@@ -23,6 +23,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft medical records + files (2026-11-23)
+
+- `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` creates medical records and uploads their image/pdf files to the `medical-records` bucket (R2), linked to the patient in the patient-city branch. Only jpg/jpeg/png/webp/pdf; other types skipped. Idempotent (deterministic ids + ON CONFLICT + fixed R2 key), not wrapped in one transaction, so it is resumable.
+- `npm run possoft:collect-files -- --file <dump.sql> --source <pos-img> --dest <med-files>` copies just the ~5,072 needed files (~2.9 GB) out of the full 9.45 GB `pos-img`, so only those reach the server. Needs no database.
+- Real export: 2,005 records, 5,072 files, 26 other-type skipped, 0 missing. Code: `import-medical.ts`. Test: `possoft-medical.test.ts` (fake storage). Steps and mapping: `docs/POSSOFT_IMPORT.md`.
+
 ## posSoft clinical import (2026-11-23)
 
 - `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` adds doctors (with staff logins in LHR, must-change-password), appointments, appointment payments and prescriptions (with lab items from the branch catalog). Runs after the sales import and `npm run seed`; refuses when appointments/prescriptions already exist.
