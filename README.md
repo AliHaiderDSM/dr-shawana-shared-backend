@@ -64,3 +64,5 @@ npm run seed               # company info and the prescription catalogue
 ```
 
 Then sign in as the Super Admin and add branches, staff, doctors, products and account sheets again. Remove `SUPER_ADMIN_PASSWORD` from `.env` after the seed.
+
+To empty the database and bring in posSoft sales instead, use `npm run db:reset` and `npm run import:possoft-sales` (see `docs/POSSOFT_IMPORT.md`).

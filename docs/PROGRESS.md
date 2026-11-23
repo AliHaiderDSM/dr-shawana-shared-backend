@@ -22,6 +22,14 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 
 ---
 
+
+## posSoft sales import (2026-11-23)
+
+- `npm run db:reset -- --confirm <db name>` empties every table except `typeorm_migrations` and creates the main warehouse again (`src/modules/possoft-import/reset-database.ts`).
+- `npm run import:possoft-sales -- --file <dump.sql> [--dry-run]` reads a posSoft MySQL export (phpMyAdmin or mysqldump style, `dump-reader.ts`) and adds sales, items and payments, with the patients, categories, products, banks and account sheets they need (`import-sales.ts`). Branch from `sale_city` (LHR, ISB, MUL, KHI). Refuses to run when sales already exist.
+- No stock, journal or audit rows; payments are approved so balances include them; images and payment screenshots are not copied.
+- Steps for the live server and every mapping rule: `docs/POSSOFT_IMPORT.md`. Test: `possoft-import.test.ts`.
+
 ## 2026-11-19 — Plan chat messages say what changed
 
 - The chat message for a plan change starts with the short line (same as the push) and lists the details on the next lines: "Medicines: …" for a new plan, "Medicines added: …" / "Blood tests removed: …" for edits, and a short plain-text preview of the plan text.
