@@ -107,6 +107,10 @@ export async function importPossoftHistory(
           country: text(customer?.cust_country) || null,
         });
 
+        const remark = text(appt.app_remark);
+        const assessment = mapped.sections.clinical_assessment as Record<string, unknown> | null;
+        if (remark && assessment && !text(assessment.plan as string)) assessment.plan = remark;
+
         const consultationId = deterministicId(`consult:${matched.id}`);
         const createdAt = timestampOf(history.crt_date) ?? `${date}T12:00:00+05:00`;
         const inserted = (await em.query(

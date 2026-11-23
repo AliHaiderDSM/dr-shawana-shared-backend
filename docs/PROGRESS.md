@@ -23,6 +23,10 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## Clinical remarks from the appointment remark (2026-11-23)
+
+- The dashboard shows a past visit's clinical remarks from the `clinical_assessment` section's `plan`; the posSoft narrative is the appointment's `app_remark`, so imported visits showed "No remarks recorded". The history import now sets `clinical_assessment.plan` from `app_remark`, and `npm run fix:clinical-remarks [-- --dry-run]` (`fix-remarks.ts`) back-fills already-imported data, creating a consultation for remark-only appointments. On the real data ~4,900 visits gain their clinical remarks. Test: `fix-remarks.test.ts`.
+
 ## Clinical data to the doctor's branch (2026-11-23)
 
 - The clinical import had placed appointments and prescriptions in the patient-city branch; an appointment belongs to the doctor's clinic branch, so a doctor's appointments were split across branches and a branch view showed too few. The import now uses the doctor's branch for appointments and prescriptions.

@@ -13,6 +13,11 @@ Two commands move posSoft's sales into this system:
 | `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` | Adds blood-work results and BHRT status logs, linked to the patient in the patient-city branch. Idempotent (deterministic ids). |
 | `npm run import:possoft-history -- --file <dump.sql> [--dry-run]` | Adds the intake history: one consultation per matched appointment, with its structured sections. Runs after the clinical import (it matches against the imported appointments). Idempotent (deterministic ids). |
 | `npm run fix:clinical-branches [-- --dry-run]` | Moves imported clinical data to the right branch: appointments, payments, consultations and prescriptions to the doctor's branch; medical records, blood work and BHRT to the branch where the patient is treated. Run it after `fix:doctor-branches`. Idempotent. |
+| `npm run fix:clinical-remarks [-- --dry-run]` | The posSoft clinical-remark note is each appointment's `app_remark`, which the dashboard shows as the visit's clinical remarks (the `plan` of the `clinical_assessment` section). This fills that plan from the appointment's remark and creates a lightweight consultation for appointments that have a remark but no consultation yet. Idempotent. |
+
+## Why `fix:clinical-remarks` exists
+
+The dashboard's patient-history panel shows each past visit's clinical remarks from `consultation_sections.data->>'plan'` of the `clinical_assessment` section. The posSoft narrative for a visit lives in the appointment's `app_remark` (imported into `appointments.remark`), not in the history columns, so the plan was empty and the panel said "No remarks recorded". This fix copies the remark into the clinical-assessment plan and, for appointments that had a remark but no intake-history consultation, creates a consultation so the remark has somewhere to live. The history import now sets the plan from `app_remark` directly, so this fix is only for data imported before the change.
 
 ## Why `fix:clinical-branches` exists
 
