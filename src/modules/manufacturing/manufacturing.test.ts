@@ -15,7 +15,7 @@ describe('manufacturing', () => {
     request(app).post(`/api/v1${path}?branchId=${ownerBranch}`).set(bearer(owner)).send(body);
   let storeKeeper: { id: string };
   let pharmacy: { id: string };
-  let islamabadAdmin: { id: string };
+  let islamabadKeeper: { id: string };
   let materialCategoryId: string;
   let almondOil: string;
   let beeswax: string;
@@ -23,7 +23,7 @@ describe('manufacturing', () => {
 
   const post = (path: string, body: object, who = admin) =>
     request(app).post(`/api/v1${path}`).set(bearer(who)).send(body);
-  const material = async (id: string, who = admin) =>
+  const material = async (id: string, who = storeKeeper) =>
     (await request(app).get(`/api/v1/branch/materials/${id}`).set(bearer(who))).body.data;
 
   beforeAll(async () => {
@@ -34,7 +34,7 @@ describe('manufacturing', () => {
     ownerBranch = lahore.id;
     storeKeeper = await createStaff(fake, { role: 'store_keeper', branchId: lahore.id });
     pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
-    islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
+    islamabadKeeper = await createStaff(fake, { role: 'store_keeper', branchId: islamabad.id });
 
     const categoryId = (await catalog('/branch/categories', { name: 'Balms' })).body.data.id;
     productId = (await catalog('/branch/products', { name: 'Lip Balm 100g', categoryId, sizeGrams: '100' }))
@@ -192,13 +192,13 @@ describe('manufacturing', () => {
     });
 
     const blocked = await request(app)
-      .delete(`/api/v1/branch/lab-transfers/${labBatchId}`)
-      .set(bearer(admin));
+      .delete(`/api/v1/branch/lab-transfers/${labBatchId}?branchId=${ownerBranch}`)
+      .set(bearer(owner));
     expect(blocked.status).toBe(409);
 
     const removed = await request(app)
-      .delete(`/api/v1/branch/productions/${production.body.data.id}`)
-      .set(bearer(admin));
+      .delete(`/api/v1/branch/productions/${production.body.data.id}?branchId=${ownerBranch}`)
+      .set(bearer(owner));
     expect(removed.status).toBe(204);
     expect(await material(almondOil)).toMatchObject({ labQuantity: '900.000' });
     const after = await request(app).get('/api/v1/branch/inventory/stock').set(bearer(admin));
@@ -261,17 +261,17 @@ describe('manufacturing', () => {
 
   it('isolates branches', async () => {
     expect(
-      (await request(app).get(`/api/v1/branch/materials/${almondOil}`).set(bearer(islamabadAdmin))).status,
+      (await request(app).get(`/api/v1/branch/materials/${almondOil}`).set(bearer(islamabadKeeper))).status,
     ).toBe(404);
     const foreign = await post(
       '/branch/lab-transfers',
       { batchNo: 'X', date: '2026-09-09', items: [{ materialId: almondOil, qty: '1' }] },
-      islamabadAdmin,
+      islamabadKeeper,
     );
     expect(foreign.status).toBe(400);
     const report = await request(app)
       .get('/api/v1/branch/manufacturing/material-report')
-      .set(bearer(islamabadAdmin));
+      .set(bearer(islamabadKeeper));
     expect(report.body.data).toHaveLength(0);
   });
 });

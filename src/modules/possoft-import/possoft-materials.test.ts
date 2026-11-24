@@ -81,7 +81,7 @@ describe('posSoft material import', () => {
   beforeEach(async () => {
     branchId = randomUUID();
     await AppDataSource.query(
-      `INSERT INTO branches (id, name, code, city, kind, status) VALUES ($1,'Falcon','FAL','Lahore','dispatch','active')`,
+      `INSERT INTO branches (id, name, code, city, kind, status) VALUES ($1,'Super Admin Stock','MAINWH','Lahore','warehouse','active')`,
       [branchId],
     );
   });
@@ -90,7 +90,7 @@ describe('posSoft material import', () => {
     const dump = await readDump(file, POSSOFT_MATERIAL_TABLES);
 
     const dry = await importPossoftMaterials(AppDataSource, dump, { dryRun: true });
-    expect(dry).toMatchObject({ branch: 'FAL', categories: 2, materials: 3, receipts: 2, batches: 1, batchItems: 2 });
+    expect(dry).toMatchObject({ branch: 'MAINWH', categories: 2, materials: 3, receipts: 2, batches: 1, batchItems: 2 });
     const [afterDry] = (await AppDataSource.query(`SELECT COUNT(*)::int AS count FROM materials`)) as {
       count: number;
     }[];

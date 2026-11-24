@@ -96,15 +96,26 @@ const frontDeskGrants: Grants = {
 
 const CATALOG_MODULES: readonly Module[] = ['categories', 'products', 'bundles', 'suppliers'];
 
+const MANUFACTURING_MODULES: readonly Module[] = [
+  'materials',
+  'materialCategories',
+  'recipes',
+  'labTransfers',
+  'production',
+  'finishedGoods',
+  'materialReport',
+];
+const CLINIC_BRANCH_MODULES = BRANCH_MODULES.filter((m) => !MANUFACTURING_MODULES.includes(m));
+
 const MATRIX: Record<Role, Grants> = {
   super_admin: grantAll([...PLATFORM_MODULES, ...BRANCH_MODULES], FULL),
   branch_admin: {
-    ...grantAll(BRANCH_MODULES, FULL),
+    ...grantAll(CLINIC_BRANCH_MODULES, FULL),
     ...grantAll(CATALOG_MODULES, VIEW),
   },
   accountant: {
     ...grantAll(
-      BRANCH_MODULES.filter((m) => m !== 'staff'),
+      CLINIC_BRANCH_MODULES.filter((m) => m !== 'staff'),
       VIEW_CREATE,
     ),
     ...grantAll(CATALOG_MODULES, VIEW),
@@ -165,10 +176,15 @@ const MATRIX: Record<Role, Grants> = {
     products: VIEW,
   },
   warehouse_keeper: {
+    dashboard: VIEW,
     stock: VIEW_CREATE,
     inventoryReport: VIEW,
     products: VIEW,
     suppliers: VIEW,
+    materials: VIEW_CREATE_UPDATE,
+    materialCategories: VIEW_CREATE_UPDATE,
+    labTransfers: VIEW_CREATE_UPDATE,
+    materialReport: VIEW,
   },
   lab_officer: {
     stock: VIEW_CREATE,

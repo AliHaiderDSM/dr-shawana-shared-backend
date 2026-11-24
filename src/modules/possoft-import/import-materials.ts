@@ -55,7 +55,7 @@ const placeOf = (value: string | null | undefined) => (/pharm/i.test(text(value)
 export async function importPossoftMaterials(
   source: DataSource,
   dump: DumpTables,
-  options: { dryRun?: boolean } = {},
+  options: { dryRun?: boolean; branchCode?: string } = {},
 ): Promise<MaterialSummary> {
   const rows = (table: string) => dump.get(table) ?? [];
   const summary: MaterialSummary = {
@@ -77,10 +77,21 @@ export async function importPossoftMaterials(
 
   try {
     await source.transaction(async (em) => {
-      const [branch] = (await em.query(
-        `SELECT id, code FROM branches WHERE kind = 'dispatch' AND deleted_at IS NULL ORDER BY created_at LIMIT 1`,
-      )) as { id: string; code: string }[];
-      if (!branch) throw new Error('No dispatch (Falcon) branch exists. Create it before importing materials.');
+      const [branch] = (
+        options.branchCode
+          ? ((await em.query(`SELECT id, code FROM branches WHERE code = $1 AND deleted_at IS NULL LIMIT 1`, [
+              options.branchCode,
+            ])) as { id: string; code: string }[])
+          : ((await em.query(
+              `SELECT id, code FROM branches WHERE kind = 'warehouse' AND deleted_at IS NULL ORDER BY created_at LIMIT 1`,
+            )) as { id: string; code: string }[])
+      );
+      if (!branch)
+        throw new Error(
+          options.branchCode
+            ? `No branch with code ${options.branchCode} exists.`
+            : 'No warehouse (MAINWH) branch exists. Run the sales import or seed first.',
+        );
       const branchId = branch.id;
       summary.branch = branch.code;
 

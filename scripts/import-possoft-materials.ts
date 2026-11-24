@@ -14,6 +14,7 @@ function argument(name: string) {
 
 async function main() {
   const file = argument('file');
+  const branchCode = argument('branch');
   const dryRun = process.argv.includes('--dry-run');
   if (!file || !existsSync(file))
     throw new Error('Pass the posSoft data export: --file /path/to/dump.sql');
@@ -24,7 +25,7 @@ async function main() {
 
   await AppDataSource.initialize();
   try {
-    const summary = await importPossoftMaterials(AppDataSource, dump, { dryRun });
+    const summary = await importPossoftMaterials(AppDataSource, dump, { dryRun, branchCode });
     console.log(JSON.stringify(summary, null, 2));
     console.log(
       dryRun ? 'Dry run: nothing was saved.' : `Materials saved to the ${summary.branch} branch.`,
