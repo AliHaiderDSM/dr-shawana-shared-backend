@@ -52,6 +52,7 @@ const DUMP = [
     [
       [1, 'DSM-001', '2026-08-04', '', 'Pharmacy Lab', 1, 1, '2026-08-05 15:03:06', '2026-08-05 15:03:06'],
       [2, 'DSM-001', '2026-08-11', '', 'Pharmacy Lab', 1, 1, '2026-08-11 13:22:03', '2026-08-11 13:22:03'],
+      [3, 'FP-001', '2026-09-01', '', 'Finished Product', 1, 1, '2026-09-01 10:00:00', '2026-09-01 10:00:00'],
     ],
   ),
   table(
@@ -61,7 +62,23 @@ const DUMP = [
       [1, 1, 1, '2026-08-04', '8000', 'Pharmacy Lab', 1, 1],
       [2, 1, 2, '2026-08-04', '400', 'Pharmacy Lab', 1, 1],
       [3, 2, 1, '2026-08-11', '500', 'Pharmacy Lab', 1, 1],
+      [4, 3, 1, '2026-09-01', '1000', 'Finished Product', 1, 1],
     ],
+  ),
+  table(
+    'products',
+    ['prod_id', 'prod_name', 'close', 'status'],
+    [[7, 'Lip Balm', 1, 1]],
+  ),
+  table(
+    'product_recipe',
+    ['prod_recipe_id', 'prod_recipe_prod_id', 'prod_recipe_date', 'prod_recipe_mat_id', 'prod_recipe_note', 'close', 'status', 'crt_date'],
+    [[1, 7, '2026-06-10', '1,2', 'mix well', 1, 1, '2026-06-10 10:00:00']],
+  ),
+  table(
+    'stocks_in',
+    ['stock_in_id', 'stock_in_prod_id', 'stock_in_date', 'stock_in_qty', 'stock_in_batch', 'close', 'status'],
+    [[1, 7, '2026-09-01', '9', 'FP-001', 1, 1]],
   ),
 ].join('\n');
 
@@ -84,20 +101,65 @@ describe('posSoft material import', () => {
       `INSERT INTO branches (id, name, code, city, kind, status) VALUES ($1,'Super Admin Stock','MAINWH','Lahore','warehouse','active')`,
       [branchId],
     );
+    const categoryId = randomUUID();
+    await AppDataSource.query(`INSERT INTO categories (id, branch_id, name) VALUES ($1,$2,'Balms')`, [
+      categoryId,
+      branchId,
+    ]);
+    await AppDataSource.query(
+      `INSERT INTO products (id, branch_id, name, category_id, size_grams, size_unit) VALUES ($1,$2,'Lip Balm',$3,'100','g')`,
+      [randomUUID(), branchId, categoryId],
+    );
   });
 
   it('imports categories, materials with thresholds, stock in and out, and lights the report warning', async () => {
     const dump = await readDump(file, POSSOFT_MATERIAL_TABLES);
 
     const dry = await importPossoftMaterials(AppDataSource, dump, { dryRun: true });
-    expect(dry).toMatchObject({ branch: 'MAINWH', categories: 2, materials: 3, receipts: 2, batches: 1, batchItems: 2 });
+    expect(dry).toMatchObject({
+      branch: 'MAINWH',
+      categories: 2,
+      materials: 3,
+      receipts: 2,
+      batches: 1,
+      batchItems: 2,
+      recipes: 1,
+      recipeItems: 2,
+      finishedGoods: 1,
+    });
     const [afterDry] = (await AppDataSource.query(`SELECT COUNT(*)::int AS count FROM materials`)) as {
       count: number;
     }[];
     expect(afterDry?.count).toBe(0);
 
     const summary = await importPossoftMaterials(AppDataSource, dump);
-    expect(summary).toMatchObject({ categories: 2, materials: 3, receipts: 2, batches: 1, batchItems: 2 });
+    expect(summary).toMatchObject({
+      categories: 2,
+      materials: 3,
+      receipts: 2,
+      batches: 1,
+      batchItems: 2,
+      recipes: 1,
+      recipeItems: 2,
+      finishedGoods: 1,
+    });
+
+    const [recipe] = (await AppDataSource.query(
+      `SELECT p.name AS product, (SELECT COUNT(*)::int FROM recipe_items i WHERE i.recipe_id = r.id) AS items
+         FROM product_recipes r JOIN products p ON p.id = r.product_id`,
+    )) as Record<string, unknown>[];
+    expect(recipe).toMatchObject({ product: 'Lip Balm', items: 2 });
+
+    const [pharmacyLab] = (await AppDataSource.query(
+      `SELECT COUNT(*)::int AS count FROM material_batches WHERE stage = 'pharmacy_lab'`,
+    )) as { count: number }[];
+    expect(pharmacyLab?.count).toBe(1);
+
+    const finished = await manufacturingReportsService.finishedGoods(branchId, {} as never);
+    expect(finished).toHaveLength(1);
+    expect(finished[0]).toMatchObject({ batchNo: 'FP-001', productName: 'Lip Balm' });
+    expect(finished[0]?.materialUsed.toString()).toBe('1000');
+    expect(finished[0]?.finishedQty.toString()).toBe('9');
 
     const materials = (await AppDataSource.query(
       `SELECT name, minimum::text AS minimum, bare_minimum::text AS bare, deleted_at IS NOT NULL AS deleted

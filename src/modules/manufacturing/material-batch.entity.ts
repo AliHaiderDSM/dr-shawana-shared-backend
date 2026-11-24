@@ -25,7 +25,7 @@ export type BatchStage = (typeof BATCH_STAGES)[number];
 })
 @Check(
   'CHK_material_batches_stage_links',
-  `("stage" = 'pharmacy_lab' AND "lab_batch_id" IS NULL AND "product_id" IS NULL) OR ("stage" = 'finished_product' AND "lab_batch_id" IS NOT NULL)`,
+  `("stage" = 'pharmacy_lab' AND "lab_batch_id" IS NULL AND "product_id" IS NULL) OR ("stage" = 'finished_product')`,
 )
 @Check(
   'CHK_material_batches_output',

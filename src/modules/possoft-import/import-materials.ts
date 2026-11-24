@@ -8,6 +8,9 @@ export const POSSOFT_MATERIAL_TABLES = [
   'materials_details',
   'materials_out',
   'materials_out_details',
+  'product_recipe',
+  'products',
+  'stocks_in',
 ];
 
 export interface MaterialSummary {
@@ -17,6 +20,9 @@ export interface MaterialSummary {
   receipts: number;
   batches: number;
   batchItems: number;
+  recipes: number;
+  recipeItems: number;
+  finishedGoods: number;
   skipped: {
     materialsNoCategory: number;
     receiptsNoMaterial: number;
@@ -24,6 +30,8 @@ export interface MaterialSummary {
     outNoMaterial: number;
     outNoQty: number;
     outNoBatch: number;
+    recipesNoProduct: number;
+    finishedNoProduct: number;
   };
 }
 
@@ -68,6 +76,9 @@ export async function importPossoftMaterials(
     receipts: 0,
     batches: 0,
     batchItems: 0,
+    recipes: 0,
+    recipeItems: 0,
+    finishedGoods: 0,
     skipped: {
       materialsNoCategory: 0,
       receiptsNoMaterial: 0,
@@ -75,6 +86,8 @@ export async function importPossoftMaterials(
       outNoMaterial: 0,
       outNoQty: 0,
       outNoBatch: 0,
+      recipesNoProduct: 0,
+      finishedNoProduct: 0,
     },
   };
 
@@ -110,6 +123,7 @@ export async function importPossoftMaterials(
       );
       await em.query(`DELETE FROM material_batches WHERE branch_id = $1`, [branchId]);
       await em.query(`DELETE FROM material_receipts WHERE branch_id = $1`, [branchId]);
+      await em.query(`DELETE FROM product_recipes WHERE branch_id = $1`, [branchId]);
       await em.query(`DELETE FROM materials WHERE branch_id = $1`, [branchId]);
       await em.query(`DELETE FROM material_categories WHERE branch_id = $1`, [branchId]);
 
@@ -216,7 +230,7 @@ export async function importPossoftMaterials(
       const batchByNo = new Map<string, { id: string; date: string; note: string | null }>();
       const headerBatch = new Map<string, string>();
       for (const head of rows('materials_out')) {
-        if (!activeMat(head)) continue;
+        if (!activeMat(head) || !/pharmacy lab/i.test(text(head.mat_out_status))) continue;
         const batchNo = text(head.mat_out_batch).slice(0, 100) || `posSoft out ${text(head.mat_out_id)}`;
         const id = deterministicId(`material_batch:${branchId}:${batchNo.toLowerCase()}`);
         headerBatch.set(text(head.mat_out_id), batchNo);
@@ -312,6 +326,130 @@ export async function importPossoftMaterials(
       );
       summary.batches = batchRows.length;
       summary.batchItems = itemRows.length;
+
+      const productByPosId = new Map<string, string>();
+      {
+        const dbProducts = (await em.query(
+          `SELECT id, lower(name) AS name FROM products WHERE branch_id = $1 AND deleted_at IS NULL`,
+          [branchId],
+        )) as { id: string; name: string }[];
+        const byName = new Map(dbProducts.map((p) => [p.name, p.id]));
+        for (const p of rows('products')) {
+          const id = byName.get(text(p.prod_name).toLowerCase());
+          if (id) productByPosId.set(text(p.prod_id), id);
+        }
+      }
+
+      const recipeRows: unknown[][] = [];
+      const recipeItemRows: unknown[][] = [];
+      for (const rec of rows('product_recipe')) {
+        if (!activeMat(rec)) continue;
+        const productId = productByPosId.get(text(rec.prod_recipe_prod_id));
+        if (!productId) {
+          summary.skipped.recipesNoProduct += 1;
+          continue;
+        }
+        const recipeId = deterministicId(`product_recipe:${branchId}:${text(rec.prod_recipe_id)}`);
+        const date = dateOf(rec.prod_recipe_date, rec.crt_date) ?? new Date().toISOString().slice(0, 10);
+        recipeRows.push([recipeId, branchId, productId, date, text(rec.prod_recipe_note) || null]);
+        const seen = new Set<string>();
+        let position = 0;
+        for (const raw of text(rec.prod_recipe_mat_id).split(',')) {
+          const materialId = materialMap.get(raw.trim());
+          if (!materialId || seen.has(materialId)) continue;
+          seen.add(materialId);
+          recipeItemRows.push([
+            deterministicId(`recipe_item:${recipeId}:${materialId}`),
+            recipeId,
+            materialId,
+            null,
+            (position += 1),
+          ]);
+        }
+      }
+      await insertIgnore(em, 'product_recipes', ['id', 'branch_id', 'product_id', 'date', 'note'], recipeRows);
+      await insertIgnore(
+        em,
+        'recipe_items',
+        ['id', 'recipe_id', 'material_id', 'qty', 'position'],
+        recipeItemRows,
+      );
+      summary.recipes = recipeRows.length;
+      summary.recipeItems = recipeItemRows.length;
+
+      const stockInByBatch = new Map<string, { prodId: string; qty: ReturnType<typeof amount> }>();
+      for (const si of rows('stocks_in')) {
+        if (!activeMat(si)) continue;
+        const batch = text(si.stock_in_batch);
+        if (!batch) continue;
+        const current = stockInByBatch.get(batch);
+        stockInByBatch.set(batch, {
+          prodId: text(si.stock_in_prod_id),
+          qty: (current?.qty ?? amount('0')).plus(amount(si.stock_in_qty)),
+        });
+      }
+
+      const finishedHeaders = new Map<string, { id: string; date: string }>();
+      const finishedBatchRows: unknown[][] = [];
+      for (const head of rows('materials_out')) {
+        if (!activeMat(head) || !/finished product/i.test(text(head.mat_out_status))) continue;
+        const posId = text(head.mat_out_id);
+        const id = deterministicId(`finished_batch:${branchId}:${posId}`);
+        const batchNo = text(head.mat_out_batch).slice(0, 100) || `posSoft finished ${posId}`;
+        const date = dateOf(head.mat_out_date, head.crt_date) ?? new Date().toISOString().slice(0, 10);
+        const si = stockInByBatch.get(text(head.mat_out_batch));
+        const productId = si && si.qty.gt(0) ? (productByPosId.get(si.prodId) ?? null) : null;
+        if (!productId) summary.skipped.finishedNoProduct += 1;
+        finishedHeaders.set(posId, { id, date });
+        finishedBatchRows.push([
+          id,
+          branchId,
+          batchNo,
+          'finished_product',
+          date,
+          text(head.mat_out_note) || null,
+          productId,
+          productId && si ? si.qty.toFixed(3) : null,
+        ]);
+      }
+
+      const finishedItemQty = new Map<string, { batchId: string; materialId: string; qty: ReturnType<typeof amount> }>();
+      for (const det of rows('materials_out_details')) {
+        if (!activeMat(det)) continue;
+        const header = finishedHeaders.get(text(det.material_out_id));
+        if (!header) continue;
+        const materialId = materialMap.get(text(det.mat_out_mat_id));
+        if (!materialId) continue;
+        const qty = amount(det.mat_out_quantity);
+        if (qty.lte(0)) continue;
+        const key = `${header.id}:${materialId}`;
+        const current = finishedItemQty.get(key);
+        finishedItemQty.set(key, { batchId: header.id, materialId, qty: (current?.qty ?? amount('0')).plus(qty) });
+      }
+      const finishedItemRows: unknown[][] = [];
+      let finishedPosition = 0;
+      for (const { batchId, materialId, qty } of finishedItemQty.values()) {
+        finishedItemRows.push([
+          deterministicId(`finished_item:${batchId}:${materialId}`),
+          batchId,
+          materialId,
+          qty.toFixed(3),
+          (finishedPosition += 1),
+        ]);
+      }
+      await insertIgnore(
+        em,
+        'material_batches',
+        ['id', 'branch_id', 'batch_no', 'stage', 'date', 'note', 'product_id', 'produced_qty'],
+        finishedBatchRows,
+      );
+      await insertIgnore(
+        em,
+        'material_batch_items',
+        ['id', 'batch_id', 'material_id', 'qty', 'position'],
+        finishedItemRows,
+      );
+      summary.finishedGoods = finishedBatchRows.length;
 
       if (options.dryRun) throw new DryRunRollback();
     });
