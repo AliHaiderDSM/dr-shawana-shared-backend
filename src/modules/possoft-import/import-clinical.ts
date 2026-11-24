@@ -40,7 +40,9 @@ export interface ClinicalSummary {
   skipped: {
     appointmentsNoDoctor: number;
     appointmentsNoDate: number;
+    appointmentsExisting: number;
     prescriptionsNoDoctor: number;
+    prescriptionsExisting: number;
     paymentsNoAppointment: number;
     paymentsNoAmount: number;
   };
@@ -92,7 +94,7 @@ function addMinutes(time: string, minutes: number): string {
 export async function importPossoftClinical(
   source: DataSource,
   dump: DumpTables,
-  options: { dryRun?: boolean; password: string },
+  options: { dryRun?: boolean; append?: boolean; password: string },
 ): Promise<ClinicalSummary> {
   const rows = (table: string) => dump.get(table) ?? [];
   const summary: ClinicalSummary = {
@@ -107,7 +109,9 @@ export async function importPossoftClinical(
     skipped: {
       appointmentsNoDoctor: 0,
       appointmentsNoDate: 0,
+      appointmentsExisting: 0,
       prescriptionsNoDoctor: 0,
+      prescriptionsExisting: 0,
       paymentsNoAppointment: 0,
       paymentsNoAmount: 0,
     },
@@ -119,13 +123,15 @@ export async function importPossoftClinical(
 
   try {
     await source.transaction(async (em) => {
-      const [existing] = (await em.query(
-        `SELECT (SELECT COUNT(*) FROM appointments) + (SELECT COUNT(*) FROM prescriptions) AS count`,
-      )) as { count: string }[];
-      if (Number(existing?.count ?? 0) > 0) {
-        throw new Error(
-          'Appointments or prescriptions already exist. The clinical import runs only on an empty clinic, so it is not added twice.',
-        );
+      if (!options.append) {
+        const [existing] = (await em.query(
+          `SELECT (SELECT COUNT(*) FROM appointments) + (SELECT COUNT(*) FROM prescriptions) AS count`,
+        )) as { count: string }[];
+        if (Number(existing?.count ?? 0) > 0) {
+          throw new Error(
+            'Appointments or prescriptions already exist. The clinical import runs only on an empty clinic, so it is not added twice.',
+          );
+        }
       }
       const branchRows = (await em.query(`SELECT id, code, kind FROM branches WHERE deleted_at IS NULL`)) as {
         id: string;
@@ -215,6 +221,23 @@ export async function importPossoftClinical(
 
       const patients = await PatientResolver.load(em, rows('customers'));
 
+      const existingApptKeys = new Set<string>();
+      const existingPresKeys = new Set<string>();
+      if (options.append) {
+        for (const row of (await em.query(
+          `SELECT patient_id, doctor_id, to_char(date, 'YYYY-MM-DD') AS d, time_from::text AS t
+             FROM appointments WHERE deleted_at IS NULL`,
+        )) as { patient_id: string; doctor_id: string; d: string; t: string }[]) {
+          existingApptKeys.add(`${row.patient_id}|${row.doctor_id}|${row.d}|${row.t}`);
+        }
+        for (const row of (await em.query(
+          `SELECT patient_id, doctor_id, to_char(date, 'YYYY-MM-DD') AS d
+             FROM prescriptions WHERE deleted_at IS NULL`,
+        )) as { patient_id: string; doctor_id: string; d: string }[]) {
+          existingPresKeys.add(`${row.patient_id}|${row.doctor_id}|${row.d}`);
+        }
+      }
+
       const accountByCode = new Map(
         (
           (await em.query(
@@ -269,6 +292,11 @@ export async function importPossoftClinical(
         const patientId = await patients.resolve(em, text(appt.app_pat_id), city, branchId);
         const id = randomUUID();
         const from = parseTime(appt.app_time_from) ?? '09:00:00';
+        if (options.append && existingApptKeys.has(`${patientId}|${doctorId}|${date}|${from}`)) {
+          summary.skipped.appointmentsExisting += 1;
+          continue;
+        }
+        existingApptKeys.add(`${patientId}|${doctorId}|${date}|${from}`);
         let to = parseTime(appt.app_time_to) ?? addMinutes(from, 15);
         if (to <= from) to = addMinutes(from, 15);
         const mode = /online/i.test(text(appt.app_on_phy_status)) ? 'online' : 'physical';
@@ -391,6 +419,11 @@ export async function importPossoftClinical(
         const city = text(customer?.cust_city) || 'Lahore';
         const branchId = doctorBranchId;
         const patientId = await patients.resolve(em, text(pres.pres_cust_id), city, branchId);
+        if (options.append && existingPresKeys.has(`${patientId}|${doctorId}|${date}`)) {
+          summary.skipped.prescriptionsExisting += 1;
+          continue;
+        }
+        existingPresKeys.add(`${patientId}|${doctorId}|${date}`);
         const id = randomUUID();
         const notes = {
           blood: text(pres.pres_bloodNote) || null,

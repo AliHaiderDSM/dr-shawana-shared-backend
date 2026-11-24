@@ -8,6 +8,7 @@ Two commands move posSoft's sales into this system:
 | `npm run import:possoft-sales -- --file <dump.sql> [--dry-run]` | Reads a posSoft MySQL data export and adds its sales. `--dry-run` does everything inside a transaction, prints the summary, then rolls it back. |
 | `npm run import:possoft-catalog -- --file <dump.sql> [--dry-run]` | Adds posSoft's categories and products to the main warehouse and links every branch product with the same name to its warehouse product. Safe to run again: existing warehouse products (same name) are reused. For databases filled by an earlier version of the sales import. |
 | `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` | Adds doctors (with logins), appointments, appointment payments and prescriptions. Runs after the sales import and `npm run seed`. Refuses to run when appointments or prescriptions already exist. |
+| `npm run import:possoft-delta -- --old <old.sql> --file <new.sql> --password <value> [--dry-run]` | Catch-up after the one-time migration: adds only the sales, appointments and prescriptions that are in the fresh export but not in the already-imported `--old` export. Existing patients, products, accounts and doctors are reused, never duplicated, and invoice numbers continue from the current maximum. See "Delta (catch-up) import" below. |
 | `npm run possoft:collect-files -- --file <dump.sql> --source <pos-img> --dest <med-files>` | Copies only the medical-record image/pdf files out of the full `pos-img` folder into a smaller folder, so just those (~2.9 GB) need to reach the server. Runs on the machine that holds the files; needs no database. |
 | `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` | Creates medical records and uploads their image/pdf files to storage (R2). Idempotent: a deterministic id per record and file means a re-run skips what is already there and re-uploads the same key. |
 | `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` | Adds blood-work results and BHRT status logs, linked to the patient in the patient-city branch. Idempotent (deterministic ids). |
@@ -46,6 +47,16 @@ The first clinical import put appointments and prescriptions in the **patient's 
 - On the real export a `--dry-run` reports about: medicalRecords 2,005, filesUploaded 5,072, filesWrongType 26, filesMissing 0.
 
 The import refuses to run when the `sales` table already has rows, so it cannot be added twice.
+
+## Delta (catch-up) import (`import-delta.ts`, `diff-dump.ts`)
+
+The one-time migration is a cutover: afterwards new work is entered in this system, not posSoft. The delta import is only for the case where posSoft kept receiving data after the migration dump was taken and that gap still has to be brought in once.
+
+- It compares the fresh export (`--file`) against the already-imported export (`--old`) and imports only the sales, appointments and prescriptions whose posSoft primary key is in the fresh one but not the old one (`diffDump`). Their child rows (sale items/payments, appointment payments) follow their parent.
+- The sales and clinical imports run in **append** mode: the empty-table guard is skipped, patients (via `PatientResolver`), branch products (by warehouse origin, then by name), accounts and banks (by name) and doctors (by username) are looked up and reused, and invoice numbers continue from the current maximum per branch.
+- It is **idempotent against the database**, so running it twice does not duplicate: a sale is skipped when its `posSoft sale #<id>` marker is already stored, and an appointment or prescription is skipped when one already exists for the same patient + doctor + date (+ time for appointments).
+- It covers sales + clinical only. After it, re-run `import:possoft-medical`, `import:possoft-clinical-extra` and `import:possoft-history` on the fresh export (all deterministic, so they add only new rows) to bring across any new medical records, blood work, BHRT and intake history.
+- **Limitation:** a payment or item added in posSoft to a sale/appointment that already existed in the old dump is not synced; only wholly-new sales/appointments/prescriptions are. **Always `--dry-run` first and check the `New rows found` counts before the real run.** Test: `possoft-delta.test.ts`.
 
 ## What the clinical import creates (`import-clinical.ts`)
 

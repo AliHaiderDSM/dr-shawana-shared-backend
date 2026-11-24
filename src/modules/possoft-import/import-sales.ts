@@ -4,6 +4,7 @@ import { Decimal } from '../../database/transformers';
 import { normalizePhone } from '../patients/phone';
 import type { DumpTables } from './dump-reader';
 import { importPossoftCatalog } from './import-catalog';
+import { PatientResolver } from './patient-resolver';
 import {
   CITY_BRANCHES,
   amount,
@@ -65,7 +66,7 @@ class DryRunRollback extends Error {}
 export async function importPossoftSales(
   source: DataSource,
   dump: DumpTables,
-  options: { dryRun?: boolean } = {},
+  options: { dryRun?: boolean; append?: boolean } = {},
 ): Promise<ImportSummary> {
   const rows = (table: string) => dump.get(table) ?? [];
   const summary: ImportSummary = {
@@ -121,11 +122,15 @@ export async function importPossoftSales(
 
   try {
     await source.transaction(async (em) => {
-      const [existing] = (await em.query(`SELECT COUNT(*)::int AS count FROM sales`)) as { count: number }[];
-      if ((existing?.count ?? 0) > 0) {
-        throw new Error(
-          'The sales table is not empty. Reset the database first so the import is not added twice.',
-        );
+      if (!options.append) {
+        const [existing] = (await em.query(`SELECT COUNT(*)::int AS count FROM sales`)) as {
+          count: number;
+        }[];
+        if ((existing?.count ?? 0) > 0) {
+          throw new Error(
+            'The sales table is not empty. Reset the database first so the import is not added twice.',
+          );
+        }
       }
 
       const branchIds = new Map<string, string>();
@@ -156,60 +161,91 @@ export async function importPossoftSales(
       }
       const branchIdOf = (code: string) => branchIds.get(code) as string;
 
-      const patientIds = new Map<string, string>();
-      const patientByLast9 = new Map<string, string>();
-      const patientRows: unknown[][] = [];
-      for (const { sale, branch } of saleRows) {
-        const custId = text(sale.sale_cust_id);
-        if (patientIds.has(custId)) continue;
-        const customer = customers.get(custId);
-        if (!customer) summary.skipped.missingCustomer += 1;
-        const rawPhone = text(customer?.cust_phone);
-        const phone = normalizePhone(rawPhone);
-        if (phone && patientByLast9.has(phone.last9)) {
-          patientIds.set(custId, patientByLast9.get(phone.last9) as string);
-          summary.patientsMerged += 1;
-          continue;
+      const alreadyImported = new Set<string>();
+      if (options.append) {
+        for (const row of (await em.query(
+          `SELECT note FROM sales WHERE note LIKE 'posSoft sale #%'`,
+        )) as { note: string | null }[]) {
+          const marker = /^posSoft sale #(\d+)$/.exec(row.note ?? '');
+          if (marker?.[1]) alreadyImported.add(marker[1]);
         }
-        if (!phone) summary.patientsWithoutValidPhone += 1;
-        const id = randomUUID();
-        const key = `P${custId.padStart(8, '0').slice(-8)}`;
-        const age = Number(text(customer?.cust_age).replace(/\D/g, ''));
-        patientRows.push([
-          id,
-          text(customer?.cust_name).slice(0, 150) || `posSoft customer ${custId}`,
-          (rawPhone || 'not given').slice(0, 30),
-          phone?.normalized ?? `possoft-${custId}`.slice(0, 20),
-          phone?.last9 ?? key,
-          (text(customer?.cust_city) || text(sale.sale_cust_city) || branch.city).slice(0, 100),
-          Number.isInteger(age) && age > 0 && age <= 150 ? age : null,
-          text(customer?.cust_country).slice(0, 100) || null,
-          text(customer?.cust_address) || null,
-          branchIdOf(branch.code),
-          timestampOf(customer?.crt_date) ?? new Date().toISOString(),
-        ]);
-        patientIds.set(custId, id);
-        if (phone) patientByLast9.set(phone.last9, id);
       }
-      await insertMany(
-        em,
-        'patients',
-        [
-          'id',
-          'name',
-          'phone',
-          'phone_normalized',
-          'phone_last9',
-          'city',
-          'age',
-          'country',
-          'address',
-          'created_in_branch_id',
-          'created_at',
-        ],
-        patientRows,
-      );
-      summary.patients = patientRows.length;
+      const importRows = options.append
+        ? saleRows.filter((r) => !alreadyImported.has(text(r.sale.sale_id)))
+        : saleRows;
+
+      const patientIds = new Map<string, string>();
+      if (options.append) {
+        const resolver = await PatientResolver.load(em, rows('customers'));
+        for (const { sale, branch } of importRows) {
+          const custId = text(sale.sale_cust_id);
+          if (patientIds.has(custId)) continue;
+          const customer = customers.get(custId);
+          if (!customer) summary.skipped.missingCustomer += 1;
+          const city = (
+            text(customer?.cust_city) ||
+            text(sale.sale_cust_city) ||
+            branch.city
+          ).slice(0, 100);
+          const id = await resolver.resolve(em, custId, city, branchIdOf(branch.code));
+          patientIds.set(custId, id);
+        }
+        summary.patients = resolver.created;
+      } else {
+        const patientByLast9 = new Map<string, string>();
+        const patientRows: unknown[][] = [];
+        for (const { sale, branch } of importRows) {
+          const custId = text(sale.sale_cust_id);
+          if (patientIds.has(custId)) continue;
+          const customer = customers.get(custId);
+          if (!customer) summary.skipped.missingCustomer += 1;
+          const rawPhone = text(customer?.cust_phone);
+          const phone = normalizePhone(rawPhone);
+          if (phone && patientByLast9.has(phone.last9)) {
+            patientIds.set(custId, patientByLast9.get(phone.last9) as string);
+            summary.patientsMerged += 1;
+            continue;
+          }
+          if (!phone) summary.patientsWithoutValidPhone += 1;
+          const id = randomUUID();
+          const key = `P${custId.padStart(8, '0').slice(-8)}`;
+          const age = Number(text(customer?.cust_age).replace(/\D/g, ''));
+          patientRows.push([
+            id,
+            text(customer?.cust_name).slice(0, 150) || `posSoft customer ${custId}`,
+            (rawPhone || 'not given').slice(0, 30),
+            phone?.normalized ?? `possoft-${custId}`.slice(0, 20),
+            phone?.last9 ?? key,
+            (text(customer?.cust_city) || text(sale.sale_cust_city) || branch.city).slice(0, 100),
+            Number.isInteger(age) && age > 0 && age <= 150 ? age : null,
+            text(customer?.cust_country).slice(0, 100) || null,
+            text(customer?.cust_address) || null,
+            branchIdOf(branch.code),
+            timestampOf(customer?.crt_date) ?? new Date().toISOString(),
+          ]);
+          patientIds.set(custId, id);
+          if (phone) patientByLast9.set(phone.last9, id);
+        }
+        await insertMany(
+          em,
+          'patients',
+          [
+            'id',
+            'name',
+            'phone',
+            'phone_normalized',
+            'phone_last9',
+            'city',
+            'age',
+            'country',
+            'address',
+            'created_in_branch_id',
+            'created_at',
+          ],
+          patientRows,
+        );
+        summary.patients = patientRows.length;
+      }
 
       const catalog = await importPossoftCatalog(em, dump);
       summary.warehouseCategories = catalog.categoriesAdded;
@@ -223,6 +259,9 @@ export async function importPossoftSales(
 
       const categoryNames = new Map<string, string>();
       const productIds = new Map<string, string>();
+      const existingProductByOrigin = new Map<string, string>();
+      const existingProductByName = new Map<string, string>();
+      const existingSheetByName = new Map<string, string>();
       const categoryRows: unknown[][] = [];
       const productRows: unknown[][] = [];
 
@@ -244,12 +283,21 @@ export async function importPossoftSales(
         const product = products.get(prodId);
         if (!product) summary.skipped.missingProduct += 1;
         const origin = catalog.productIds.get(prodId) ?? null;
+        const branchId = branchIdOf(code);
+        const name = (text(product?.prod_name) || `posSoft product ${prodId}`).slice(0, 200);
+        const reused =
+          (origin && existingProductByOrigin.get(`${branchId}:${origin}`)) ||
+          existingProductByName.get(`${branchId}:${name.toLowerCase()}`);
+        if (reused) {
+          productIds.set(key, reused);
+          return reused;
+        }
         const id = randomUUID();
         const active = product ? isActive(product) && text(product.status) !== '0' : false;
         productRows.push([
           id,
-          branchIdOf(code),
-          (text(product?.prod_name) || `posSoft product ${prodId}`).slice(0, 200),
+          branchId,
+          name,
           categoryFor(code, text(product?.prod_cat_id)),
           text(product?.prod_batch_no).slice(0, 100) || null,
           (origin && prices.get(origin)) ?? '0.00',
@@ -257,6 +305,8 @@ export async function importPossoftSales(
           origin,
         ]);
         productIds.set(key, id);
+        if (origin) existingProductByOrigin.set(`${branchId}:${origin}`, id);
+        existingProductByName.set(`${branchId}:${name.toLowerCase()}`, id);
         return id;
       };
 
@@ -278,8 +328,11 @@ export async function importPossoftSales(
       };
 
       const noAccountChosen = (fallbackDate: string) => {
-        const known = sheetIds.get('none');
-        if (known) return known;
+        const known = sheetIds.get('none') ?? existingSheetByName.get(NO_ACCOUNT_CHOSEN.toLowerCase());
+        if (known) {
+          sheetIds.set('none', known);
+          return known;
+        }
         const id = randomUUID();
         sheetRows.push([
           id,
@@ -292,6 +345,7 @@ export async function importPossoftSales(
           new Date().toISOString(),
         ]);
         sheetIds.set('none', id);
+        existingSheetByName.set(NO_ACCOUNT_CHOSEN.toLowerCase(), id);
         return id;
       };
 
@@ -305,12 +359,18 @@ export async function importPossoftSales(
         if (known) return known;
         const bankName = text(banks.get(text(sheet.as_sheet_type))?.bank_name);
         const isCash = !bankName || /\bcash\b/i.test(bankName);
+        const accountName = (text(sheet.as_account_name) || bankName || 'posSoft account').slice(0, 150);
+        const reused = existingSheetByName.get(accountName.toLowerCase());
+        if (reused) {
+          sheetIds.set(sheetId, reused);
+          return reused;
+        }
         const id = randomUUID();
         const bankId = isCash ? null : bankFor(bankName.slice(0, 150));
         sheetRows.push([
           id,
           accountsBranchId(),
-          (text(sheet.as_account_name) || bankName || 'posSoft account').slice(0, 150),
+          accountName,
           (text(sheet.as_account_code) || '-').slice(0, 100),
           bankId,
           isCash ? 'cash' : 'bank',
@@ -318,15 +378,50 @@ export async function importPossoftSales(
           isActive(sheet) ? null : (timestampOf(sheet.del_date) ?? new Date().toISOString()),
         ]);
         sheetIds.set(sheetId, id);
+        existingSheetByName.set(accountName.toLowerCase(), id);
         return id;
       };
 
       const sequence = new Map<string, number>();
+      if (options.append) {
+        const codeByBranchId = new Map<string, string>();
+        for (const [code, bid] of branchIds) codeByBranchId.set(bid, code);
+        for (const row of (await em.query(
+          `SELECT branch_id, lower(name) AS name, id FROM categories WHERE deleted_at IS NULL`,
+        )) as { branch_id: string; name: string; id: string }[]) {
+          const code = codeByBranchId.get(row.branch_id);
+          if (code) categoryNames.set(`${code}:${row.name}`, row.id);
+        }
+        for (const row of (await em.query(
+          `SELECT branch_id, origin_product_id AS origin, lower(name) AS name, id FROM products WHERE deleted_at IS NULL`,
+        )) as { branch_id: string; origin: string | null; name: string; id: string }[]) {
+          if (row.origin) existingProductByOrigin.set(`${row.branch_id}:${row.origin}`, row.id);
+          existingProductByName.set(`${row.branch_id}:${row.name}`, row.id);
+        }
+        for (const row of (await em.query(`SELECT lower(name) AS name, id FROM banks WHERE branch_id = $1`, [
+          catalog.warehouseId,
+        ])) as { name: string; id: string }[]) {
+          bankNames.set(row.name, row.id);
+        }
+        for (const row of (await em.query(
+          `SELECT lower(account_name) AS name, id FROM account_sheets WHERE branch_id = $1`,
+          [catalog.warehouseId],
+        )) as { name: string; id: string }[]) {
+          existingSheetByName.set(row.name, row.id);
+        }
+        for (const row of (await em.query(
+          `SELECT b.code AS code, COALESCE(MAX(s.invoice_seq), 0)::int AS last
+             FROM sales s JOIN branches b ON b.id = s.branch_id
+            GROUP BY b.code`,
+        )) as { code: string; last: number }[]) {
+          sequence.set(row.code, row.last);
+        }
+      }
       const salesInsert: unknown[][] = [];
       const itemsInsert: unknown[][] = [];
       const paymentsInsert: unknown[][] = [];
 
-      for (const { sale, branch } of saleRows) {
+      for (const { sale, branch } of importRows) {
         const code = branch.code;
         const branchId = branchIdOf(code);
         const saleId = text(sale.sale_id);

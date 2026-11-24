@@ -23,6 +23,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft delta (catch-up) import (2026-11-24)
+
+- After the one-time migration, posSoft kept receiving data; the one-shot imports use random ids and a not-empty guard, so they cannot "add only the new rows". `npm run import:possoft-delta -- --old <old.sql> --file <new.sql> --password <value> [--dry-run]` compares the fresh export against the already-imported one and brings across only the new sales, appointments and prescriptions.
+- `diff-dump.ts` filters the fact tables to the primary keys that are new; `import-sales.ts` and `import-clinical.ts` gained an `append` mode that skips the empty-table guard, reuses existing patients / products / accounts / banks / doctors instead of duplicating them, and continues invoice numbers from the current maximum. It is idempotent against the DB (sales by the `posSoft sale #<id>` note marker; appointments/prescriptions by patient + doctor + date (+ time)), so a second run adds nothing.
+- Covers sales + clinical; the deterministic medical / blood-work / BHRT / history imports are re-run on the fresh export afterwards to catch their new rows. Known limitation: payments/items added to a pre-existing sale/appointment are not synced. Code: `import-delta.ts`, `diff-dump.ts`. Test: `possoft-delta.test.ts`. Docs: `docs/POSSOFT_IMPORT.md`.
+
 ## Full medical history in the intake import (2026-11-24)
 
 - The Medical history tab was missing most of its data: the hormones / contraception / periods block did not show, and the lifestyle fields (alcohol / smoking / exercise) came through empty even though posSoft had them. Cause: `history-mapper.ts` only mapped conditions / surgeries / family / allergies / diet / relationship and had omitted the rest of `medical_history`.
