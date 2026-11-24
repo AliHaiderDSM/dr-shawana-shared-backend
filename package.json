@@ -41,6 +41,7 @@
     "import:possoft-clinical-extra": "ts-node scripts/import-possoft-clinical-extra.ts",
     "import:possoft-history": "ts-node scripts/import-possoft-history.ts",
     "fix:clinical-branches": "ts-node scripts/fix-clinical-branches.ts",
+    "fix:duplicate-doctors": "ts-node scripts/fix-duplicate-doctors.ts",
     "fix:clinical-remarks": "ts-node scripts/fix-clinical-remarks.ts"
   },
   "dependencies": {
