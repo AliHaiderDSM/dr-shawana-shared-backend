@@ -82,6 +82,19 @@ appointmentsRouter.get(
 );
 
 appointmentsRouter.get(
+  '/admin/appointments',
+  authenticate,
+  requireRole('super_admin'),
+  validate({ query: appointmentListQuerySchema }),
+  async (req, res) => {
+    const { items, meta } = await appointmentsService.listAllBranches(
+      validQuery(req, appointmentListQuerySchema),
+    );
+    sendOk(res, items, meta);
+  },
+);
+
+appointmentsRouter.get(
   `${path}/summary`,
   can('view'),
   validate({ query: appointmentSummaryQuerySchema }),

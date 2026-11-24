@@ -13,6 +13,7 @@ describe('appointments and payments', () => {
   let frontDesk: { id: string };
   let pharmacy: { id: string };
   let islamabadAdmin: { id: string };
+  let owner: { id: string };
   let doctorUser: { id: string };
   let doctorId: string;
   let otherDoctorId: string;
@@ -42,7 +43,7 @@ describe('appointments and payments', () => {
     frontDesk = await createStaff(fake, { role: 'front_desk', branchId: lahore.id });
     pharmacy = await createStaff(fake, { role: 'pharmacy', branchId: lahore.id });
     islamabadAdmin = await createStaff(fake, { role: 'branch_admin', branchId: islamabad.id });
-    const owner = await createStaff(fake, { role: 'super_admin', branchId: null });
+    owner = await createStaff(fake, { role: 'super_admin', branchId: null });
     doctorUser = await createStaff(fake, { role: 'doctor', branchId: lahore.id });
     const otherDoctorUser = await createStaff(fake, { role: 'doctor', branchId: lahore.id });
 
@@ -286,6 +287,24 @@ describe('appointments and payments', () => {
     });
     const tooLong = await api('get', '/branch/appointments/calendar?from=2026-01-01&to=2026-12-31', admin);
     expect(tooLong.status).toBe(400);
+  });
+
+  it('lets super admin see appointments across all branches, and blocks other roles', async () => {
+    const all = await api('get', '/admin/appointments', owner);
+    expect(all.status).toBe(200);
+    expect(all.body.data.length).toBeGreaterThan(0);
+    expect(all.body.data[0]).toMatchObject({ branch: { code: 'LHR' } });
+    expect(all.body.data[0].patient).toBeTruthy();
+
+    const empty = await api(
+      'get',
+      '/admin/appointments?branchId=00000000-0000-0000-0000-000000000000',
+      owner,
+    );
+    expect(empty.body.data).toHaveLength(0);
+
+    const blocked = await api('get', '/admin/appointments', admin);
+    expect(blocked.status).toBe(403);
   });
 
   it('sets the status and remark with screenshots', async () => {

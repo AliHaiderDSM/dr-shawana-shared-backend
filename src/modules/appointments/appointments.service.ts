@@ -33,7 +33,8 @@ import {
   toPaymentDto,
   uploadProofs,
 } from './appointment-payments.service';
-import { type Appointment } from './appointment.entity';
+import { Appointment } from './appointment.entity';
+import { Branch } from '../branches/branch.entity';
 import { type AppointmentPayment } from './appointment-payment.entity';
 import {
   type AppointmentListQuery,
@@ -266,6 +267,60 @@ export const appointmentsService = {
         ...toAppointmentDto(i, paid.get(i.id)),
         createdByName: i.createdBy ? (creatorName.get(i.createdBy) ?? null) : null,
       })),
+      meta,
+    };
+  },
+
+  async listAllBranches(query: AppointmentListQuery) {
+    const qb = AppDataSource.getRepository(Appointment)
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.patient', 'patient')
+      .leftJoinAndSelect('a.doctor', 'doctor')
+      .leftJoinAndMapOne('a.branch', Branch, 'branch', 'branch.id = a.branch_id')
+      .where('a.deleted_at IS NULL');
+    if (query.branchId) qb.andWhere('a.branch_id = :branchId', { branchId: query.branchId });
+    if (query.doctorId) qb.andWhere('a.doctorId = :doctorId', { doctorId: query.doctorId });
+    if (query.patientId) qb.andWhere('a.patientId = :patientId', { patientId: query.patientId });
+    if (query.status) qb.andWhere('a.status = :status', { status: query.status });
+    if (query.mode) qb.andWhere('a.mode = :mode', { mode: query.mode });
+    if (query.visitType) qb.andWhere('a.visitType = :visitType', { visitType: query.visitType });
+    if (query.from) qb.andWhere('a.date >= :from', { from: query.from });
+    if (query.to) qb.andWhere('a.date <= :to', { to: query.to });
+    if (query.search) {
+      qb.andWhere(
+        `(patient.name ILIKE :term OR patient.phone ILIKE :term OR CONCAT('APP#', a.appointmentNo, CASE WHEN a.repeatNo IS NULL THEN '' ELSE CONCAT('.', a.repeatNo) END) ILIKE :term)`,
+        { term: `%${escapeLike(query.search)}%` },
+      );
+    }
+    applyListQuery(
+      qb,
+      { ...query, search: undefined },
+      { sortMap: { date: 'a.date', createdAt: 'a.createdAt', appointmentNo: 'a.appointmentNo' } },
+    );
+    if (query.sort.endsWith('date')) qb.addOrderBy('a.timeFrom', query.sort.startsWith('-') ? 'DESC' : 'ASC');
+    const [items, total] = await qb.getManyAndCount();
+    const meta = pageMeta(query, total);
+    return {
+      items: items.map((a) => {
+        const branch = (a as Appointment & { branch?: Branch }).branch;
+        return {
+          id: a.id,
+          appointmentNo: a.appointmentNo,
+          repeatNo: a.repeatNo,
+          date: a.date,
+          timeFrom: a.timeFrom,
+          timeTo: a.timeTo,
+          status: a.status,
+          mode: a.mode,
+          visitType: a.visitType,
+          fee: toMoney(a.fee),
+          patient: a.patient
+            ? { id: a.patient.id, name: a.patient.name, phone: a.patient.phone, city: a.patient.city }
+            : null,
+          doctor: a.doctor ? { id: a.doctor.id, name: a.doctor.displayName } : null,
+          branch: branch ? { id: branch.id, code: branch.code, name: branch.name } : null,
+        };
+      }),
       meta,
     };
   },

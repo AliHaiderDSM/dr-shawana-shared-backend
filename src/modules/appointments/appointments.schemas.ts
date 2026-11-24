@@ -165,6 +165,7 @@ export const appointmentListQuerySchema = listQuerySchema(
   '-date',
 ).extend({
   ...filterFields,
+  branchId: z.uuid().optional().openapi({ description: 'All-branches view: filter by one branch' }),
   from: dateInput.optional(),
   to: dateInput.optional(),
   visitType: z.enum(VISIT_TYPES).optional(),
@@ -422,6 +423,27 @@ const withData = (payload: z.ZodType, files: Record<string, z.ZodType>) => ({
   },
 });
 
+export const appointmentOverviewSchema = registry.register(
+  'AppointmentOverview',
+  z.object({
+    id: z.uuid(),
+    appointmentNo: z.number().int(),
+    repeatNo: z.number().int().nullable(),
+    date: z.string(),
+    timeFrom: z.string(),
+    timeTo: z.string(),
+    status: z.enum(APPOINTMENT_STATUSES),
+    mode: z.enum(APPOINTMENT_MODES),
+    visitType: z.enum(VISIT_TYPES),
+    fee: moneyOutput,
+    patient: z
+      .object({ id: z.uuid(), name: z.string(), phone: z.string(), city: z.string().nullable() })
+      .nullable(),
+    doctor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+    branch: z.object({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  }),
+);
+
 const appointmentDocs = securedDocs('Appointments');
 const paymentDocs = securedDocs('Appointment payments');
 const item = '/branch/appointments/{id}';
@@ -463,6 +485,18 @@ registry.registerPath({
   request: { query: appointmentListQuerySchema },
   responses: {
     200: { description: 'Page', ...jsonContent(pageEnvelope(appointmentSchema)) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...appointmentDocs,
+  method: 'get',
+  path: '/admin/appointments',
+  summary: 'Super Admin: appointments across every branch, with a branch filter',
+  request: { query: appointmentListQuerySchema },
+  responses: {
+    200: { description: 'Page', ...jsonContent(pageEnvelope(appointmentOverviewSchema)) },
     ...errorResponses,
   },
 });
