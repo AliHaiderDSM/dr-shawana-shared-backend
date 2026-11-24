@@ -27,6 +27,7 @@ const dimensions = [
     [
       [1, 'Alpha Patient', '03001112223', 'Lahore', '35', 'Pakistan', '', 1, '2026-01-01 00:00:00'],
       [2, 'Beta Patient', '03004445556', 'Lahore', '41', 'Pakistan', '', 1, '2026-01-02 00:00:00'],
+      [3, 'Gamma Patient', '03007778889', 'Karachi', '29', 'Pakistan', '', 1, '2026-01-03 00:00:00'],
     ],
   ),
   table('categories', ['cat_id', 'cat_name', 'close', 'status'], [[1, 'Meds', 1, 1]]),
@@ -137,10 +138,15 @@ const PRES_COLS = [
 
 const oldSales: (string | number)[][] = [
   [100, 1, 'Lahore', '2026-02-01', 'Office Sale', 'Lahore', '2400', '0', '2400', '2400', 1, 1, '2026-02-01 11:00:00'],
+  [103, 3, 'Karachi', '2026-02-02', 'Office Sale', 'Karachi', '1200', '0', '1200', '1200', 1, 1, '2026-02-02 11:00:00'],
 ];
-const oldSaleProducts: (string | number)[][] = [[1, 100, 10, '2', '1200', '2400', 1, '2026-02-01 11:00:00']];
+const oldSaleProducts: (string | number)[][] = [
+  [1, 100, 10, '2', '1200', '2400', 1, '2026-02-01 11:00:00'],
+  [4, 103, 10, '1', '1200', '1200', 1, '2026-02-02 11:00:00'],
+];
 const oldSalePayments: (string | number)[][] = [
   [1, 100, 'Cash Payment', '', '', '', 1, '2400', '2026-02-01', 1, '2026-02-01 11:00:00'],
+  [4, 103, 'Cash Payment', '', '', '', 1, '1200', '2026-02-02', 1, '2026-02-02 11:00:00'],
 ];
 const oldAppointments: (string | number)[][] = [
   [1, 1, 'Lahore', 1, 'Physical', 'New', '2026-07-01', '10:00:00', '10:30:00', 'issue', '3000', 'ok', 1, 1, '2026-07-01 10:00:00'],
@@ -240,10 +246,10 @@ describe('posSoft delta import', () => {
     await importPossoftSales(AppDataSource, oldDump);
     await importPossoftClinical(AppDataSource, oldDump, { password: 'StartPass1' });
 
-    expect(await count(`SELECT COUNT(*)::int AS count FROM sales`)).toBe(1);
+    expect(await count(`SELECT COUNT(*)::int AS count FROM sales`)).toBe(2);
     expect(await count(`SELECT COUNT(*)::int AS count FROM appointments`)).toBe(1);
     expect(await count(`SELECT COUNT(*)::int AS count FROM prescriptions`)).toBe(1);
-    expect(await count(`SELECT COUNT(*)::int AS count FROM patients`)).toBe(1);
+    expect(await count(`SELECT COUNT(*)::int AS count FROM patients`)).toBe(2);
 
     const newDump = await readDump(newFile, POSSOFT_DELTA_TABLES);
     const summary = await importPossoftDelta(AppDataSource, oldDump, newDump, { password: 'StartPass1' });
@@ -252,10 +258,10 @@ describe('posSoft delta import', () => {
     expect(summary.sales.sales).toBe(2);
     expect(summary.clinical).toMatchObject({ doctors: 0, doctorsReused: 1, appointments: 2, prescriptions: 1 });
 
-    expect(await count(`SELECT COUNT(*)::int AS count FROM sales`)).toBe(3);
+    expect(await count(`SELECT COUNT(*)::int AS count FROM sales`)).toBe(4);
     expect(await count(`SELECT COUNT(*)::int AS count FROM appointments`)).toBe(3);
     expect(await count(`SELECT COUNT(*)::int AS count FROM prescriptions`)).toBe(2);
-    expect(await count(`SELECT COUNT(*)::int AS count FROM patients`)).toBe(2);
+    expect(await count(`SELECT COUNT(*)::int AS count FROM patients`)).toBe(3);
 
     expect(await count(`SELECT COUNT(DISTINCT doctor_id)::int AS count FROM appointments`)).toBe(1);
 
@@ -284,9 +290,9 @@ describe('posSoft delta import', () => {
       skipped: expect.objectContaining({ appointmentsExisting: 2, prescriptionsExisting: 1 }),
     });
 
-    expect(await count(`SELECT COUNT(*)::int AS count FROM sales`)).toBe(3);
+    expect(await count(`SELECT COUNT(*)::int AS count FROM sales`)).toBe(4);
     expect(await count(`SELECT COUNT(*)::int AS count FROM appointments`)).toBe(3);
     expect(await count(`SELECT COUNT(*)::int AS count FROM prescriptions`)).toBe(2);
-    expect(await count(`SELECT COUNT(*)::int AS count FROM patients`)).toBe(2);
+    expect(await count(`SELECT COUNT(*)::int AS count FROM patients`)).toBe(3);
   });
 });

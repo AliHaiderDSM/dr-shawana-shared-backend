@@ -589,10 +589,12 @@ export async function importPossoftSales(
         paymentsInsert,
       );
       for (const [code, last] of sequence) {
+        const sequenceBranchId = branchIds.get(code);
+        if (!sequenceBranchId) continue;
         await em.query(
           `INSERT INTO document_sequences (branch_id, key, last_value) VALUES ($1, 'sale', $2)
          ON CONFLICT (branch_id, key) DO UPDATE SET last_value = GREATEST(document_sequences.last_value, EXCLUDED.last_value)`,
-          [branchIdOf(code), last],
+          [sequenceBranchId, last],
         );
       }
 
