@@ -28,6 +28,7 @@ export interface MedicalSummary {
     filesWrongType: number;
   };
   missingSample: string[];
+  missingFiles: string[];
 }
 
 const extensionOf = (name: string) => (name.split('.').pop() ?? '').toLowerCase();
@@ -75,6 +76,7 @@ export async function importPossoftMedical(
     patientsCreated: 0,
     skipped: { filesMissing: 0, filesWrongType: 0 },
     missingSample: [],
+    missingFiles: [],
   };
 
   const branchRows = (await em.query(`SELECT id, code, kind FROM branches WHERE deleted_at IS NULL`)) as {
@@ -145,6 +147,7 @@ export async function importPossoftMedical(
       const localPath = join(options.filesDir, name);
       if (!existsSync(localPath)) {
         summary.skipped.filesMissing += 1;
+        summary.missingFiles.push(name);
         if (summary.missingSample.length < 10) summary.missingSample.push(name);
         continue;
       }

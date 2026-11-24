@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { AppDataSource } from '../src/database/data-source';
 import { readDump } from '../src/modules/possoft-import/dump-reader';
 import { POSSOFT_MEDICAL_TABLES, importPossoftMedical } from '../src/modules/possoft-import/import-medical';
@@ -28,7 +28,15 @@ async function main() {
       filesDir,
       onProgress: (message) => console.log(message),
     });
-    console.log(JSON.stringify(summary, null, 2));
+    const { missingFiles, ...printable } = summary;
+    console.log(JSON.stringify(printable, null, 2));
+    if (missingFiles.length > 0) {
+      const outPath = 'missing-files.txt';
+      writeFileSync(outPath, missingFiles.join('\n') + '\n');
+      console.log(
+        `${missingFiles.length} file(s) were missing from --files. Their full list is written to ${outPath} — download these from posSoft, drop them into the files folder, and run this import again.`,
+      );
+    }
     console.log(dryRun ? 'Dry run: nothing was uploaded or saved.' : 'Medical records and files saved.');
   } finally {
     await AppDataSource.destroy();
