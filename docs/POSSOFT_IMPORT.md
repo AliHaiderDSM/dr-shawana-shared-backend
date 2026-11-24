@@ -9,6 +9,7 @@ Two commands move posSoft's sales into this system:
 | `npm run import:possoft-catalog -- --file <dump.sql> [--dry-run]` | Adds posSoft's categories and products to the main warehouse and links every branch product with the same name to its warehouse product. Safe to run again: existing warehouse products (same name) are reused. For databases filled by an earlier version of the sales import. |
 | `npm run import:possoft-clinical -- --file <dump.sql> --password <value> [--dry-run]` | Adds doctors (with logins), appointments, appointment payments and prescriptions. Runs after the sales import and `npm run seed`. Refuses to run when appointments or prescriptions already exist. |
 | `npm run import:possoft-delta -- --old <old.sql> --file <new.sql> --password <value> [--dry-run]` | Catch-up after the one-time migration: adds only the sales, appointments and prescriptions that are in the fresh export but not in the already-imported `--old` export. Existing patients, products, accounts and doctors are reused, never duplicated, and invoice numbers continue from the current maximum. See "Delta (catch-up) import" below. |
+| `npm run import:possoft-materials -- --file <dump.sql> [--dry-run]` | Adds the raw-material data (categories, materials with their minimum / bare-minimum thresholds, material stock in, and material out to the pharmacy lab) to the dispatch (Falcon) branch. Idempotent (deterministic ids). See "Raw material import" below. |
 | `npm run possoft:collect-files -- --file <dump.sql> --source <pos-img> --dest <med-files>` | Copies only the medical-record image/pdf files out of the full `pos-img` folder into a smaller folder, so just those (~2.9 GB) need to reach the server. Runs on the machine that holds the files; needs no database. |
 | `npm run import:possoft-medical -- --file <dump.sql> --files <folder> [--dry-run]` | Creates medical records and uploads their image/pdf files to storage (R2). Idempotent: a deterministic id per record and file means a re-run skips what is already there and re-uploads the same key. |
 | `npm run import:possoft-clinical-extra -- --file <dump.sql> [--dry-run]` | Adds blood-work results and BHRT status logs, linked to the patient in the patient-city branch. Idempotent (deterministic ids). |
@@ -47,6 +48,14 @@ The first clinical import put appointments and prescriptions in the **patient's 
 - On the real export a `--dry-run` reports about: medicalRecords 2,005, filesUploaded 5,072, filesWrongType 26, filesMissing 0.
 
 The import refuses to run when the `sales` table already has rows, so it cannot be added twice.
+
+## Raw material import (`import-materials.ts`)
+
+- Brings posSoft's manufacturing raw-material data into the **dispatch (Falcon) branch** (resolved by `kind = 'dispatch'`; the branch must exist first). Everything is branch-scoped, and posSoft was a single clinic, so it all lands in that one branch.
+- **Categories** (`material_categories`) and **materials** (`materials`) map one-to-one; `mat_minimum` → `minimum` (the yellow / low threshold) and `mat_bear_minimum` → `bare_minimum` (the red / critical threshold), unit defaults to grams. Deleted rows (`close = 0`) are imported soft-deleted so stock movements still resolve, but they do not show in the report.
+- **Stock in** (`materials_details`, active rows only) becomes a `material_receipt` plus a `material_in` store movement. **Material out** (`materials_out` + `materials_out_details`) becomes a `pharmacy_lab` `material_batch` with its items and `material_out_to_lab` movements (store → lab); several out rows sharing one batch number are merged into one batch, summing each material.
+- The **low-stock warning is already built** into the material report (`manufacturing-reports.service.ts`): for the store location it returns `alert` = `minimum` (closing below the material's minimum → yellow) or `bare_minimum` (closing below the bare minimum → red). So the colours light up automatically once this data is imported; no report change is needed.
+- Idempotent: every row has a deterministic id and inserts with `ON CONFLICT (id) DO NOTHING`, so re-running adds nothing and is safe after an interruption. On the real export it reads about 6 categories, 143 materials, 191 stock-in rows, 63 out batches and 554 out lines. Test: `possoft-materials.test.ts`.
 
 ## Delta (catch-up) import (`import-delta.ts`, `diff-dump.ts`)
 

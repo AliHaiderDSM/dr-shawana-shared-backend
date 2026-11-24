@@ -23,6 +23,11 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## posSoft raw-material import (2026-11-24)
+
+- `npm run import:possoft-materials -- --file <dump.sql> [--dry-run]` brings posSoft's raw-material data (categories, materials with min / bare-min thresholds, stock in, and material out to the pharmacy lab) into the dispatch (Falcon) branch. `mat_minimum` → `minimum`, `mat_bear_minimum` → `bare_minimum`; stock in → `material_receipts` + `material_in` movements; material out → `pharmacy_lab` `material_batches` + items + `material_out_to_lab` movements (out rows sharing a batch number are merged). Deleted rows are soft-deleted so movements resolve. Idempotent (deterministic ids + ON CONFLICT). Real export: ~6 categories, 143 materials, 191 stock-in, 63 out batches, 554 out lines.
+- The low-stock **warning already exists** in the material report (`manufacturing-reports.service.ts` `alertFor`): store closing below `minimum` → `minimum` (yellow), below `bare_minimum` → `bare_minimum` (red). No report change was needed — the colours appear once the data is imported. Code: `import-materials.ts`. Test: `possoft-materials.test.ts`. Docs: `docs/POSSOFT_IMPORT.md`.
+
 ## posSoft delta (catch-up) import (2026-11-24)
 
 - After the one-time migration, posSoft kept receiving data; the one-shot imports use random ids and a not-empty guard, so they cannot "add only the new rows". `npm run import:possoft-delta -- --old <old.sql> --file <new.sql> --password <value> [--dry-run]` compares the fresh export against the already-imported one and brings across only the new sales, appointments and prescriptions.
