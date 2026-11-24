@@ -1,6 +1,7 @@
 import type { DataSource } from 'typeorm';
 import type { DumpTables } from './dump-reader';
 import { diffDump, type DiffStats } from './diff-dump';
+import { fixClinicalBranches } from './fix-branches';
 import { POSSOFT_CLINICAL_TABLES, importPossoftClinical, type ClinicalSummary } from './import-clinical';
 import { POSSOFT_SALES_TABLES, importPossoftSales, type ImportSummary } from './import-sales';
 
@@ -12,6 +13,7 @@ export interface DeltaSummary {
   diff: DiffStats;
   sales: ImportSummary;
   clinical: ClinicalSummary;
+  branchFixes: Record<string, number>;
 }
 
 export async function importPossoftDelta(
@@ -27,5 +29,6 @@ export async function importPossoftDelta(
     append: true,
     password: options.password,
   });
-  return { diff: stats, sales, clinical };
+  const branchFixes = await fixClinicalBranches(source, { dryRun: options.dryRun });
+  return { diff: stats, sales, clinical, branchFixes };
 }
