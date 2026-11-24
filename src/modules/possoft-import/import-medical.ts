@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { DataSource } from 'typeorm';
@@ -100,6 +100,13 @@ export async function importPossoftMedical(
       : ((await em.query(`SELECT id FROM medical_record_files`)) as { id: string }[]).map((r) => r.id),
   );
 
+  const filesByLower = new Map<string, string>();
+  try {
+    for (const entry of readdirSync(options.filesDir)) filesByLower.set(entry.toLowerCase(), entry);
+  } catch {
+    // files directory missing; every file is then reported missing
+  }
+
   const records = (dump.get('customers_med_record') ?? []).filter(isActive);
   const tasks: FileTask[] = [];
   let processed = 0;
@@ -144,13 +151,14 @@ export async function importPossoftMedical(
         summary.skipped.filesWrongType += 1;
         continue;
       }
-      const localPath = join(options.filesDir, name);
-      if (!existsSync(localPath)) {
+      const actualName = filesByLower.get(name.toLowerCase());
+      if (!actualName) {
         summary.skipped.filesMissing += 1;
         summary.missingFiles.push(name);
         if (summary.missingSample.length < 10) summary.missingSample.push(name);
         continue;
       }
+      const localPath = join(options.filesDir, actualName);
       const fileId = deterministicId(`medfile:${medId}:${index}`);
       if (existingFileIds.has(fileId)) {
         summary.filesReused += 1;
