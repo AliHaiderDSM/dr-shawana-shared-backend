@@ -163,12 +163,13 @@ export async function importPossoftMaterials(
           amount(mat.mat_minimum).toFixed(3),
           amount(mat.mat_bear_minimum).toFixed(3),
           activeMat(mat) ? null : (timestampOf(mat.del_date) ?? new Date().toISOString()),
+          timestampOf(mat.crt_date) ?? new Date().toISOString(),
         ]);
       }
       await insertIgnore(
         em,
         'materials',
-        ['id', 'branch_id', 'name', 'category_id', 'unit', 'minimum', 'bare_minimum', 'deleted_at'],
+        ['id', 'branch_id', 'name', 'category_id', 'unit', 'minimum', 'bare_minimum', 'deleted_at', 'created_at'],
         materialRows,
       );
       summary.materials = materialRows.length;
@@ -227,7 +228,7 @@ export async function importPossoftMaterials(
       );
       summary.receipts = receiptRows.length;
 
-      const batchByNo = new Map<string, { id: string; date: string; note: string | null }>();
+      const batchByNo = new Map<string, { id: string; date: string; note: string | null; createdAt: string }>();
       const headerBatch = new Map<string, string>();
       for (const head of rows('materials_out')) {
         if (!activeMat(head) || !/pharmacy lab/i.test(text(head.mat_out_status))) continue;
@@ -235,9 +236,10 @@ export async function importPossoftMaterials(
         const id = deterministicId(`material_batch:${branchId}:${batchNo.toLowerCase()}`);
         headerBatch.set(text(head.mat_out_id), batchNo);
         const date = dateOf(head.mat_out_date, head.crt_date) ?? new Date().toISOString().slice(0, 10);
+        const createdAt = timestampOf(head.crt_date) ?? `${date}T12:00:00+05:00`;
         const existing = batchByNo.get(batchNo);
         if (!existing || date < existing.date) {
-          batchByNo.set(batchNo, { id, date, note: text(head.mat_out_note) || existing?.note || null });
+          batchByNo.set(batchNo, { id, date, note: text(head.mat_out_note) || existing?.note || null, createdAt });
         }
       }
 
@@ -266,7 +268,7 @@ export async function importPossoftMaterials(
 
       const batchRows: unknown[][] = [];
       for (const [batchNo, b] of batchByNo) {
-        batchRows.push([b.id, branchId, batchNo, 'pharmacy_lab', b.date, b.note]);
+        batchRows.push([b.id, branchId, batchNo, 'pharmacy_lab', b.date, b.note, b.createdAt]);
       }
 
       const itemRows: unknown[][] = [];
@@ -309,7 +311,7 @@ export async function importPossoftMaterials(
       await insertIgnore(
         em,
         'material_batches',
-        ['id', 'branch_id', 'batch_no', 'stage', 'date', 'note'],
+        ['id', 'branch_id', 'batch_no', 'stage', 'date', 'note', 'created_at'],
         batchRows,
       );
       await insertIgnore(
@@ -410,6 +412,7 @@ export async function importPossoftMaterials(
           text(head.mat_out_note) || null,
           productId,
           productId && si ? si.qty.toFixed(3) : null,
+          timestampOf(head.crt_date) ?? `${date}T12:00:00+05:00`,
         ]);
       }
 
@@ -440,7 +443,7 @@ export async function importPossoftMaterials(
       await insertIgnore(
         em,
         'material_batches',
-        ['id', 'branch_id', 'batch_no', 'stage', 'date', 'note', 'product_id', 'produced_qty'],
+        ['id', 'branch_id', 'batch_no', 'stage', 'date', 'note', 'product_id', 'produced_qty', 'created_at'],
         finishedBatchRows,
       );
       await insertIgnore(

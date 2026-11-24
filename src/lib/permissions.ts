@@ -184,6 +184,8 @@ const MATRIX: Record<Role, Grants> = {
     materials: VIEW_CREATE_UPDATE,
     materialCategories: VIEW_CREATE_UPDATE,
     labTransfers: VIEW_CREATE_UPDATE,
+    recipes: VIEW_CREATE_UPDATE,
+    finishedGoods: VIEW,
     materialReport: VIEW,
   },
   lab_officer: {
