@@ -64,6 +64,10 @@ const DUMP = [
       'hist_StartBHRTReVal',
       'hist_VasomotorSymptomsReVal',
       'hist_glpDietPlanStatus',
+      'hist_alcoholStatus',
+      'hist_smokeStatus',
+      'hist_hormoneTreatStatus',
+      'hist_contraceptionStatus',
       'close',
       'crt_date',
     ],
@@ -90,6 +94,10 @@ const DUMP = [
         1,
         1,
         1,
+        '1',
+        '2',
+        '2',
+        '2',
         '1',
         1,
         '2025-07-01 10:00:00',
@@ -181,6 +189,12 @@ describe('posSoft intake history import', () => {
     const byKey = Object.fromEntries(sections.map((s) => [s.section_key, s.data]));
     expect(byKey.basic_info).toMatchObject({ maritalStatus: 'married', weightKg: 65 });
     expect(byKey.medical_history?.conditions).toEqual(expect.arrayContaining(['pcos', 'hypothyroidism']));
+    expect(byKey.medical_history).toMatchObject({
+      alcohol: 'no',
+      smoking: 'no',
+      hormoneTherapy: 'currently_using',
+      contraception: 'yes',
+    });
     expect(byKey.mrs_scale).toMatchObject({ hotFlushes: 3, sleepProblems: 2 });
     expect(byKey.additional_symptoms?.symptoms).toEqual(expect.arrayContaining(['bloating', 'hair_loss']));
     expect(byKey.clinical_assessment?.treatmentPlan).toContain('start_bhrt');

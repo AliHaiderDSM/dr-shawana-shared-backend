@@ -171,7 +171,10 @@ async function insertSections(
     const id = deterministicId(`section:${consultationId}:${key}`);
     const done = (await em.query(
       `INSERT INTO consultation_sections (id, branch_id, consultation_id, section_key, data)
-       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (consultation_id, section_key) WHERE deleted_at IS NULL
+       DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+       RETURNING id`,
       [id, branchId, consultationId, key, JSON.stringify(result.data)],
     )) as { id: string }[];
     if (done.length) {

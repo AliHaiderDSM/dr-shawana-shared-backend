@@ -23,6 +23,12 @@ Build plan: `../progress/backend.md`. One phase per session; each phase ends wit
 ---
 
 
+## Full medical history in the intake import (2026-11-24)
+
+- The Medical history tab was missing most of its data: the hormones / contraception / periods block did not show, and the lifestyle fields (alcohol / smoking / exercise) came through empty even though posSoft had them. Cause: `history-mapper.ts` only mapped conditions / surgeries / family / allergies / diet / relationship and had omitted the rest of `medical_history`.
+- Added the hormones / contraception / periods block, the medication flags (UTI antibiotics, pain, mood, sleep, weight-loss) and alcohol / smoking / exercise, using the posSoft value→label maps from `admin/view/Appointments_remarks.html.php`. `havingPeriods` is only set to `yes` when both the last-period date and cycle are present, so the section passes its Zod `superRefine` instead of being dropped.
+- The history import's section insert now upserts on `(consultation_id, section_key)` (`DO UPDATE`), so re-running it after this change refreshes already-imported sections with the new fields instead of skipping them. Re-run `npm run import:possoft-history` after deploy to back-fill live data (do it before clinicians edit imported consultations — it overwrites the imported section data). Real export: medical_history now populated for ~1,826 consultations (alcohol 677, hormone therapy 578, periods 714), sections ~8,420. Code: `history-mapper.ts`, `import-history.ts`. Test: `possoft-history.test.ts`.
+
 ## Clinical remarks from the appointment remark (2026-11-23)
 
 - The dashboard shows a past visit's clinical remarks from the `clinical_assessment` section's `plan`; the posSoft narrative is the appointment's `app_remark`, so imported visits showed "No remarks recorded". The history import now sets `clinical_assessment.plan` from `app_remark`, and `npm run fix:clinical-remarks [-- --dry-run]` (`fix-remarks.ts`) back-fills already-imported data, creating a consultation for remark-only appointments. On the real data ~4,900 visits gain their clinical remarks. Test: `fix-remarks.test.ts`.

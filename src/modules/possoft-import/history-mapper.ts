@@ -235,6 +235,10 @@ const yn = (row: DumpRow, col: string, yes = '1') => {
 };
 const nullIfEmpty = (value: string) => value || null;
 
+const mapCode = (row: DumpRow, col: string, map: Record<string, string>) => map[text(row[col])] ?? null;
+const YES_NO = { '1': 'yes', '2': 'no' };
+const YES_NO_OCC = { '1': 'yes', '2': 'no', '3': 'occasionally' };
+
 const scanStatus = (value: string): string | null => {
   const v = value.toLowerCase();
   if (v.includes('abnormal')) return 'abnormal';
@@ -280,17 +284,50 @@ export function mapHistorySections(
     years: [],
   }));
 
+  const lastPeriodDate = dateOf(row.hist_custPeriodsDate);
+  const cycle = mapCode(row, 'hist_periodsCycleStatus', { '1': 'regular', '2': 'irregular' });
+  const havingPeriods =
+    text(row.hist_periodsStatus) === '2'
+      ? 'no'
+      : text(row.hist_periodsStatus) === '1' && lastPeriodDate && cycle
+        ? 'yes'
+        : null;
+
   const medicalHistory = {
     majorComplaint: nullIfEmpty(text(row.hist_custMajorComplaint)),
     currentMedications: nullIfEmpty(text(row.hist_custCurrentMedication)),
+    hormoneTherapy: mapCode(row, 'hist_hormoneTreatStatus', {
+      '1': 'never',
+      '2': 'currently_using',
+      '3': 'previously_used',
+    }),
+    hormonesUsed: nullIfEmpty(text(row.hist_hormoneUsedStatus)),
+    contraception: mapCode(row, 'hist_contraceptionStatus', { '1': 'yes', '2': 'no', '3': 'not_needed' }),
+    havingPeriods,
+    lastPeriodDate,
+    cycle,
+    flow: mapCode(row, 'hist_periodsFlowStatus', { '1': 'normal', '2': 'heavy', '3': 'low' }),
+    dub: on(row, 'hist_DUBVal'),
+    oligomenorrhea: on(row, 'hist_OligomenorrheaVal'),
+    periodsNote: nullIfEmpty(text(row.hist_custPeriodTextArea)),
+    menopauseDiagnosed: mapCode(row, 'hist_diagnosedWithMenopauseStatus', YES_NO),
+    menopauseDiagnosedAge: nullIfEmpty(text(row.hist_diagnosedAgeMenopauseStatus)),
     conditions: pick(row, CONDITIONS),
     surgeries: surgeries.length ? surgeries : [],
     otherSurgery: nullIfEmpty(text(row.hist_OtherSurgeryText)),
     familyRelatives: pick(row, FAMILY_RELATIVES),
     familyConditions: pick(row, FAMILY_CONDITIONS),
     familyOther: nullIfEmpty(text(row.hist_OtherfamilyText)),
+    utiAntibiotics12m: mapCode(row, 'hist_antibioticsStatus', YES_NO),
+    painMedication: mapCode(row, 'hist_medicationStatus', YES_NO),
+    moodMedication: mapCode(row, 'hist_anxietyMoodStatus', YES_NO),
+    sleepMedication: mapCode(row, 'hist_medSleepStatus', YES_NO),
+    weightLossMedication: mapCode(row, 'hist_weightLossStatus', YES_NO),
     hasAllergies: yn(row, 'hist_AllergiesStatus'),
     allergies: text(row.hist_AllergiesStatus) === '1' ? text(row.hist_AllergiesText) || '-' : null,
+    alcohol: mapCode(row, 'hist_alcoholStatus', YES_NO_OCC),
+    smoking: mapCode(row, 'hist_smokeStatus', YES_NO_OCC),
+    exercise: mapCode(row, 'hist_exerciseStatus', YES_NO_OCC),
     followsDiet: yn(row, 'hist_specificDietStatus'),
     dietName: text(row.hist_specificDietStatus) === '1' ? text(row.hist_specificDietName) || '-' : null,
     relationship: [

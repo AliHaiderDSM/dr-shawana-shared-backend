@@ -27,8 +27,10 @@ The first clinical import put appointments and prescriptions in the **patient's 
 
 - Each active `customers_history` row is tied to its posSoft appointment (`hist_appoint_id`), matched to the imported appointment by patient + date + time; the consultation takes that appointment's doctor and branch. Rows whose appointment cannot be matched are skipped (`appointmentNotMatched`).
 - The consultation carries the major complaint, current medications and discussion topics. The 300-odd posSoft history columns are mapped into the structured consultation sections (basic info, medical history + conditions + surgeries + family history, MRS scale, additional symptoms, imaging results, clinical assessment, plans, referral).
+- **Medical history is mapped in full:** besides conditions, surgeries, family history, allergies, diet and relationship, the mapper now fills the hormones / contraception / periods block (hormone therapy, hormones used, contraception, having periods, last period date, cycle, flow, DUB, oligomenorrhea, periods note, menopause diagnosed + age), the medication flags (UTI antibiotics, pain, mood, sleep, weight-loss) and the lifestyle fields (alcohol, smoking, exercise). `havingPeriods` is only set to `yes` when both the last-period date and the cycle are present, so the section passes its Zod `superRefine` instead of being dropped.
 - **Safety:** every section is run through the same Zod schema the dashboard uses (`SECTION_SCHEMAS`) before it is saved. A section that does not validate is dropped (`sectionsInvalid`), so only data the UI can render reaches the database. Empty sections are not created.
-- On the real export about 1,835 consultations and 7,800 sections import; ~93 appointments do not match and ~35 sections are dropped.
+- **Re-running updates in place:** sections upsert on `(consultation_id, section_key)` (`DO UPDATE`), so re-running the import after a mapping change refreshes already-imported sections with the new fields rather than skipping them. Run it before clinicians start editing imported consultations, since it overwrites the imported section's data.
+- On the real export about 1,835 consultations and 8,420 sections import; ~93 appointments do not match and ~44 sections are dropped.
 
 ## What the clinical-extras import creates (`import-clinical-extra.ts`)
 
