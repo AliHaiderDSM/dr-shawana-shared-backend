@@ -1,6 +1,6 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import type { DumpTables } from './dump-reader';
-import { amount, dateOf, deterministicId, isActive, text, timestampOf } from './possoft-values';
+import { amount, dateOf, deterministicId, text, timestampOf } from './possoft-values';
 
 export const POSSOFT_MATERIAL_TABLES = [
   'material_categories',
@@ -52,6 +52,9 @@ async function insertIgnore(em: EntityManager, table: string, columns: string[],
 
 const placeOf = (value: string | null | undefined) => (/pharm/i.test(text(value)) ? 'pharmacy' : 'falcon');
 
+const activeMat = (row: { close?: string | null; status?: string | null }) =>
+  text(row.close) === '1' && text(row.status) === '1';
+
 export async function importPossoftMaterials(
   source: DataSource,
   dump: DumpTables,
@@ -95,6 +98,21 @@ export async function importPossoftMaterials(
       const branchId = branch.id;
       summary.branch = branch.code;
 
+      await em.query(`ALTER TABLE material_movements DISABLE TRIGGER "TRG_material_movements_append_only"`);
+      try {
+        await em.query(`DELETE FROM material_movements WHERE branch_id = $1`, [branchId]);
+      } finally {
+        await em.query(`ALTER TABLE material_movements ENABLE TRIGGER "TRG_material_movements_append_only"`);
+      }
+      await em.query(
+        `DELETE FROM material_batch_items WHERE batch_id IN (SELECT id FROM material_batches WHERE branch_id = $1)`,
+        [branchId],
+      );
+      await em.query(`DELETE FROM material_batches WHERE branch_id = $1`, [branchId]);
+      await em.query(`DELETE FROM material_receipts WHERE branch_id = $1`, [branchId]);
+      await em.query(`DELETE FROM materials WHERE branch_id = $1`, [branchId]);
+      await em.query(`DELETE FROM material_categories WHERE branch_id = $1`, [branchId]);
+
       const categoryMap = new Map<string, string>();
       const categoryRows: unknown[][] = [];
       for (const cat of rows('material_categories')) {
@@ -105,7 +123,7 @@ export async function importPossoftMaterials(
           id,
           branchId,
           text(cat.mat_cat_name).slice(0, 150) || `posSoft category ${posId}`,
-          isActive(cat) ? null : (timestampOf(cat.del_date) ?? new Date().toISOString()),
+          activeMat(cat) ? null : (timestampOf(cat.del_date) ?? new Date().toISOString()),
         ]);
       }
       await insertIgnore(em, 'material_categories', ['id', 'branch_id', 'name', 'deleted_at'], categoryRows);
@@ -130,7 +148,7 @@ export async function importPossoftMaterials(
           'g',
           amount(mat.mat_minimum).toFixed(3),
           amount(mat.mat_bear_minimum).toFixed(3),
-          isActive(mat) ? null : (timestampOf(mat.del_date) ?? new Date().toISOString()),
+          activeMat(mat) ? null : (timestampOf(mat.del_date) ?? new Date().toISOString()),
         ]);
       }
       await insertIgnore(
@@ -144,7 +162,7 @@ export async function importPossoftMaterials(
       const receiptRows: unknown[][] = [];
       const inMovementRows: unknown[][] = [];
       for (const det of rows('materials_details')) {
-        if (!isActive(det)) continue;
+        if (!activeMat(det)) continue;
         const materialId = materialMap.get(text(det.material_id));
         if (!materialId) {
           summary.skipped.receiptsNoMaterial += 1;
@@ -198,7 +216,7 @@ export async function importPossoftMaterials(
       const batchByNo = new Map<string, { id: string; date: string; note: string | null }>();
       const headerBatch = new Map<string, string>();
       for (const head of rows('materials_out')) {
-        if (!isActive(head)) continue;
+        if (!activeMat(head)) continue;
         const batchNo = text(head.mat_out_batch).slice(0, 100) || `posSoft out ${text(head.mat_out_id)}`;
         const id = deterministicId(`material_batch:${branchId}:${batchNo.toLowerCase()}`);
         headerBatch.set(text(head.mat_out_id), batchNo);
@@ -211,7 +229,7 @@ export async function importPossoftMaterials(
 
       const itemQty = new Map<string, { batchNo: string; materialId: string; qty: ReturnType<typeof amount> }>();
       for (const det of rows('materials_out_details')) {
-        if (!isActive(det)) continue;
+        if (!activeMat(det) || !/pharmacy lab/i.test(text(det.mat_out_status))) continue;
         const batchNo = headerBatch.get(text(det.material_out_id));
         if (!batchNo) {
           summary.skipped.outNoBatch += 1;
