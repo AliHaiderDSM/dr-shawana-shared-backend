@@ -6,6 +6,7 @@ export const RESOURCES = {
   liverDetox: { label: 'Liver detox', file: 'liver-detox.jpeg', type: 'image/jpeg' },
   skinCareRoutine: { label: 'Skin care routine', file: 'skin-care-routine.jpeg', type: 'image/jpeg' },
   hairCareRoutine: { label: 'Hair care routine', file: 'hair-care-routine.jpeg', type: 'image/jpeg' },
+  pcos: { label: 'PCOS', file: 'pcos.pdf', type: 'application/pdf' },
 } as const;
 
 export type ResourceKey = keyof typeof RESOURCES;

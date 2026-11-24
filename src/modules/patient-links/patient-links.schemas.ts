@@ -41,7 +41,7 @@ export const publicPatientHistorySchema = registry.register(
       .openapi({ description: 'The intake form of the linked appointment; null for history-only links' }),
     resources: z.array(z.string()).optional().openapi({
       description:
-        'Educational resources ticked Yes: glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine',
+        'Educational resources ticked Yes: glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine, pcos',
     }),
     expiresAt: z.iso.datetime(),
     appointments: z.array(

@@ -526,6 +526,7 @@ export const plansSchema = z.object({
   liverDetox: yesNo,
   skinCareRoutine: yesNo,
   hairCareRoutine: yesNo,
+  pcos: yesNo,
 });
 
 export const SECTION_SCHEMAS = {

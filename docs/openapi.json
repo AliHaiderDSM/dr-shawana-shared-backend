@@ -6987,7 +6987,7 @@
             "items": {
               "type": "string"
             },
-            "description": "Educational resources ticked Yes: glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine"
+            "description": "Educational resources ticked Yes: glpDietPlan, generalDietPlan, liverDetox, skinCareRoutine, hairCareRoutine, pcos"
           },
           "expiresAt": {
             "type": "string",
@@ -12968,6 +12968,18 @@
             "default": null
           },
           "hairCareRoutine": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "yes",
+              "no",
+              null
+            ],
+            "default": null
+          },
+          "pcos": {
             "type": [
               "string",
               "null"

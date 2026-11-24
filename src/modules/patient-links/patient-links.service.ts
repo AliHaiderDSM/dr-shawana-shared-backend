@@ -63,6 +63,7 @@ const RESOURCE_KEYS = [
   'liverDetox',
   'skinCareRoutine',
   'hairCareRoutine',
+  'pcos',
 ] as const;
 
 function patientOf(token: string) {
