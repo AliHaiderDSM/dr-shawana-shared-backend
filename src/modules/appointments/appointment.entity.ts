@@ -30,7 +30,14 @@ export type AppointmentSource = (typeof APPOINTMENT_SOURCES)[number];
   '("repeat_of_id" IS NULL) = ("repeat_no" IS NULL) AND ("repeat_no" IS NULL OR "repeat_no" > 0)',
 )
 @Check('CHK_appointments_time_range', `"time_to" > "time_from"`)
+@Index('UQ_appointments_source_app_id', ['sourceAppId'], {
+  unique: true,
+  where: '"source_app_id" IS NOT NULL AND "deleted_at" IS NULL',
+})
 export class Appointment extends BranchScopedEntity {
+  @Column({ name: 'source_app_id', type: 'varchar', length: 20, nullable: true })
+  sourceAppId: string | null;
+
   @Column({
     name: 'appointment_no',
     type: 'integer',

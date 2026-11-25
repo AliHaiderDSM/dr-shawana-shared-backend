@@ -329,6 +329,7 @@ export async function importPossoftClinical(
           text(appt.app_remark) || null,
           status,
           createdAt,
+          apptId,
         ]);
         apptIds.set(apptId, id);
         for (const pay of payList) {
@@ -375,6 +376,7 @@ export async function importPossoftClinical(
           'remark',
           'status',
           'created_at',
+          'source_app_id',
         ],
         apptRows,
       );
