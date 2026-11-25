@@ -1,6 +1,6 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import { type SectionKey } from '../consultations/consultation-section.entity';
-import { SECTION_SCHEMAS } from '../consultations/section-schemas';
+import { basicInfoSchema, SECTION_SCHEMAS } from '../consultations/section-schemas';
 import type { DumpTables } from './dump-reader';
 import { mapHistorySections } from './history-mapper';
 import { PatientResolver } from './patient-resolver';
@@ -76,9 +76,18 @@ export async function importPossoftHistory(
         return found.length === 1 ? found[0] : null;
       };
 
-      for (const history of rows('customers_history')) {
-        if (!isActive(history)) continue;
-        const appt = posAppts.get(text(history.hist_appoint_id));
+      const lastBasicByCust = new Map<string, Record<string, unknown>>();
+      const ordered = rows('customers_history')
+        .filter(isActive)
+        .map((history) => ({ history, appt: posAppts.get(text(history.hist_appoint_id)) }))
+        .sort((a, b) => {
+          const da = a.appt ? (dateOf(a.appt.app_date, a.appt.crt_date) ?? '') : '';
+          const db = b.appt ? (dateOf(b.appt.app_date, b.appt.crt_date) ?? '') : '';
+          if (da !== db) return da < db ? -1 : 1;
+          return Number(text(a.history.hist_id)) - Number(text(b.history.hist_id));
+        });
+
+      for (const { history, appt } of ordered) {
         if (!appt) {
           summary.skipped.noAppointmentRow += 1;
           continue;
@@ -106,6 +115,17 @@ export async function importPossoftHistory(
           city,
           country: text(customer?.cust_country) || null,
         });
+
+        const basicInfo = mapped.sections.basic_info;
+        let resolvedBasic: Record<string, unknown> | null = null;
+        if (basicInfo) {
+          const parsed = basicInfoSchema.safeParse(basicInfo);
+          if (parsed.success) {
+            resolvedBasic = parsed.data as Record<string, unknown>;
+            lastBasicByCust.set(custId, resolvedBasic);
+          }
+        }
+        mapped.sections.basic_info = resolvedBasic ?? lastBasicByCust.get(custId) ?? null;
 
         const remark = text(appt.app_remark);
         const assessment = mapped.sections.clinical_assessment as Record<string, unknown> | null;

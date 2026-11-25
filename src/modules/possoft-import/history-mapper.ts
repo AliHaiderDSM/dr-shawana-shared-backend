@@ -15,9 +15,15 @@ function number(value: string): number | null {
 }
 
 function heightFeet(raw: string): number | null {
-  const feetInches = /^(\d+)\s*['’]\s*(\d+)/.exec(raw.trim());
-  if (feetInches) return Number(feetInches[1]) + Number(feetInches[2]) / 12;
-  const n = number(raw);
+  const s = raw.trim();
+  const feetInches = /^(\d+)\s*(?:['’"”]|ft|feet)\s*(\d*)/i.exec(s);
+  if (feetInches) {
+    const feet = Number(feetInches[1]);
+    const inches = feetInches[2] ? Math.min(11, Number(feetInches[2])) : 0;
+    const value = Math.round((feet + inches / 12) * 100) / 100;
+    return value > 0 && value <= 10 ? value : null;
+  }
+  const n = number(s);
   if (n === null) return null;
   if (n > 10 && n < 250) return Math.round((n / 30.48) * 100) / 100;
   if (n > 0 && n <= 10) return n;
