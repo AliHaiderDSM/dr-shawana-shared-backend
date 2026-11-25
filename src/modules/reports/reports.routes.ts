@@ -17,6 +17,7 @@ import {
   appointmentPaymentsReportQuerySchema,
   appointmentsReportQuerySchema,
   branchStockQuerySchema,
+  dailyRevenueQuerySchema,
   dashboardQuerySchema,
   doctorSalesQuerySchema,
   expensesReportQuerySchema,
@@ -158,6 +159,17 @@ reportsRouter.get(
   async (req, res) => {
     const { range } = validQuery(req, topProductsQuerySchema);
     sendOk(res, await dashboardService.topProducts(await scopeOf(req), range));
+  },
+);
+
+reportsRouter.get(
+  '/branch/dashboard/daily-revenue',
+  ...scoped,
+  requirePermission('dashboard.view'),
+  validate({ query: dailyRevenueQuerySchema }),
+  async (req, res) => {
+    const { month } = validQuery(req, dailyRevenueQuerySchema);
+    sendOk(res, await dashboardService.dailyRevenue(actorFrom(req), await scopeOf(req), month));
   },
 );
 

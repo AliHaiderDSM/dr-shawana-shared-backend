@@ -114,6 +114,14 @@ export const dashboardQuerySchema = z
     path: ['to'],
   });
 
+export const dailyRevenueQuerySchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM')
+    .openapi({ example: '2026-11', description: 'The month to break down day by day' }),
+  branchId: z.uuid().optional(),
+});
+
 export type SaleProductsQuery = z.output<typeof saleProductsQuerySchema>;
 export type PurchasesQuery = z.output<typeof purchasesQuerySchema>;
 export type StockReportQuery = z.output<typeof stockReportQuerySchema>;
@@ -344,6 +352,31 @@ registry.registerPath({
   request: { query: topProductsQuerySchema },
   responses: {
     200: { description: 'Top products', ...jsonContent(dataEnvelope(z.record(z.string(), z.unknown()))) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...docs,
+  method: 'get',
+  path: '/branch/dashboard/daily-revenue',
+  summary:
+    'Sales and appointment payments received on each day of one month, for the revenue chart (all branches for the Super Admin without ?branchId=)',
+  request: { query: dailyRevenueQuerySchema },
+  responses: {
+    200: {
+      description: 'Daily revenue',
+      ...jsonContent(
+        dataEnvelope(
+          z.object({
+            month: z.string(),
+            days: z.array(z.string()),
+            salesAmount: z.array(z.string()).optional(),
+            appointmentAmount: z.array(z.string()).optional(),
+          }),
+        ),
+      ),
+    },
     ...errorResponses,
   },
 });

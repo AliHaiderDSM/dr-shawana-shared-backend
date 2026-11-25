@@ -477,6 +477,26 @@ describe('accounts, expenses, reports and dashboard', () => {
       expect(all.body.data.byBranch.map((b: { branch: string }) => b.branch)).toEqual(['ISB', 'LHR']);
     });
 
+    it('breaks one month down day by day for the revenue chart', async () => {
+      const total = (values: string[]) => values.reduce((sum, v) => sum + Number(v), 0);
+      const adminView = await api('get', '/branch/dashboard/daily-revenue?month=2026-09', admin);
+      expect(adminView.status).toBe(200);
+      expect(adminView.body.data.days).toHaveLength(30);
+      expect(adminView.body.data.days[0]).toBe('2026-09-01');
+      expect(total(adminView.body.data.salesAmount)).toBe(2000);
+      expect(total(adminView.body.data.appointmentAmount)).toBe(5000);
+
+      const doctorView = await api('get', '/branch/dashboard/daily-revenue?month=2026-09', doctorUser);
+      expect(doctorView.body.data.salesAmount).toBeUndefined();
+      expect(doctorView.body.data.appointmentAmount).toBeDefined();
+
+      const all = await api('get', '/branch/dashboard/daily-revenue?month=2026-09', superAdmin);
+      expect(total(all.body.data.appointmentAmount)).toBeGreaterThanOrEqual(5000);
+
+      const bad = await api('get', '/branch/dashboard/daily-revenue?month=2026-13', admin);
+      expect(bad.status).toBe(400);
+    });
+
     it('lists the top products of today, this month or this year', async () => {
       const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
       const top = (who: { id: string }, range: string) =>

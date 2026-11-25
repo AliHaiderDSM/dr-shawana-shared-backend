@@ -35,6 +35,51 @@ export const dashboardService = {
     return { range, from, to: day, items: rows.map((r) => ({ product: r.product, qty: r.qty })) };
   },
 
+  async dailyRevenue(actor: Actor, scope: ReportScope, month: string) {
+    const [y, m] = month.split('-').map(Number) as [number, number];
+    const dayCount = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const days = Array.from({ length: dayCount }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`);
+    const from = days[0]!;
+    const to = days[dayCount - 1]!;
+    const b = scope.branchId;
+    const can = (permission: Parameters<typeof hasPermission>[1]) => hasPermission(actor.role, permission);
+    const series = (rows: Row[]) => days.map((d) => rows.find((r) => r.day === d)?.amount ?? '0');
+
+    const [salesRows, appointmentRows] = await Promise.all([
+      can('sales.view')
+        ? many(
+            `SELECT t.day, SUM(t.amount)::numeric(12,2)::text AS amount FROM (
+             SELECT to_char(y.date, 'YYYY-MM-DD') AS day, y.amount
+               FROM sale_payments y JOIN sales s ON s.id = y.sale_id
+              WHERE s.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)} AND y.date BETWEEN $2 AND $3
+             UNION ALL
+             SELECT to_char(r.refund_date, 'YYYY-MM-DD'), -r.refund_amount
+               FROM sale_returns r
+              WHERE r.deleted_at IS NULL AND r.refund_amount > 0 AND ${branchClause('r.branch_id', 1)} AND r.refund_date BETWEEN $2 AND $3
+            ) t GROUP BY 1`,
+            [b, from, to],
+          )
+        : null,
+      can('appointments.view')
+        ? many(
+            `SELECT to_char(y.date, 'YYYY-MM-DD') AS day, SUM(y.amount)::numeric(12,2)::text AS amount
+               FROM appointment_payments y JOIN appointments a ON a.id = y.appointment_id
+              WHERE a.deleted_at IS NULL AND y.deleted_at IS NULL AND ${branchClause('y.branch_id', 1)}
+                AND ($4::uuid IS NULL OR a.doctor_id = $4) AND y.date BETWEEN $2 AND $3
+              GROUP BY 1`,
+            [b, from, to, scope.doctorId],
+          )
+        : null,
+    ]);
+
+    return {
+      month,
+      days,
+      ...(salesRows ? { salesAmount: series(salesRows) } : {}),
+      ...(appointmentRows ? { appointmentAmount: series(appointmentRows) } : {}),
+    };
+  },
+
   async kpis(actor: Actor, scope: ReportScope, year?: number, period: { from?: string; to?: string } = {}) {
     const day = today();
     const month = day.slice(0, 7);
