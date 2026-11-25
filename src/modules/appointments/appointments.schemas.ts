@@ -436,11 +436,23 @@ export const appointmentOverviewSchema = registry.register(
     mode: z.enum(APPOINTMENT_MODES),
     visitType: z.enum(VISIT_TYPES),
     fee: moneyOutput,
+    createdAt: z.iso.datetime(),
+    createdByName: z.string().nullable(),
     patient: z
       .object({ id: z.uuid(), name: z.string(), phone: z.string(), city: z.string().nullable() })
       .nullable(),
     doctor: z.object({ id: z.uuid(), name: z.string() }).nullable(),
     branch: z.object({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
+  }),
+);
+
+export const appointmentOverviewSummarySchema = registry.register(
+  'AppointmentOverviewSummary',
+  z.object({
+    total: z.number().int(),
+    booked: z.number().int(),
+    completed: z.number().int(),
+    cancelled: z.number().int(),
   }),
 );
 
@@ -497,6 +509,18 @@ registry.registerPath({
   request: { query: appointmentListQuerySchema },
   responses: {
     200: { description: 'Page', ...jsonContent(pageEnvelope(appointmentOverviewSchema)) },
+    ...errorResponses,
+  },
+});
+
+registry.registerPath({
+  ...appointmentDocs,
+  method: 'get',
+  path: '/admin/appointments/summary',
+  summary: 'Super Admin: appointment counts across every branch (total, booked, completed)',
+  request: { query: appointmentListQuerySchema },
+  responses: {
+    200: { description: 'Counts', ...jsonContent(dataEnvelope(appointmentOverviewSummarySchema)) },
     ...errorResponses,
   },
 });

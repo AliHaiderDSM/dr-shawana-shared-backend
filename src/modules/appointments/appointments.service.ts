@@ -300,6 +300,14 @@ export const appointmentsService = {
     if (query.sort.endsWith('date')) qb.addOrderBy('a.timeFrom', query.sort.startsWith('-') ? 'DESC' : 'ASC');
     const [items, total] = await qb.getManyAndCount();
     const meta = pageMeta(query, total);
+    const creatorIds = [...new Set(items.flatMap((i) => (i.createdBy ? [i.createdBy] : [])))];
+    const creators: { id: string; name: string }[] = creatorIds.length
+      ? await AppDataSource.query(
+          `SELECT id, trim(first_name || ' ' || last_name) AS name FROM staff_profiles WHERE id = ANY($1)`,
+          [creatorIds],
+        )
+      : [];
+    const creatorName = new Map(creators.map((c) => [c.id, c.name]));
     return {
       items: items.map((a) => {
         const branch = (a as Appointment & { branch?: Branch }).branch;
@@ -314,6 +322,8 @@ export const appointmentsService = {
           mode: a.mode,
           visitType: a.visitType,
           fee: toMoney(a.fee),
+          createdAt: a.createdAt,
+          createdByName: a.createdBy ? (creatorName.get(a.createdBy) ?? null) : null,
           patient: a.patient
             ? { id: a.patient.id, name: a.patient.name, phone: a.patient.phone, city: a.patient.city }
             : null,
@@ -322,6 +332,37 @@ export const appointmentsService = {
         };
       }),
       meta,
+    };
+  },
+
+  async allBranchesSummary(query: AppointmentListQuery) {
+    const qb = AppDataSource.getRepository(Appointment)
+      .createQueryBuilder('a')
+      .leftJoin('a.patient', 'patient')
+      .select('a.status', 'status')
+      .addSelect('COUNT(*)::int', 'count')
+      .where('a.deleted_at IS NULL')
+      .groupBy('a.status');
+    if (query.branchId) qb.andWhere('a.branch_id = :branchId', { branchId: query.branchId });
+    if (query.doctorId) qb.andWhere('a.doctorId = :doctorId', { doctorId: query.doctorId });
+    if (query.status) qb.andWhere('a.status = :status', { status: query.status });
+    if (query.mode) qb.andWhere('a.mode = :mode', { mode: query.mode });
+    if (query.visitType) qb.andWhere('a.visitType = :visitType', { visitType: query.visitType });
+    if (query.from) qb.andWhere('a.date >= :from', { from: query.from });
+    if (query.to) qb.andWhere('a.date <= :to', { to: query.to });
+    if (query.search) {
+      qb.andWhere(
+        `(patient.name ILIKE :term OR patient.phone ILIKE :term OR CONCAT('APP#', a.appointmentNo, CASE WHEN a.repeatNo IS NULL THEN '' ELSE CONCAT('.', a.repeatNo) END) ILIKE :term)`,
+        { term: `%${escapeLike(query.search)}%` },
+      );
+    }
+    const rows = (await qb.getRawMany()) as { status: string; count: number }[];
+    const byStatus = new Map(rows.map((r) => [r.status, r.count]));
+    return {
+      total: rows.reduce((sum, r) => sum + r.count, 0),
+      booked: byStatus.get('booked') ?? 0,
+      completed: byStatus.get('completed') ?? 0,
+      cancelled: byStatus.get('cancelled') ?? 0,
     };
   },
 

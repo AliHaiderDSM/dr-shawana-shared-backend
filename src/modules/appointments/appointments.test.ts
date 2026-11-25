@@ -295,6 +295,16 @@ describe('appointments and payments', () => {
     expect(all.body.data.length).toBeGreaterThan(0);
     expect(all.body.data[0]).toMatchObject({ branch: { code: 'LHR' } });
     expect(all.body.data[0].patient).toBeTruthy();
+    expect(typeof all.body.data[0].createdAt).toBe('string');
+    expect('createdByName' in all.body.data[0]).toBe(true);
+
+    const counts = await api('get', '/admin/appointments/summary', owner);
+    expect(counts.status).toBe(200);
+    expect(counts.body.data.total).toBe(all.body.meta.total);
+    expect(counts.body.data).toMatchObject({
+      booked: expect.any(Number),
+      completed: expect.any(Number),
+    });
 
     const empty = await api(
       'get',
