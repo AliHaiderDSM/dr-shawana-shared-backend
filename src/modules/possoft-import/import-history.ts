@@ -13,6 +13,7 @@ export interface HistorySummary {
   consultationsReused: number;
   sections: number;
   patientsCreated: number;
+  statusAligned: number;
   skipped: {
     noAppointmentRow: number;
     appointmentNotMatched: number;
@@ -50,6 +51,7 @@ export async function importPossoftHistory(
     consultationsReused: 0,
     sections: 0,
     patientsCreated: 0,
+    statusAligned: 0,
     skipped: { noAppointmentRow: 0, appointmentNotMatched: 0, sectionsInvalid: 0 },
     sectionsByKey: {},
   };
@@ -69,10 +71,10 @@ export async function importPossoftHistory(
 
       const matchAppointment = async (patientId: string, date: string, timeFrom: string) => {
         const found = (await em.query(
-          `SELECT id, doctor_id AS "doctorId", branch_id AS "branchId" FROM appointments
+          `SELECT id, doctor_id AS "doctorId", branch_id AS "branchId", status FROM appointments
             WHERE patient_id = $1 AND date = $2 AND time_from = $3 AND deleted_at IS NULL LIMIT 2`,
           [patientId, date, timeFrom],
-        )) as { id: string; doctorId: string; branchId: string }[];
+        )) as { id: string; doctorId: string; branchId: string; status: string }[];
         return found.length === 1 ? found[0] : null;
       };
 
@@ -132,10 +134,11 @@ export async function importPossoftHistory(
         if (remark && assessment && !text(assessment.plan as string)) assessment.plan = remark;
 
         const consultationId = deterministicId(`consult:${matched.id}`);
+        const consultationStatus = matched.status === 'completed' ? 'completed' : 'open';
         const createdAt = timestampOf(history.crt_date) ?? `${date}T12:00:00+05:00`;
         const inserted = (await em.query(
           `INSERT INTO consultations (id, branch_id, patient_id, doctor_id, appointment_id, status, discuss_topics, major_complaint, current_medications, created_at)
-           VALUES ($1,$2,$3,$4,$5,'completed',$6,$7,$8,$9)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
            ON CONFLICT (appointment_id) WHERE deleted_at IS NULL DO NOTHING RETURNING id`,
           [
             consultationId,
@@ -143,6 +146,7 @@ export async function importPossoftHistory(
             patientId,
             matched.doctorId,
             matched.id,
+            consultationStatus,
             mapped.discussTopics,
             mapped.majorComplaint,
             mapped.currentMedications,
@@ -163,6 +167,15 @@ export async function importPossoftHistory(
 
         await insertSections(em, summary, existingId, matched.branchId, mapped.sections);
       }
+
+      const aligned = (await em.query(
+        `UPDATE consultations c SET status = 'open', updated_at = now()
+           FROM appointments a
+          WHERE c.appointment_id = a.id AND c.deleted_at IS NULL
+            AND c.status = 'completed' AND a.status <> 'completed'
+        RETURNING c.id`,
+      )) as { id: string }[];
+      summary.statusAligned = aligned.length;
 
       summary.patientsCreated = patients.created;
       if (options.dryRun) throw new DryRunRollback();
