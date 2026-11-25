@@ -160,13 +160,22 @@ export async function importPossoftClinical(
         const username = text(doc.doc_username)
           .toLowerCase()
           .replace(/[^a-z0-9._-]/g, '');
-        const [found] = username
-          ? ((await em.query(
-              `SELECT d.id FROM doctors d JOIN staff_profiles s ON s.id = d.staff_id
-                WHERE s.username = $1 AND d.deleted_at IS NULL LIMIT 1`,
-              [username],
-            )) as { id: string }[])
-          : [];
+        const docName = text(doc.doc_name);
+        let found: { id: string } | undefined;
+        if (username) {
+          [found] = (await em.query(
+            `SELECT d.id FROM doctors d JOIN staff_profiles s ON s.id = d.staff_id
+              WHERE s.username = $1 AND d.deleted_at IS NULL LIMIT 1`,
+            [username],
+          )) as { id: string }[];
+        }
+        if (!found && docName) {
+          [found] = (await em.query(
+            `SELECT id FROM doctors WHERE lower(trim(display_name)) = lower($1)
+               AND deleted_at IS NULL ORDER BY created_at LIMIT 1`,
+            [docName],
+          )) as { id: string }[];
+        }
         if (found) {
           doctorMap.set(docId, found.id);
           summary.doctorsReused += 1;

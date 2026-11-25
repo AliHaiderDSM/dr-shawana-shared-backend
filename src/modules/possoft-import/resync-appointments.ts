@@ -61,12 +61,22 @@ export async function resyncAppointments(
         const username = text(doc.doc_username)
           .toLowerCase()
           .replace(/[^a-z0-9._-]/g, '');
-        if (!username) continue;
-        const [found] = (await em.query(
-          `SELECT d.id, d.branch_id FROM doctors d JOIN staff_profiles s ON s.id = d.staff_id
-            WHERE s.username = $1 AND d.deleted_at IS NULL LIMIT 1`,
-          [username],
-        )) as { id: string; branch_id: string }[];
+        const name = text(doc.doc_name);
+        let found: { id: string; branch_id: string } | undefined;
+        if (username) {
+          [found] = (await em.query(
+            `SELECT d.id, d.branch_id FROM doctors d JOIN staff_profiles s ON s.id = d.staff_id
+              WHERE s.username = $1 AND d.deleted_at IS NULL LIMIT 1`,
+            [username],
+          )) as { id: string; branch_id: string }[];
+        }
+        if (!found && name) {
+          [found] = (await em.query(
+            `SELECT id, branch_id FROM doctors WHERE lower(trim(display_name)) = lower($1)
+               AND deleted_at IS NULL ORDER BY created_at LIMIT 1`,
+            [name],
+          )) as { id: string; branch_id: string }[];
+        }
         if (found) doctorMap.set(text(doc.doc_id), { doctorId: found.id, branchId: found.branch_id });
       }
 
