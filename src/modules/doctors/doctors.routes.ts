@@ -22,6 +22,10 @@ export const doctorsRouter = Router();
 const scoped = [authenticate, branchScope()];
 const canBook = requirePermission('doctors.view', 'appointments.view');
 
+doctorsRouter.get('/admin/doctors/options', authenticate, requireRole('super_admin'), async (_req, res) => {
+  sendOk(res, await doctorsService.allBranchesOptions());
+});
+
 doctorsRouter.get('/branch/doctors/options', ...scoped, canBook, async (req, res) => {
   sendOk(res, await doctorsService.options(branchIdOf(req)));
 });

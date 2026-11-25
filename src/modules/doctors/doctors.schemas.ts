@@ -109,6 +109,26 @@ registerCrudDocs({
 
 const common = securedDocs('Doctors');
 
+const allBranchesDoctorOptionSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  branchCode: z.string().nullable(),
+});
+
+registry.registerPath({
+  ...common,
+  method: 'get',
+  path: '/admin/doctors/options',
+  summary: 'Super Admin: active doctors across every branch, for the all-appointments filter',
+  responses: {
+    200: {
+      description: 'Doctors',
+      ...jsonContent(dataEnvelope(z.array(allBranchesDoctorOptionSchema))),
+    },
+    ...errorResponses,
+  },
+});
+
 registry.registerPath({
   ...common,
   method: 'get',

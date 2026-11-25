@@ -114,6 +114,20 @@ export const doctorsService = {
     }));
   },
 
+  async allBranchesOptions() {
+    const rows = await AppDataSource.getRepository(Doctor)
+      .createQueryBuilder('doc')
+      .leftJoinAndMapOne('doc.branch', Branch, 'branch', 'branch.id = doc.branch_id')
+      .where('doc.deleted_at IS NULL')
+      .andWhere("doc.status = 'active'")
+      .orderBy('doc.displayName', 'ASC')
+      .getMany();
+    return rows.map((d) => {
+      const branch = (d as Doctor & { branch?: Branch }).branch;
+      return { id: d.id, name: d.displayName, branchCode: branch?.code ?? null };
+    });
+  },
+
   async get(branchId: string, id: string) {
     return toDoctorDto(await getDoctor(branchId, id));
   },
