@@ -12,6 +12,7 @@ export interface HistorySummary {
   consultations: number;
   consultationsReused: number;
   sections: number;
+  sectionsKept: number;
   patientsCreated: number;
   statusAligned: number;
   skipped: {
@@ -50,6 +51,7 @@ export async function importPossoftHistory(
     consultations: 0,
     consultationsReused: 0,
     sections: 0,
+    sectionsKept: 0,
     patientsCreated: 0,
     statusAligned: 0,
     skipped: { noAppointmentRow: 0, appointmentNotMatched: 0, sectionsInvalid: 0 },
@@ -205,14 +207,15 @@ async function insertSections(
     const done = (await em.query(
       `INSERT INTO consultation_sections (id, branch_id, consultation_id, section_key, data)
        VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (consultation_id, section_key) WHERE deleted_at IS NULL
-       DO UPDATE SET data = EXCLUDED.data, updated_at = now()
+       ON CONFLICT (consultation_id, section_key) WHERE deleted_at IS NULL DO NOTHING
        RETURNING id`,
       [id, branchId, consultationId, key, JSON.stringify(result.data)],
     )) as { id: string }[];
-    if (done.length) {
-      summary.sections += 1;
-      summary.sectionsByKey[key] = (summary.sectionsByKey[key] ?? 0) + 1;
+    if (!done.length) {
+      summary.sectionsKept += 1;
+      continue;
     }
+    summary.sections += 1;
+    summary.sectionsByKey[key] = (summary.sectionsByKey[key] ?? 0) + 1;
   }
 }

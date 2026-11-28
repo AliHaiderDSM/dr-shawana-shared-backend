@@ -200,8 +200,22 @@ describe('posSoft intake history import', () => {
     expect(byKey.clinical_assessment?.treatmentPlan).toContain('start_bhrt');
     expect(byKey.plans).toMatchObject({ glpDietPlan: 'yes' });
 
+    await AppDataSource.query(
+      `UPDATE consultation_sections s SET data = jsonb_set(data, '{weightKg}', '70')
+         FROM consultations c
+        WHERE c.id = s.consultation_id AND c.appointment_id = $1 AND s.section_key = 'basic_info'`,
+      [appointmentId],
+    );
     const again = await importPossoftHistory(AppDataSource, dump);
-    expect(again).toMatchObject({ consultations: 0, consultationsReused: 1 });
+    expect(again).toMatchObject({ consultations: 0, consultationsReused: 1, sections: 0 });
+    expect(again.sectionsKept).toBe(summary.sections);
+
+    const [edited] = (await AppDataSource.query(
+      `SELECT s.data FROM consultation_sections s JOIN consultations c ON c.id = s.consultation_id
+        WHERE c.appointment_id = $1 AND s.section_key = 'basic_info'`,
+      [appointmentId],
+    )) as { data: Record<string, unknown> }[];
+    expect(edited?.data).toMatchObject({ weightKg: 70 });
   });
 
   it('dry run saves nothing', async () => {
