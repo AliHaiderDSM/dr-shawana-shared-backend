@@ -61,12 +61,19 @@ const app = (id: number, date: string, from: string, to: string): (string | numb
   '2026-06-20 10:00:00',
 ];
 
-const OLD = [...dims, table('appointments', APP_COLS, [app(1, '2026-07-01', '10:00:00', '10:30:00')])].join('\n');
+const OLD = [
+  ...dims,
+  table('appointments', APP_COLS, [
+    app(1, '2026-07-01', '10:00:00', '10:30:00'),
+    app(3, '2026-07-07', '09:00:00', '09:30:00'),
+  ]),
+].join('\n');
 const NEW = [
   ...dims,
   table('appointments', APP_COLS, [
     app(1, '2026-07-05', '11:00:00', '11:30:00'),
     app(2, '2026-07-06', '12:00:00', '12:30:00'),
+    app(3, '2026-07-07', '09:00:00', '09:30:00'),
   ]),
 ].join('\n');
 
@@ -114,13 +121,23 @@ describe('resync appointments', () => {
        VALUES ($1,$2,$3,$4,'2026-07-01','10:00:00','10:30:00','physical','new',0,'booked')`,
       [existingAppt, branchId, patientId, doctorId],
     );
+    await AppDataSource.query(
+      `INSERT INTO appointments (branch_id, patient_id, doctor_id, date, time_from, time_to, mode, visit_type, fee, status, source_app_id)
+       VALUES ($1,$2,$3,'2026-07-08','15:00:00','15:30:00','online','followup',0,'completed','3')`,
+      [branchId, patientId, doctorId],
+    );
   });
 
   it('back-fills ids, updates rescheduled appointments and creates missing ones', async () => {
     const oldDump = await readDump(join(dir, 'old.sql'), POSSOFT_RESYNC_TABLES);
     const newDump = await readDump(join(dir, 'new.sql'), POSSOFT_RESYNC_TABLES);
     const summary = await resyncAppointments(AppDataSource, oldDump, newDump);
-    expect(summary).toMatchObject({ backfilled: 1, updated: 1, created: 1 });
+    expect(summary).toMatchObject({ backfilled: 1, updated: 1, unchanged: 1, created: 1 });
+
+    const [kept] = (await AppDataSource.query(
+      `SELECT to_char(date,'YYYY-MM-DD') AS d, status, mode FROM appointments WHERE source_app_id = '3'`,
+    )) as { d: string; status: string; mode: string }[];
+    expect(kept).toMatchObject({ d: '2026-07-08', status: 'completed', mode: 'online' });
 
     const [moved] = (await AppDataSource.query(
       `SELECT to_char(date,'YYYY-MM-DD') AS d, time_from::text AS t, source_app_id FROM appointments WHERE id = $1`,

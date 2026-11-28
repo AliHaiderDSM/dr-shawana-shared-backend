@@ -14,9 +14,41 @@ export const POSSOFT_RESYNC_TABLES = [
 export interface ResyncSummary {
   backfilled: number;
   updated: number;
+  unchanged: number;
   created: number;
   payments: number;
   skipped: { noDoctor: number };
+}
+
+const SYNCED_FIELDS = [
+  'app_pat_id',
+  'app_pat_city',
+  'app_doc_id',
+  'app_date',
+  'app_time_from',
+  'app_time_to',
+  'app_on_phy_status',
+  'app_on_phy_followup',
+  'app_status',
+  'app_remark',
+  'app_issues',
+  'app_received_amount',
+];
+
+function signatures(dump: DumpTables) {
+  const paid = new Map<string, string[]>();
+  for (const pay of dump.get('appointment_payments') ?? []) {
+    if (!isActive(pay)) continue;
+    const key = text(pay.appoint_id);
+    paid.set(key, [...(paid.get(key) ?? []), amount(pay.app_pay_amount).toFixed(2)]);
+  }
+  return new Map(
+    (dump.get('appointments') ?? []).map((row) => {
+      const id = text(row.app_id);
+      const fields = SYNCED_FIELDS.map((f) => text(row[f]));
+      return [id, JSON.stringify([fields, (paid.get(id) ?? []).sort()])] as const;
+    }),
+  );
 }
 
 class DryRunRollback extends Error {}
@@ -49,6 +81,7 @@ export async function resyncAppointments(
   const summary: ResyncSummary = {
     backfilled: 0,
     updated: 0,
+    unchanged: 0,
     created: 0,
     payments: 0,
     skipped: { noDoctor: 0 },
@@ -135,6 +168,9 @@ export async function resyncAppointments(
         summary.backfilled += 1;
       }
 
+      const before = signatures(oldDump);
+      const after = signatures(newDump);
+
       for (const appt of newDump.get('appointments') ?? []) {
         if (!isActive(appt)) continue;
         const doc = doctorMap.get(text(appt.app_doc_id));
@@ -161,6 +197,11 @@ export async function resyncAppointments(
         )) as { id: string }[];
 
         if (existing) {
+          const appId = text(appt.app_id);
+          if (before.get(appId) === after.get(appId)) {
+            summary.unchanged += 1;
+            continue;
+          }
           await em.query(
             `UPDATE appointments SET patient_id = $1, patient_city = $2, date = $3, time_from = $4,
                time_to = $5, mode = $6, visit_type = $7, status = $8, fee = $9,
@@ -233,7 +274,7 @@ export async function resyncAppointments(
       }
 
       report(
-        `back-filled ${summary.backfilled}, updated ${summary.updated}, created ${summary.created}`,
+        `back-filled ${summary.backfilled}, updated ${summary.updated}, unchanged ${summary.unchanged}, created ${summary.created}`,
       );
       if (options.dryRun) throw new DryRunRollback();
     });
