@@ -29,6 +29,7 @@ const DUMP = [
       [101, 4, '2026-11-16 11:12:00', 1],
       [102, 7, '2026-10-23 12:18:00', 1],
       [103, 99, '2026-10-01 09:00:00', 1],
+      [104, 7, '2026-09-05 17:45:00', 1],
     ],
   ),
 ].join('\n');
@@ -79,12 +80,13 @@ describe('backfill posSoft entered by', () => {
     await appt('101', '10:00:00', null);
     await appt('102', '11:00:00', staffId);
     await appt('103', '12:00:00', null);
+    await appt('104', '13:00:00', null);
   });
 
   it('fills the posSoft entry name and time on imported appointments only', async () => {
     const dump = await readDump(join(dir, 'dump.sql'), POSSOFT_ENTERED_BY_TABLES);
     const dry = await backfillEnteredBy(AppDataSource, dump, { dryRun: true });
-    expect(dry).toMatchObject({ appointments: 3, updated: 2, withoutUser: 1 });
+    expect(dry).toMatchObject({ appointments: 4, updated: 3, withoutUser: 1 });
     const [untouched] = (await AppDataSource.query(
       `SELECT entered_by_name FROM appointments WHERE source_app_id = '101'`,
     )) as { entered_by_name: string | null }[];
@@ -99,5 +101,6 @@ describe('backfill posSoft entered by', () => {
     expect(rows[0]).toMatchObject({ id: '101', name: 'Amna Rafique', at: '2026-11-16 11:12' });
     expect(rows[1]?.name).toBeNull();
     expect(rows[2]).toMatchObject({ id: '103', name: null, at: '2026-10-01 09:00' });
+    expect(rows[3]).toMatchObject({ id: '104', name: 'Zainab Yaseen', at: '2026-09-05 17:45' });
   });
 });

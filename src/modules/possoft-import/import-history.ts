@@ -170,14 +170,16 @@ export async function importPossoftHistory(
         await insertSections(em, summary, existingId, matched.branchId, mapped.sections);
       }
 
-      const aligned = (await em.query(
-        `UPDATE consultations c SET status = 'open', updated_at = now()
-           FROM appointments a
-          WHERE c.appointment_id = a.id AND c.deleted_at IS NULL
-            AND c.status = 'completed' AND a.status <> 'completed'
-        RETURNING c.id`,
-      )) as { id: string }[];
-      summary.statusAligned = aligned.length;
+      const [aligned] = (await em.query(
+        `WITH changed AS (
+           UPDATE consultations c SET status = 'open', updated_at = now()
+             FROM appointments a
+            WHERE c.appointment_id = a.id AND c.deleted_at IS NULL
+              AND c.status = 'completed' AND a.status <> 'completed'
+           RETURNING 1)
+         SELECT count(*)::int AS count FROM changed`,
+      )) as { count: number }[];
+      summary.statusAligned = aligned?.count ?? 0;
 
       summary.patientsCreated = patients.created;
       if (options.dryRun) throw new DryRunRollback();

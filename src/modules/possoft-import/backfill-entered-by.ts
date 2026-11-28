@@ -35,16 +35,18 @@ export async function backfillEnteredBy(
 
   try {
     await source.transaction(async (em) => {
-      const updated = (await em.query(
-        `UPDATE appointments a
-            SET entered_by_name = coalesce(v.name, a.entered_by_name),
-                created_at = coalesce(v.at, a.created_at)
-           FROM unnest($1::text[], $2::text[], $3::timestamptz[]) AS v(app_id, name, at)
-          WHERE a.source_app_id = v.app_id AND a.created_by IS NULL AND a.deleted_at IS NULL
-        RETURNING a.id`,
+      const [result] = (await em.query(
+        `WITH changed AS (
+           UPDATE appointments a
+              SET entered_by_name = coalesce(v.name, a.entered_by_name),
+                  created_at = coalesce(v.at, a.created_at)
+             FROM unnest($1::text[], $2::text[], $3::timestamptz[]) AS v(app_id, name, at)
+            WHERE a.source_app_id = v.app_id AND a.created_by IS NULL AND a.deleted_at IS NULL
+           RETURNING 1)
+         SELECT count(*)::int AS count FROM changed`,
         [appIds, names, times],
-      )) as { id: string }[];
-      summary.updated = updated.length;
+      )) as { count: number }[];
+      summary.updated = result?.count ?? 0;
       if (options.dryRun) throw new DryRunRollback();
     });
   } catch (error) {

@@ -159,6 +159,7 @@ describe('posSoft intake history import', () => {
     const summary = await importPossoftHistory(AppDataSource, dump);
     expect(summary).toMatchObject({
       consultations: 1,
+      statusAligned: 0,
       skipped: { appointmentNotMatched: 0, noAppointmentRow: 0 },
     });
     expect(summary.sectionsByKey).toMatchObject({
