@@ -1,7 +1,7 @@
 import type { DataSource } from 'typeorm';
 import type { DumpRow, DumpTables } from './dump-reader';
 import { PatientResolver } from './patient-resolver';
-import { amount, dateOf, isActive, money, text } from './possoft-values';
+import { amount, dateOf, enteredByNames, isActive, money, text, timestampOf } from './possoft-values';
 
 export const POSSOFT_RESYNC_TABLES = [
   'doctors',
@@ -9,6 +9,7 @@ export const POSSOFT_RESYNC_TABLES = [
   'appointment_payments',
   'customers',
   'accounts_sheet',
+  'wt_users',
 ];
 
 export interface ResyncSummary {
@@ -168,6 +169,7 @@ export async function resyncAppointments(
         summary.backfilled += 1;
       }
 
+      const enteredBy = enteredByNames(newDump.get('wt_users') ?? []);
       const before = signatures(oldDump);
       const after = signatures(newDump);
 
@@ -227,8 +229,8 @@ export async function resyncAppointments(
 
         const [created] = (await em.query(
           `INSERT INTO appointments (branch_id, patient_id, patient_city, doctor_id, date, time_from, time_to,
-             mode, visit_type, issues, fee, remark, status, source_app_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+             mode, visit_type, issues, fee, remark, status, source_app_id, entered_by_name, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
           [
             doc.branchId,
             patientId,
@@ -244,6 +246,8 @@ export async function resyncAppointments(
             text(appt.app_remark) || null,
             statusOf(appt),
             text(appt.app_id),
+            enteredBy(appt.entry_by),
+            timestampOf(appt.crt_date) ?? `${date}T12:00:00+05:00`,
           ],
         )) as { id: string }[];
         summary.created += 1;

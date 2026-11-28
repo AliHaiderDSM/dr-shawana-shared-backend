@@ -8,6 +8,7 @@ import {
   amount,
   byId,
   dateOf,
+  enteredByNames,
   groupBy,
   insertMany,
   isActive,
@@ -24,6 +25,7 @@ export const POSSOFT_CLINICAL_TABLES = [
   'customers',
   'banks',
   'accounts_sheet',
+  'wt_users',
 ];
 
 const NO_ACCOUNT_CHOSEN = 'posSoft: no account chosen';
@@ -120,6 +122,7 @@ export async function importPossoftClinical(
   const customers = byId(rows('customers'), 'cust_id');
   const posSheets = byId(rows('accounts_sheet'), 'as_id');
   const paymentsByAppt = groupBy(rows('appointment_payments'), 'appoint_id');
+  const enteredBy = enteredByNames(rows('wt_users'));
 
   try {
     await source.transaction(async (em) => {
@@ -339,6 +342,7 @@ export async function importPossoftClinical(
           status,
           createdAt,
           apptId,
+          enteredBy(appt.entry_by),
         ]);
         apptIds.set(apptId, id);
         for (const pay of payList) {
@@ -386,6 +390,7 @@ export async function importPossoftClinical(
           'status',
           'created_at',
           'source_app_id',
+          'entered_by_name',
         ],
         apptRows,
       );

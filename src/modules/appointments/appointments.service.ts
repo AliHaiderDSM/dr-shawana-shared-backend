@@ -265,7 +265,7 @@ export const appointmentsService = {
     return {
       items: items.map((i) => ({
         ...toAppointmentDto(i, paid.get(i.id)),
-        createdByName: i.createdBy ? (creatorName.get(i.createdBy) ?? null) : null,
+        createdByName: (i.createdBy ? creatorName.get(i.createdBy) : undefined) ?? i.enteredByName ?? null,
       })),
       meta,
     };
@@ -323,7 +323,7 @@ export const appointmentsService = {
           visitType: a.visitType,
           fee: toMoney(a.fee),
           createdAt: a.createdAt,
-          createdByName: a.createdBy ? (creatorName.get(a.createdBy) ?? null) : null,
+          createdByName: (a.createdBy ? creatorName.get(a.createdBy) : undefined) ?? a.enteredByName ?? null,
           patient: a.patient
             ? { id: a.patient.id, name: a.patient.name, phone: a.patient.phone, city: a.patient.city }
             : null,

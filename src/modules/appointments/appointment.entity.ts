@@ -38,6 +38,9 @@ export class Appointment extends BranchScopedEntity {
   @Column({ name: 'source_app_id', type: 'varchar', length: 20, nullable: true })
   sourceAppId: string | null;
 
+  @Column({ name: 'entered_by_name', type: 'varchar', length: 150, nullable: true })
+  enteredByName: string | null;
+
   @Column({
     name: 'appointment_no',
     type: 'integer',

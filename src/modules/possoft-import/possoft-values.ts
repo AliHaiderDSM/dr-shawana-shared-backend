@@ -67,6 +67,15 @@ export function byId(rows: DumpRow[], key: string) {
   return map;
 }
 
+export function enteredByNames(users: DumpRow[]) {
+  const names = new Map<string, string>();
+  for (const user of users) {
+    const name = `${text(user.fname)} ${text(user.lname)}`.trim();
+    if (name) names.set(text(user.wt_id), name.slice(0, 150));
+  }
+  return (entryBy: string | null | undefined) => names.get(text(entryBy)) ?? null;
+}
+
 export function groupBy(rows: DumpRow[], key: string) {
   const map = new Map<string, DumpRow[]>();
   for (const row of rows) {
